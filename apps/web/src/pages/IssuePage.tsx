@@ -7,6 +7,7 @@ import { ErrorNote } from "../components/ErrorNote";
 import { priorityLabel, statusLabel } from "../format";
 import { extraIssue } from "../issueSlots";
 import { useOpenChanges } from "../review/review";
+import { revealAboveBar } from "../review/reveal";
 
 export function IssuePage() {
   const { key = "" } = useParams();
@@ -22,13 +23,10 @@ export function IssuePage() {
   const pendingClass = (field: string) => (pendingByField.has(field) ? ` pending-field${pendingByField.get(field)!.state === "conflicted" ? " conflicted" : ""}` : "");
   useEffect(() => {
     if (!changeParam) return;
-    const el = document.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
+    const el = document.querySelector<HTMLElement>(`label[data-change-id="${CSS.escape(changeParam)}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
     if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-    el.classList.remove("flash");
-    void el.offsetWidth;
-    el.classList.add("flash");
+    requestAnimationFrame(() => revealAboveBar(el));
   }, [changeParam, issue.dataUpdatedAt, pendingByField.size]);
 
   const refreshAfterSave = (saved: IssueView) => {

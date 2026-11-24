@@ -111,9 +111,9 @@ function Shell() {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:key" element={<ProjectPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
-              <Route path="/calendar" element={<PlaceholderPage title="Calendar" body="The calendar arrives in slice B3, which Hein owns. Due dates you set on issues are already stored for it." />} />
-              <Route path="/notifications" element={<PlaceholderPage title="Notifications" body="Reminders arrive in slice B4. A due date awaiting review never triggers a reminder." />} />
-              <Route path="/settings" element={<PlaceholderPage title="Settings" body="AI provider profiles arrive in slice C. Notes and projects never need a key." />} />
+              <Route path="/calendar" element={<PlaceholderPage title="Calendar" body="The calendar is not available yet. Due dates you set on issues are already saved." />} />
+              <Route path="/notifications" element={<PlaceholderPage title="Notifications" body="Reminders are not available yet. A due date that is still awaiting review will never trigger a reminder." />} />
+              <Route path="/settings" element={<PlaceholderPage title="Settings" body="AI providers cannot be set up in this version yet. Notes and projects never need a key." />} />
               <Route path="*" element={<PlaceholderPage title="Not found" body="This page does not exist." />} />
             </Routes>
           )}

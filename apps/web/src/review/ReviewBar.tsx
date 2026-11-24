@@ -12,7 +12,19 @@ export function ReviewBar() {
   const navigate = useNavigate();
   const [reason, setReason] = useState("");
   const feedbackInput = useRef<HTMLTextAreaElement>(null);
+  const barRef = useRef<HTMLElement>(null);
   useEffect(() => { if (feedbackFor) feedbackInput.current?.focus(); }, [feedbackFor]);
+  // Publish the bar height so pages reserve space beneath their content for it.
+  useEffect(() => {
+    const el = barRef.current;
+    const root = document.documentElement;
+    if (!el) { root.style.setProperty("--review-bar-h", "0px"); return; }
+    const update = () => root.style.setProperty("--review-bar-h", `${Math.ceil(el.getBoundingClientRect().height)}px`);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.setProperty("--review-bar-h", "0px"); };
+  });
 
   if (changes.length === 0 && !feedbackFor && !message && incomplete.length === 0) return null;
   const focused = new URLSearchParams(location.search).get("change");
@@ -27,13 +39,13 @@ export function ReviewBar() {
   };
 
   return (
-    <section className="review-bar" role="region" aria-label="Changes awaiting review">
+    <section className="review-bar" role="region" aria-label="Changes awaiting review" ref={barRef}>
       {current ? (
         <div className="review-main">
           <p className="review-source">{current.sourceLabel}</p>
           <p className="review-status">
             <strong>Change {index + 1} of {changes.length}</strong>
-            <span> · {current.summary}</span>
+            <span className="review-summary"> · {current.summary}</span>
             {current.state === "prepared" ? <span className="conflict-tag"> · Not written: {current.fileError ?? "the write did not happen"}</span> : null}
             {current.state === "conflicted" ? <span className="conflict-tag"> · Conflict: {current.conflictReason === "ambiguous" ? "the text appears more than once" : "the text was edited after the change"}</span> : null}
           </p>

@@ -91,7 +91,7 @@ export function useReviewActions() {
   });
   const feedback = useMutation({
     mutationFn: ({ change, text }: { change: ChangeView; text: string }) => api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/feedback`, { text }),
-    onSuccess: () => setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change. AI corrections arrive in slice D." }),
+    onSuccess: () => setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change." }),
   });
   const runAction = useMutation({
     mutationFn: ({ runId, action }: { runId: string; action: "retry" | "discard" }) => api.post<RunOutcome>(`/review/runs/${encodeURIComponent(runId)}/${action}`),

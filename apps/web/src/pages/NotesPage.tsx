@@ -9,6 +9,7 @@ import { extraNotes } from "../noteSlots";
 import { useOpenChanges } from "../review/review";
 import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
+import { revealAboveBar } from "../review/reveal";
 
 /** Workspace identity that scopes drafts; "none" before a workspace is known. */
 function useWorkspaceId(): string {
@@ -26,7 +27,7 @@ export function NotesPage() {
   const withDrafts = new Set(drafts.paths(wsId));
 
   return (
-    <div className="notes-layout">
+    <div className={path ? "notes-layout has-note" : "notes-layout"}>
       <aside className="note-list" aria-label="Notes">
         <h1 className="section-title">Notes</h1>
         <NoteSearch />
@@ -165,11 +166,8 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
     if (mode !== "preview" || !changeParam) return;
     const el = previewRef.current?.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
     if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-    el.classList.remove("flash");
-    void el.offsetWidth;
-    el.classList.add("flash");
+    // Wait a frame so the review bar has its final height before measuring.
+    requestAnimationFrame(() => revealAboveBar(el));
   }, [changeParam, mode, note.dataUpdatedAt, pendingBlocks.length]);
 
   useEffect(() => {

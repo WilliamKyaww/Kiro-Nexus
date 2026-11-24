@@ -59,7 +59,6 @@ export function ProjectPage() {
     <section className="page" aria-labelledby="project-h">
       <p className="path"><Link to="/projects">Projects</Link> / {key}</p>
       <h1 id="project-h">{project ? `${project.key} ${project.name}` : key}</h1>
-      <p className="muted">A simple list for now. Hein's board view (slice B3) will replace it.</p>
       <form className="inline-form" onSubmit={(e) => { e.preventDefault(); create.mutate(); }} aria-label="Create an issue">
         <label>New issue<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Write the judge instructions" required /></label>
         <button type="submit" disabled={create.isPending || !project}>Create issue</button>
