@@ -10,6 +10,7 @@
 //   nexus-test-double-none        supports neither tools nor structured output (400)
 //   nexus-test-double-unsure      always answers "insufficient evidence"
 //   nexus-test-double-nocite      cites the note but never the issue records
+//   nexus-test-double-echo        echoes the key in error messages (tool probe and questions)
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -173,7 +174,15 @@ export function startProviderDouble(port = 0) {
       if (!auth.startsWith("Bearer ") || auth === "Bearer invalid-key" || model.endsWith("-401")) return send(401, { error: { message: "Invalid API key provided.", type: "invalid_request_error" } });
       if (model.endsWith("-429")) return send(429, { error: { message: "Rate limit reached for requests.", type: "rate_limit" } }, { "retry-after": "0" });
       const respond = () => { const r = handleChat(body); send(r.status, r.body); };
-      const isProbe = (Array.isArray(body.tools) && body.tools.some((t) => t.function?.name === "ping")) || body.response_format?.json_schema?.name === "probe";
+      const isToolProbe = Array.isArray(body.tools) && body.tools.some((t) => t.function?.name === "ping");
+      const isProbe = isToolProbe || body.response_format?.json_schema?.name === "probe";
+      if (model.endsWith("-echo") && !(isProbe && !isToolProbe)) {
+        // Like some real providers, echo the credential back in an error message: the whole
+        // key for the tool probe (a non-fatal 400), and a long fragment for a real question.
+        const token = auth.slice("Bearer ".length);
+        const echoed = isToolProbe ? token : `${token.slice(0, 16)}…`;
+        return send(400, { error: { message: `Tools are not enabled for key ${echoed}.\u001b[31m\nCheck your plan.`, type: "invalid_request_error" } });
+      }
       if (model.endsWith("-slow") && !isProbe) setTimeout(respond, 20_000); else respond();
     });
   });

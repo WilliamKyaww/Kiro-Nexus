@@ -120,8 +120,14 @@ endpoint. Base URLs must use HTTPS; plain HTTP is allowed only for
 memory for the session only. The desktop app encrypts the key with Windows
 protection (`safeStorage`), outside the workspace. Free plans may use what
 you send for training, so use the fictional sample until you are happy
-with that. `docs/judge-ai-route.md` describes a scripted live check
-(`npm run live:check`) and the routes proposed for judges.
+with that. `docs/judge-ai-route.md` describes a scripted live check and
+the routes proposed for judges. Run `npm run build`, then
+`npm run live:check`, and paste the key when asked. The prompt masks the
+key, so it never appears on screen, in shell history or in an
+environment variable. Never type a key into a command line.
+
+Nexus removes keys, fragments of keys and key-shaped strings from provider
+error messages before it shows, logs or saves them.
 
 ## Your own workspace
 

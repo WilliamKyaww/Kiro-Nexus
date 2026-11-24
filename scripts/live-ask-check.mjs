@@ -3,12 +3,18 @@
 // system temp folder, so no real notes leave the machine.
 //
 //   npm run build
-//   npm run live:check
+//   npm run live:check        then paste the key at the masked prompt
+//
+// The key is read at a prompt that echoes "*", so it never appears on screen, in shell
+// history or in an environment variable. It is sent to the disposable service over its
+// API and from there only to the provider. Both processes exit and the temporary profile
+// is deleted at the end; reports and console output are sanitised.
 //
 // Optional settings (environment variables):
 //   NEXUS_LIVE_BASE_URL   default https://api.groq.com/openai/v1
 //   NEXUS_LIVE_MODEL      default openai/gpt-oss-20b
-//   NEXUS_LIVE_KEY        the key, for non-interactive runs only
+//   NEXUS_LIVE_KEY        the key, for automated runs only (tests); removed from the
+//                         environment at once and never passed to the service process
 //   NEXUS_LIVE_OUT_DIR    where the report goes (default .tmp/live-check)
 //   NEXUS_LIVE_ANSWER_TIMEOUT_MS  how long to wait for the answer (default 240000)
 //
@@ -23,6 +29,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
+import { redactSecrets, sanitiseDeep, sanitiseDiagnostic } from "../server/src/providers/sanitise.mjs";
 import { repoRoot } from "./launcher-lib.mjs";
 
 export const EXIT = { pass: 0, checkFailed: 1, setup: 2, auth: 3, timeout: 4, unsupported: 5, fixture: 6, provider: 7 };
@@ -63,16 +70,69 @@ export function evaluateAnswer(message, { actionsHeadingExists, nex1Exists }) {
   return checks;
 }
 
-/** Remove the key before anything is shown or saved. */
+/** Remove the key, fragments of it and key-shaped strings, keeping the layout. */
 export function sanitiseReport(text, keys) {
-  let out = String(text);
-  for (const key of keys.filter((k) => k && k.length >= 6)) out = out.split(key).join("[redacted key]");
-  return out;
+  return redactSecrets(text, keys);
+}
+
+/**
+ * Read a line from a terminal without showing it: each character echoes as "*".
+ * Returns null when the input is not a terminal. Raw mode is always restored.
+ */
+export function promptHidden(question, input = process.stdin, output = process.stdout) {
+  if (!input.isTTY || typeof input.setRawMode !== "function") return Promise.resolve(null);
+  output.write(question);
+  return new Promise((resolve) => {
+    let value = "";
+    const finish = (result) => {
+      input.off("data", onData);
+      input.setRawMode(false);
+      input.pause();
+      output.write("\n");
+      resolve(result);
+    };
+    const onData = (chunk) => {
+      const raw = String(chunk);
+      if (raw === "\u001b") return finish(null); // Esc on its own: give up
+      // Drop bracketed-paste markers and cursor keys rather than treating them as input.
+      const text = raw.replace(/\u001b\[[0-9;]*[A-Za-z~]/g, "");
+      for (const ch of text) {
+        if (ch === "\r" || ch === "\n") return finish(value);
+        if (ch === "\u0003") return finish(null); // Ctrl+C: give up
+        if (ch === "\u007f" || ch === "\b") {
+          if (value) { value = value.slice(0, -1); output.write("\b \b"); }
+          continue;
+        }
+        if (ch < " ") continue;
+        value += ch;
+        output.write("*");
+      }
+    };
+    input.setRawMode(true);
+    input.setEncoding?.("utf8");
+    input.on("data", onData);
+    input.resume();
+  });
+}
+
+let activeKey = "";
+/** Console output passes through the same sanitiser as the report. */
+const say = (line) => console.log(sanitiseDiagnostic(line, { keys: [activeKey], max: 2000 }));
+
+async function readKey() {
+  // A key in the environment works for automation, but is removed at once so that the
+  // service child process and anything else started from here never inherit it.
+  const fromEnv = process.env.NEXUS_LIVE_KEY?.trim();
+  delete process.env.NEXUS_LIVE_KEY;
+  if (fromEnv) return fromEnv;
+  const typed = await promptHidden("Paste your provider key (it is not shown, saved or logged), then press Enter: ");
+  return typed?.trim() || null;
 }
 
 async function main() {
-  const key = process.env.NEXUS_LIVE_KEY?.trim();
-  if (!key) throw new CheckError(EXIT.setup, "Set NEXUS_LIVE_KEY for this command only. Nothing was sent.");
+  const key = await readKey();
+  activeKey = key ?? "";
+  if (!key) throw new CheckError(EXIT.setup, "No key was given. Run npm run live:check in a terminal and paste the key when asked. Nothing was sent.");
   const baseUrl = process.env.NEXUS_LIVE_BASE_URL ?? "https://api.groq.com/openai/v1";
   const model = process.env.NEXUS_LIVE_MODEL ?? "openai/gpt-oss-20b";
   const answerTimeoutMs = Number(process.env.NEXUS_LIVE_ANSWER_TIMEOUT_MS ?? 240_000);
@@ -113,7 +173,9 @@ async function main() {
     const ws = join(base, "ws");
     const profile = join(base, "profile");
     await cp(join(repoRoot, "samples", "meeting-workspace"), ws, { recursive: true });
-    child = spawn(process.execPath, [bundle, "--profile", profile, "--workspace", ws], { stdio: ["ignore", "pipe", "pipe"] });
+    const env = { ...process.env };
+    delete env.NEXUS_LIVE_KEY; // the service gets the key over its API, never through its environment
+    child = spawn(process.execPath, [bundle, "--profile", profile, "--workspace", ws], { stdio: ["ignore", "pipe", "pipe"], env });
     report.servicePid = child.pid;
     child.stderr.resume(); // service logs stay in the disposable profile
     port = await new Promise((resolve, reject) => {
@@ -173,7 +235,7 @@ async function main() {
     const caps = tested?.profile?.capabilities;
     if (!caps) throw new CheckError(EXIT.setup, "The provider test returned no capabilities.");
     report.capabilities = caps;
-    console.log(`Capabilities: tool calling ${caps.toolCalling}, structured output ${caps.structuredOutput}${caps.detail ? ` (${caps.detail})` : ""}`);
+    say(`Capabilities: tool calling ${caps.toolCalling}, structured output ${caps.structuredOutput}${caps.detail ? ` (${caps.detail})` : ""}`);
     let fixture = caps.fixture === true || /^nexus-test-double/.test(model);
     if (caps.toolCalling !== "yes" && caps.structuredOutput !== "yes") {
       if (caps.toolCalling === "error" || caps.structuredOutput === "error") {
@@ -208,7 +270,7 @@ async function main() {
     const actionsHeadingExists = (note?.headings ?? []).some((h) => h.slug === "actions");
     const nex1Exists = await api("GET", "/issues/NEX-1").then(() => true, () => false);
     report.checks = evaluateAnswer(message, { actionsHeadingExists, nex1Exists });
-    for (const c of report.checks) console.log(`${c.ok ? "PASS" : "FAIL"}  ${c.name}${c.ok ? "" : `: ${c.detail}`}`);
+    for (const c of report.checks) say(`${c.ok ? "PASS" : "FAIL"}  ${c.name}${c.ok ? "" : `: ${c.detail}`}`);
     const failed = report.checks.filter((c) => !c.ok);
     if (failed.length) throw new CheckError(EXIT.checkFailed, `${failed.length} answer check${failed.length === 1 ? "" : "s"} failed.`);
     if (fixture) throw new CheckError(EXIT.fixture, "The transport and checks worked, but the provider is the local test double, which is a fixture and never counts as a live pass.");
@@ -227,19 +289,19 @@ async function main() {
     if (base) await rm(base, { recursive: true, force: true }).catch(() => undefined);
   }
 
-  const safe = (v) => sanitiseReport(typeof v === "string" ? v : JSON.stringify(v, null, 2), [key ?? ""]);
+  // Every string in the report is sanitised value by value, so the JSON stays valid.
   await mkdir(outDir, { recursive: true });
   const file = join(outDir, `live-check-${report.date.replace(/[:.]/g, "-")}.json`);
-  await writeFile(file, safe(report) + "\n");
-  console.log(safe(`Result: ${report.verdict} (exit ${report.exitCode}).${report.error ? ` ${report.error}` : ""}`));
-  console.log(`Report saved to ${file}.`);
-  if (report.exitCode === EXIT.pass) console.log("Record the provider, model, date and capabilities in docs/judge-ai-route.md and STATE.md, then close Q1.");
+  await writeFile(file, JSON.stringify(sanitiseDeep(report, { keys: [key], max: 4000 }), null, 2) + "\n");
+  say(`Result: ${report.verdict} (exit ${report.exitCode}).${report.error ? ` ${report.error}` : ""}`);
+  say(`Report saved to ${file}.`);
+  if (report.exitCode === EXIT.pass) say("Record the provider, model, date and capabilities in docs/judge-ai-route.md and STATE.md, then close Q1.");
   return report.exitCode;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().then((code) => { process.exitCode = code; }, (e) => {
-    const text = sanitiseReport(String(e?.message ?? e), [process.env.NEXUS_LIVE_KEY ?? ""]);
+    const text = sanitiseDiagnostic(String(e?.message ?? e), { keys: [activeKey], max: 2000 });
     console.error(e instanceof CheckError ? text : `live check crashed: ${text}`);
     process.exitCode = e instanceof CheckError ? e.exit : EXIT.setup;
   });

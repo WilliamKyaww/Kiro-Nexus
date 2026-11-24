@@ -63,7 +63,7 @@ describe("live-check CLI against the local fixture", () => {
     ["an answer that takes too long", { NEXUS_LIVE_MODEL: "nexus-test-double-slow", NEXUS_LIVE_ANSWER_TIMEOUT_MS: "1500" }, EXIT.timeout, /No answer within 2 s/],
     ["an insufficient-evidence answer", { NEXUS_LIVE_MODEL: "nexus-test-double-unsure" }, EXIT.checkFailed, /answer checks? failed/],
     ["an answer without the NEX-1 citation", { NEXUS_LIVE_MODEL: "nexus-test-double-nocite" }, EXIT.checkFailed, /answer checks? failed/],
-    ["a missing key", { NEXUS_LIVE_KEY: "" }, EXIT.setup, /Set NEXUS_LIVE_KEY/],
+    ["a missing key and no terminal to ask in", { NEXUS_LIVE_KEY: "" }, EXIT.setup, /No key was given/],
   ])("fails with a distinct status for %s", async (_name, env, exit, message) => {
     const r = await runCli(env);
     expect(r.code).toBe(exit);

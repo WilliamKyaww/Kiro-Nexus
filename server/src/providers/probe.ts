@@ -1,6 +1,7 @@
 // Probe tool calling and structured output separately (PRD-075).
 import type { ProviderProfile } from "./profiles";
 import { ProviderError, chat } from "./openai";
+import { sanitiseDiagnostic } from "./sanitise.mjs";
 
 type Cap = ProviderProfile["capabilities"];
 
@@ -59,5 +60,5 @@ export async function probeProfile(profile: ProviderProfile, key: string, signal
   const [first, second] = failures;
   if (first && second && first.kind === second.kind && ["timeout", "network", "rate_limit"].includes(first.kind)) throw first;
 
-  return { toolCalling, structuredOutput, testedAt: new Date().toISOString(), detail: notes.join(" ").slice(0, 400) || null, fixture };
+  return { toolCalling, structuredOutput, testedAt: new Date().toISOString(), detail: sanitiseDiagnostic(notes.join(" "), { keys: [key], max: 400 }) || null, fixture };
 }

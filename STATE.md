@@ -125,10 +125,9 @@ test double. **No human has reviewed this run yet.**
 
 1. **Will: run the live check** with a free Groq key (steps in
    `docs/judge-ai-route.md`):
-   `npm run build`, then
-   `$env:NEXUS_LIVE_KEY = "<your key>"; npm run live:check; Remove-Item Env:NEXUS_LIVE_KEY`.
-   The result is written to `.tmp/live-check/`, with the key redacted.
-   Close Q1 only if the answer cites the Actions heading and NEX-1.
+   `npm run build`, then `npm run live:check`, and paste the key at the
+   masked prompt. The result is written to `.tmp/live-check/`, sanitised.
+   Close Q1 only on exit 0 (a live pass).
 2. **Will: decide Q5**, the judge route (PRD-091). The deadline in the PRD
    is 1 December.
 3. **Register Playwright MCP in Kiro.** Kiro's policy blocks agent writes to

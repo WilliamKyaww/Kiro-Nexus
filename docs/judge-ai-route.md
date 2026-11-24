@@ -20,21 +20,49 @@
 
 1. Create a free key at <https://console.groq.com/keys>. No card is needed
    for the free plan.
-2. In the Nexus folder, run:
+2. In the Nexus folder, in a PowerShell window, run:
 
    ```powershell
    npm run build
-   $env:NEXUS_LIVE_KEY = "<your key>"; npm run live:check; Remove-Item Env:NEXUS_LIVE_KEY
+   npm run live:check
    ```
 
-3. The script works on a disposable copy of the fictional sample:
-   1. It probes tool calling and structured output.
-   2. It asks "Which action from the kickoff still has no issue?"
-   3. It writes the result, with the key redacted, to
+3. When asked, paste the key and press Enter. The prompt shows `*` for
+   each character, so the key never appears on screen, in your PowerShell
+   history or in an environment variable. Esc or Ctrl+C cancels without
+   sending anything.
+4. The script works on a disposable copy of the fictional sample:
+   1. It starts a separate Nexus service with a temporary profile. The
+      key goes to that service over its local API, and from there only to
+      the provider.
+   2. It probes tool calling and structured output.
+   3. It asks "Which action from the kickoff still has no issue?"
+   4. It checks the answer: a recorded fact must name "Will writes the
+      judge instructions" as having no issue and cite the kickoff's
+      Actions heading, and a fact or discrepancy must cite NEX-1 for the
+      calendar work. Both citation targets must exist.
+   5. It stops the service and deletes the temporary profile, whatever
+      the outcome. The key, any fragment of it and key-shaped strings are
+      removed from the console output and from the report in
       `.tmp/live-check/`.
-4. Record the provider, model, date and observed capabilities here and in
-   `STATE.md`, and close Q1 if the answer cites the Actions heading and
-   NEX-1.
+5. Read the result line and the exit status:
+
+   | Exit | Meaning |
+   | --- | --- |
+   | 0 | Live pass |
+   | 1 | The answer failed a check (for example insufficient evidence or a missing citation) |
+   | 2 | Set-up problem (no key given, service not built, unexpected HTTP response) |
+   | 3 | The provider rejected the key |
+   | 4 | Timed out |
+   | 5 | The model showed neither tool calling nor structured output |
+   | 6 | The local test double answered: a fixture never counts as a live pass |
+   | 7 | Other provider error |
+
+6. Only on exit 0, record the provider, model, date and observed
+   capabilities here and in `STATE.md`, and close Q1.
+
+Optional: set `NEXUS_LIVE_MODEL` or `NEXUS_LIVE_BASE_URL` before the
+command to try another model or route.
 
 You can also run the check in the UI:
 

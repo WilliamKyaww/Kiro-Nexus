@@ -2,3 +2,4 @@ export const EXIT: { pass: 0; checkFailed: 1; setup: 2; auth: 3; timeout: 4; uns
 export interface LiveCheck { name: string; ok: boolean; detail: string }
 export function evaluateAnswer(message: unknown, opts: { actionsHeadingExists: boolean; nex1Exists: boolean }): LiveCheck[];
 export function sanitiseReport(text: string, keys: string[]): string;
+export function promptHidden(question: string, input?: NodeJS.ReadableStream & { isTTY?: boolean; setRawMode?: (on: boolean) => void }, output?: NodeJS.WritableStream): Promise<string | null>;

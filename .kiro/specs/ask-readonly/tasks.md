@@ -141,3 +141,27 @@ acceptance condition has been seen to pass.
       rejected key, a model with neither capability, a slow answer, an
       insufficient-evidence answer, an answer without the NEX-1 citation
       and a missing key each give their own status. Q1 stays open.
+  - [x] 6.2 Provider diagnostics are sanitised, and the key is entered at a masked prompt
+    - **Defect, reproduced by Kiro on `e61a3d4`:** a provider that echoed
+      the bearer key in a non-fatal probe error (double variant `-echo`)
+      had it copied into the profile's `detail`. The key was saved in
+      `providers.json`, returned by `GET /providers` and printed by the
+      live check. The runbook told Will to type the key into a PowerShell
+      command, which puts it in the shell history.
+    - **Fix:** one shared sanitiser (`server/src/providers/sanitise.mjs`)
+      removes known keys, any run of 8 or more characters copied from one,
+      key-shaped strings, bearer tokens and key query parameters. It also
+      strips control and bidirectional characters, and caps the length.
+      It is applied at the source (the adapter's provider message), to probe
+      details before they are saved and again on output, to provider errors
+      in conversations, to every service log line, and to the live-check
+      console output and report. The live check now asks for the key at a
+      masked prompt. A key from the environment is removed at once and is
+      never passed to the service process.
+    - **Verified by Kiro:** `sanitise.test.ts` uses a synthetic sentinel
+      key. The HTTP responses, `providers.json`, `service.log`, the
+      conversation file, stderr, the CLI report and the CLI output contain
+      neither the sentinel nor a 16-character fragment of it. The prompt
+      echoes only `*`, handles backspace, paste markers and Ctrl+C, and
+      restores the terminal. These prompt tests use a simulated terminal;
+      a real console was not driven.

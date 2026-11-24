@@ -1,4 +1,6 @@
 // One OpenAI-compatible chat-completions adapter (PRD-074, PRD-075).
+import { sanitiseDiagnostic } from "./sanitise.mjs";
+
 export type ProviderErrorKind = "auth" | "rate_limit" | "timeout" | "cancelled" | "network" | "http" | "bad_response";
 
 export class ProviderError extends Error {
@@ -40,9 +42,10 @@ const sleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, 
   signal?.addEventListener("abort", () => { clearTimeout(t); reject(new ProviderError("cancelled", "Cancelled.")); }, { once: true });
 });
 
-function providerMessage(body: unknown): string {
+/** The provider's own error text, sanitised at the source: it may echo the key. */
+function providerMessage(body: unknown, key: string): string {
   const msg = (body as { error?: { message?: unknown } })?.error?.message;
-  return typeof msg === "string" ? msg.slice(0, 300) : "";
+  return typeof msg === "string" ? sanitiseDiagnostic(msg, { keys: [key], max: 300 }) : "";
 }
 
 export async function chat(req: ChatRequest): Promise<ChatResult> {
@@ -80,13 +83,14 @@ export async function chat(req: ChatRequest): Promise<ChatResult> {
       const text = await res.text();
       let body: unknown = null;
       try { body = text ? JSON.parse(text) : null; } catch { body = null; }
-      if (res.status === 401 || res.status === 403) throw new ProviderError("auth", `The provider rejected the key${providerMessage(body) ? `: ${providerMessage(body)}` : "."}`, res.status);
+      const said = providerMessage(body, req.key);
+      if (res.status === 401 || res.status === 403) throw new ProviderError("auth", `The provider rejected the key${said ? `: ${said}` : "."}`, res.status);
       if (res.status === 429) {
         const ra = Number(res.headers.get("retry-after"));
-        throw new ProviderError("rate_limit", `The provider is rate limiting requests${providerMessage(body) ? `: ${providerMessage(body)}` : "."}`, 429, Number.isFinite(ra) ? ra * 1000 : null);
+        throw new ProviderError("rate_limit", `The provider is rate limiting requests${said ? `: ${said}` : "."}`, 429, Number.isFinite(ra) ? ra * 1000 : null);
       }
       if (res.status >= 500) throw new ProviderError("http", `The provider had an error (${res.status}).`, res.status);
-      if (!res.ok) throw new ProviderError("http", `The provider refused the request (${res.status})${providerMessage(body) ? `: ${providerMessage(body)}` : "."}`, res.status);
+      if (!res.ok) throw new ProviderError("http", `The provider refused the request (${res.status})${said ? `: ${said}` : "."}`, res.status);
       const message = (body as { choices?: Array<{ message?: ChatResult["message"] }> })?.choices?.[0]?.message;
       if (!message) throw new ProviderError("bad_response", "The provider returned a response Nexus could not read.");
       return { message, fixture, model: String((body as { model?: unknown })?.model ?? req.model) };

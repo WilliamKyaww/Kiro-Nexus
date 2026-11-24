@@ -15,6 +15,7 @@ const contexts = new WeakMap<AppState, AiContext>();
 export async function installProviders(state: AppState): Promise<AiContext> {
   const ctx: AiContext = { registry: await ProviderRegistry.load(state.profileDir), keys: new KeyStore(), desktop: process.env.NEXUS_DESKTOP === "1" };
   contexts.set(state, ctx);
+  state.addLogRedactor((line) => ctx.keys.redact(line));
   return ctx;
 }
 
@@ -36,12 +37,14 @@ export function handleParentMessage(state: AppState, data: unknown): void {
 }
 
 export function profileView(ctx: AiContext, p: ProviderProfile) {
-  return { ...p, hasKey: ctx.keys.has(p.id), keyStorage: ctx.keys.storage(p.id), receivingHost: receivingHost(p.baseUrl) };
+  // detail holds provider diagnostics; sanitise again on the way out (older files, new keys).
+  const capabilities = { ...p.capabilities, detail: ctx.keys.sanitise(p.capabilities.detail) };
+  return { ...p, capabilities, hasKey: ctx.keys.has(p.id), keyStorage: ctx.keys.storage(p.id), receivingHost: receivingHost(p.baseUrl) };
 }
 
 export function describeProviderError(e: unknown, ctx: AiContext): { code: string; message: string } {
   if (e instanceof ProviderError) {
-    const message = ctx.keys.redact(e.message);
+    const message = ctx.keys.sanitise(e.message, 400) ?? "The provider returned an error.";
     const code = { auth: "PROVIDER_AUTH", rate_limit: "PROVIDER_RATE_LIMITED", timeout: "PROVIDER_TIMEOUT", cancelled: "CANCELLED", network: "PROVIDER_UNREACHABLE", http: "PROVIDER_ERROR", bad_response: "PROVIDER_BAD_RESPONSE" }[e.kind];
     return { code, message };
   }
@@ -98,7 +101,9 @@ export function providerRoutes(state: AppState) {
       if (!key) throw new NexusError("VALIDATION", "Add a key for this profile first.");
       try {
         const caps = await probeProfile(p, key);
-        return { profile: profileView(ctx, await ctx.registry.setCapabilities(p.id, caps)) };
+        // Sanitised before it is saved: non-fatal probe errors carry the provider's own text.
+        const safe = { ...caps, detail: ctx.keys.sanitise(caps.detail) };
+        return { profile: profileView(ctx, await ctx.registry.setCapabilities(p.id, safe)) };
       } catch (e) {
         const err = describeProviderError(e, ctx);
         await ctx.registry.setCapabilities(p.id, { ...p.capabilities, testedAt: new Date().toISOString(), detail: err.message, toolCalling: "error", structuredOutput: "error" });

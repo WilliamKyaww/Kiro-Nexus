@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const fakeKeys = ["nexus-fake-key-7f3a9c2e1b", "nexus-fake-e2e-key-5d1c8a", "nexus-fake-ask-key-3b9e"];
+const fakeKeys = ["nexus-fake-key-7f3a9c2e1b", "nexus-fake-e2e-key-5d1c8a", "nexus-fake-ask-key-3b9e", "nexus-fake-live-key-0c4d", "nexus-sentinel-K7q2Zp9Lw4Rt8Vx1Hc6"];
 const shapes = [/\bsk-[A-Za-z0-9_-]{20,}/, /\bgsk_[A-Za-z0-9]{20,}/, /\bAIza[0-9A-Za-z_-]{30,}/, /\bsk-or-v1-[a-f0-9]{40,}/];
 // Test sources legitimately contain the fake keys; everything else must not.
 const allowFake = (rel) => /^(server\/src\/.*\.test\.ts|tests\/e2e\/.*\.spec\.ts|scripts\/secret-scan\.mjs)$/.test(rel);

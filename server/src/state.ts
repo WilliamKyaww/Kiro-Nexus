@@ -17,13 +17,22 @@ export class AppState {
   readonly onOpen: Array<(service: WorkspaceService) => Promise<void>> = [];
   readonly onClose: Array<(service: WorkspaceService) => Promise<void>> = [];
 
+  private readonly redactors: Array<(line: string) => string> = [];
+  /** Every log line passes through the redactors (provider keys, PRD-076) before it is written. */
+  readonly log: Logger;
+
   constructor(
     readonly profileDir: string,
     readonly instanceId: string,
     public port: number | null,
-    readonly log: Logger,
+    rawLog: Logger,
   ) {
     this.bus.setMaxListeners(100);
+    this.log = (line) => rawLog(this.redactors.reduce((text, redact) => redact(text), line));
+  }
+
+  addLogRedactor(redact: (line: string) => string): void {
+    this.redactors.push(redact);
   }
 
   publish(event: ServerEvent): void {

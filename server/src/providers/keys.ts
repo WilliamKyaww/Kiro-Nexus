@@ -2,6 +2,8 @@
 // keeps them encrypted with safeStorage and sends them over the private process port;
 // in the browser they last for the session. Keys never leave this module except in the
 // Authorization header of a request to the profile's own base URL.
+import { redactSecrets, sanitiseDiagnostic } from "./sanitise.mjs";
+
 export type KeyStorage = "os-protected" | "session";
 
 export class KeyStore {
@@ -19,10 +21,16 @@ export class KeyStore {
   /** Only the provider adapter calls this. */
   reveal(profileId: string): string | null { return this.keys.get(profileId)?.key ?? null; }
 
-  /** Remove every known key from text before it is logged or returned. */
+  private known(): string[] { return [...this.keys.values()].map((k) => k.key); }
+
+  /** Remove every known key, fragments of it and key-shaped strings (for log lines). */
   redact(text: string): string {
-    let out = text;
-    for (const { key } of this.keys.values()) if (key.length >= 6) out = out.split(key).join("[redacted key]");
-    return out;
+    return redactSecrets(text, this.known());
+  }
+
+  /** A provider diagnostic made safe to show, log or save: redacted, one line, capped. */
+  sanitise(text: string | null, max = 400): string | null {
+    if (text === null) return null;
+    return sanitiseDiagnostic(text, { keys: this.known(), max }) || null;
   }
 }
