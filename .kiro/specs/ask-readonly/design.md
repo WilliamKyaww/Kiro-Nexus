@@ -88,6 +88,9 @@ Its behaviour is chosen by the model name:
 | `-429` | Returns 429 with `Retry-After: 0` |
 | `-slow` | Waits 20 s |
 | `-plain` | Answers in plain text with no tool call |
+| `-none` | Refuses both tools and `response_format` (400) |
+| `-unsure` | Always answers "insufficient evidence" |
+| `-nocite` | Cites the note but never the issue records |
 
 Every response carries `x-nexus-fixture: 1`.
 

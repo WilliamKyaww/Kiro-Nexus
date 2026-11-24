@@ -7,6 +7,9 @@
 //   nexus-test-double-invent      adds an invented citation S99
 //   nexus-test-double-writer      first tries to call propose_changes
 //   nexus-test-double-plain       replies with plain text, no tool call
+//   nexus-test-double-none        supports neither tools nor structured output (400)
+//   nexus-test-double-unsure      always answers "insufficient evidence"
+//   nexus-test-double-nocite      cites the note but never the issue records
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -35,7 +38,7 @@ function toolData(text) {
 }
 
 /** The fixed rule: checklist items in the consulted section, matched to issues by title words. */
-export function buildAnswer({ section, issues, invent = false }) {
+export function buildAnswer({ section, issues, invent = false, citeIssues = true }) {
   if (!section || typeof section.text !== "string") {
     return { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "No relevant note section was found." };
   }
@@ -58,9 +61,10 @@ export function buildAnswer({ section, issues, invent = false }) {
     }
     if (best) {
       const status = STATUS_TEXT[best.status] ?? best.status;
-      facts.push({ text: `“${item.text}” is tracked by ${best.key} (${best.title}, ${status}).`, sources: [section.handle, best.handle] });
+      const sources = citeIssues ? [section.handle, best.handle] : [section.handle];
+      facts.push({ text: `“${item.text}” is tracked by ${best.key} (${best.title}, ${status}).`, sources });
       if (item.done !== (best.status === "done")) {
-        discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${status}.`, sources: [section.handle, best.handle] });
+        discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${status}.`, sources });
       }
     } else {
       facts.push({ text: `“${item.text}” has no matching issue.`, sources: [section.handle] });
@@ -116,7 +120,7 @@ function agentStep(body, variant) {
   }
   const issues = resultOf("query_issues");
   if (issues === undefined) return { tool_calls: [toolCall("query_issues", {}, n)] };
-  const answer = buildAnswer({ section: section && !section.error ? section : null, issues: issues?.issues, invent: variant === "invent" });
+  const answer = buildAnswer({ section: section && !section.error ? section : null, issues: issues?.issues, invent: variant === "invent", citeIssues: variant !== "nocite" });
   return { tool_calls: [toolCall("final_answer", answer, n)] };
 }
 
@@ -128,8 +132,10 @@ function structuredAnswer(body, variant) {
   const question = data?.question ?? "";
   const sections = data?.sections ?? [];
   const best = chooseSection(sections, question);
-  return buildAnswer({ section: best, issues: data?.issues ?? [], invent: variant === "invent" });
+  return buildAnswer({ section: best, issues: data?.issues ?? [], invent: variant === "invent", citeIssues: variant !== "nocite" });
 }
+
+const UNSURE = { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "Fixture variant: always reports insufficient evidence." };
 
 export function handleChat(body) {
   const model = String(body.model ?? "");
@@ -137,11 +143,13 @@ export function handleChat(body) {
   const wantsTools = Array.isArray(body.tools) && body.tools.length > 0;
   const schemaName = body.response_format?.json_schema?.name;
   if (variant === "structured" && wantsTools) return { status: 400, body: { error: { message: "This model does not support tools.", type: "invalid_request_error" } } };
+  if (variant === "none" && (wantsTools || body.response_format)) return { status: 400, body: { error: { message: "This model supports neither tools nor response_format.", type: "invalid_request_error" } } };
   const reply = (message) => ({ status: 200, body: { id: "chatcmpl-fixture", object: "chat.completion", model, choices: [{ index: 0, message: { role: "assistant", content: null, ...message }, finish_reason: message.tool_calls ? "tool_calls" : "stop" }] } });
   // Capability probes.
   if (wantsTools && body.tools.some((t) => t.function?.name === "ping")) return reply({ tool_calls: [toolCall("ping", { value: "nexus" }, 1)] });
   if (schemaName === "probe") return reply({ content: JSON.stringify({ ok: true }) });
   if (variant === "plain") return reply({ content: "Here is a friendly answer without any structure." });
+  if (variant === "unsure") return schemaName === "final_answer" ? reply({ content: JSON.stringify(UNSURE) }) : reply({ tool_calls: [toolCall("final_answer", UNSURE, 1)] });
   if (schemaName === "final_answer") return reply({ content: JSON.stringify(structuredAnswer(body, variant)) });
   if (wantsTools) return reply(agentStep(body, variant));
   return reply({ content: "Fixture reply." });

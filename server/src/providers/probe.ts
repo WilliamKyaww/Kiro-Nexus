@@ -7,6 +7,7 @@ type Cap = ProviderProfile["capabilities"];
 export async function probeProfile(profile: ProviderProfile, key: string, signal?: AbortSignal): Promise<Cap> {
   const base = { baseUrl: profile.baseUrl, model: profile.model, key, signal, timeoutMs: 30_000, maxRetries: 1 };
   const notes: string[] = [];
+  const failures: ProviderError[] = [];
   let fixture = false;
   const classify = (e: unknown): "no" | "error" => {
     if (e instanceof ProviderError && e.kind === "http" && e.status !== null && e.status >= 400 && e.status < 500) return "no";
@@ -30,6 +31,7 @@ export async function probeProfile(profile: ProviderProfile, key: string, signal
   } catch (e) {
     if (e instanceof ProviderError && (e.kind === "auth" || e.kind === "cancelled")) throw e;
     toolCalling = classify(e);
+    if (e instanceof ProviderError) failures.push(e);
     notes.push(`Tool calling: ${(e as Error).message}`);
   }
 
@@ -48,8 +50,14 @@ export async function probeProfile(profile: ProviderProfile, key: string, signal
   } catch (e) {
     if (e instanceof ProviderError && (e.kind === "auth" || e.kind === "cancelled")) throw e;
     structuredOutput = classify(e);
+    if (e instanceof ProviderError) failures.push(e);
     notes.push(`Structured output: ${(e as Error).message}`);
   }
+
+  // Both probes failed to reach the model for the same transport reason: that is a failed
+  // test (timeout, network, rate limit), not a statement about the model's capabilities.
+  const [first, second] = failures;
+  if (first && second && first.kind === second.kind && ["timeout", "network", "rate_limit"].includes(first.kind)) throw first;
 
   return { toolCalling, structuredOutput, testedAt: new Date().toISOString(), detail: notes.join(" ").slice(0, 400) || null, fixture };
 }

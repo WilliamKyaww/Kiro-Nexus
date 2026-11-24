@@ -47,6 +47,11 @@ describe("adapter and probes", () => {
     expect(await probeProfile(profile("nexus-test-double-structured"), FAKE_KEY)).toMatchObject({ toolCalling: "no", structuredOutput: "yes" });
   });
 
+  it("treats an unreachable provider as a failed test, not as missing capabilities", async () => {
+    const unreachable = { ...profile("x"), baseUrl: "http://127.0.0.1:9/v1" };
+    await expect(probeProfile(unreachable, FAKE_KEY)).rejects.toMatchObject({ kind: "network" });
+  });
+
   it("reports invalid credentials, rate limits, timeouts and cancellation distinctly", async () => {
     const call = (model: string, extra: Partial<Parameters<typeof chat>[0]> = {}) =>
       chat({ baseUrl: double.baseUrl, model, key: FAKE_KEY, messages: [{ role: "user", content: "hi" }], ...extra });
