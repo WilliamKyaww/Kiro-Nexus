@@ -5,14 +5,16 @@ tasks live in its spec's `tasks.md`; do not copy them here. Move behaviour
 to `FEATURES.md` once it has been verified. Requirement IDs refer to
 `docs/PRD/structure.md` (`PRD-xxx`) and to the intake (`R-*`).
 
-Done overnight on 24 November 2026 (see `FEATURES.md`):
+Done on 24 November 2026 (see `FEATURES.md`):
 
 - the PRD and its amendments;
 - the B1 workspace core;
 - B5 with fixed operations;
 - the B2 search and outside-edits slice;
 - the review hooks;
-- the Impeccable and Playwright MCP checks.
+- the Impeccable and Playwright MCP checks;
+- the four Phase 1 repairs;
+- slice C read-only Ask, tested against the test double only.
 
 ## P0: needed for submission (in order)
 
@@ -38,9 +40,12 @@ Done overnight on 24 November 2026 (see `FEATURES.md`):
   `.kiro/specs/change-journal/`. Remaining (task 9, with slice D):
   `record.create`, `note.create`, the `dependsOn` cascade, correction runs
   and "Restore original" for an ambiguous conflict.
-- [ ] **C Provider settings and read-only AI** (PRD-050 to PRD-055, PRD-074
-  to PRD-076). Owner: Will. Spec: not yet written. Open questions: Q1, the
-  free route, and Q5, the team route.
+- [~] **C Provider settings and read-only AI** (PRD-050 to PRD-055, PRD-074
+  to PRD-076). Owner: Will. Spec: `.kiro/specs/ask-readonly/`. Done:
+  tasks 1 to 4, verified against the test double only. Remaining: task 5,
+  the live check with a real free key, which closes Q1 if it passes. The
+  team route (Q5, PRD-091) is proposed in `docs/judge-ai-route.md` but not
+  decided or built.
 - [ ] **D Agent edits, correction and personalised reminders** (PRD-042,
   PRD-051, PRD-060 to PRD-066). Owner: Will. Spec: not yet written.
 - [ ] **E Package, rehearse and submit** (PRD-073, PRD-090 to PRD-092, R-V1

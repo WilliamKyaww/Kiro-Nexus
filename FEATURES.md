@@ -206,6 +206,71 @@ them again before fixing them.
   Evidence: `usability.spec.ts` (5 tests), and Impeccable detect `[]` on
   the changed UI files.
 
+### C read-only Ask (verified by Kiro, 2026-11-24, against the test double only; no human review yet)
+
+Every answer below came from the deterministic test double
+(`tools/provider-double/server.mjs`), a rule-based fixture that is not AI.
+**No live provider has been tested**, so these entries show that Nexus's
+side of the workflow works. They do not show how a real model behaves (Q1
+is open). Spec: `.kiro/specs/ask-readonly/`.
+
+- **Provider settings** (`00084bc`).
+  - Settings adds, tests, selects and removes an OpenAI-compatible profile.
+    The test probes tool calling and structured output separately and
+    shows both results.
+  - Remote base URLs must use HTTPS. Plain HTTP is accepted only for
+    `localhost`, `127.0.0.1` and `[::1]`.
+  - A rejected key (401), rate limiting (429, retried twice while honouring
+    `Retry-After`), a timeout and a cancellation each give their own
+    message.
+  - `GET /providers` never returns a key. In the browser, the key is held
+    in service memory only. In Electron, the key is encrypted with
+    `safeStorage` in `secrets.bin`, survives a relaunch and never reaches
+    renderer storage.
+  - Evidence: `providers.test.ts` (4 tests, including a disk scan for the
+    fake key) and `c1-providers.spec.ts` (browser and Electron).
+- **Read-only by construction** (`f065fa2`, DEC-017).
+  - Ask can only search notes, read a note section, query issues and give
+    its final answer. A `propose_changes` call, even one prompted by an
+    instruction planted in a note, is refused and recorded.
+  - Citations use handles that the service assigns during the run.
+    Invented handles are removed and counted, and a fact left with no
+    sources becomes a suggestion.
+  - The "Consulted" note is computed by the service, not by the model.
+  - A pending change is reported as proposed, and the accepted value is
+    given as the fact. A renamed or missing heading is reported as not
+    found.
+  - Profiles with structured output but no tool calling use
+    retrieval-first mode.
+  - Workspace files other than `.nexus/conversations/` are byte-for-byte
+    unchanged after every Ask run.
+  - Evidence: `ask.test.ts` (11 tests).
+- **Home and conversations** (`e6b3aa6`).
+  - Home shows the workspace, the model and where excerpts are sent. With
+    AI off, the composer is disabled, explains why and still offers the
+    notes.
+  - An answer shows recorded facts, discrepancies, suggestions and the
+    fixture label. Citations open the exact heading or issue, and "← Back
+    to conversation" returns to the answer.
+  - A run can be cancelled. A failed run offers Retry. A rejected key links
+    to Settings. Only one run per conversation can be active at a time.
+  - Conversations are saved in `.nexus/conversations/` and survive a
+    restart. A run interrupted by a crash is marked as interrupted.
+  - Evidence: `ask-http.test.ts` (2 tests against the real service) and
+    `c3-conversations.spec.ts`.
+- **End-to-end proof in two fictional workspaces** (`a5195b5`).
+  - On the kickoff sample, "Which action from the kickoff still has no
+    issue?" names "Will writes the judge instructions" as untracked, and
+    says that NEX-1 tracks "Hein builds the calendar view".
+  - After NEX-2 "Write the judge instructions" is created by hand, the
+    same question reports the action as tracked by NEX-2.
+  - A second workspace, with different people, actions and the key `OPS`,
+    gets answers built only from its own data.
+  - Evidence: `c4-ask-proof.spec.ts` (2 tests, with workspace hashes before
+    and after), plus the matching service-level test in `ask.test.ts`.
+    Kiro also inspected screenshots of the running app at 1360 × 900 and
+    390 px wide.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
@@ -215,8 +280,11 @@ them again before fixing them.
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - `npm test` passes 71 tests, stable across 3 repeat runs.
-  - `npm run test:e2e` passes 8 tests in Edge and Electron, 24 of 24 across 3 repeats.
+  - `npm test` passes 100 tests (latest run at `65f951a`).
+  - `npm run test:e2e` passes 26 tests in Edge and Electron. A sweep with
+    `--repeat-each=2` passed 52 of 52; one earlier sweep had a single
+    unexplained failure (see `STATE.md`).
+  - `npm run scan:secrets` passes.
 - **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on agent edits and on file saves, and record PASS or FAIL. See `docs/tooling.md`.
 - **Dev tooling** (Kiro, 2026-11-24): see `docs/tooling.md`.
   - The Impeccable detector and renders ran.
