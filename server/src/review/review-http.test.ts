@@ -41,7 +41,7 @@ describe("review over HTTP", () => {
     expect((await api.get(atProposedDate)).body.reminders).toEqual([]);
 
     const again = await api.post("/review/demo");
-    expect(again.body).toMatchObject({ runId: null, duplicates: ["demo-1-note-checklist", "demo-1-nex1-due"] });
+    expect(again.body).toMatchObject({ repeated: true, phase: "applied", duplicates: ["demo-1-note-checklist", "demo-1-nex1-due"] });
 
     const [noteChange, dueChange] = demo.body.changes;
     expect((await api.post(`/review/changes/${noteChange.changeId}/accept`)).body.state).toBe("accepted");
@@ -51,6 +51,26 @@ describe("review over HTTP", () => {
     expect(await note()).toContain("- [x] Hein builds the calendar view\n");
     expect(await due()).toEqual({ date: "2026-12-05" });
     expect((await api.get("/reminders/due?at=" + encodeURIComponent("2026-12-05T09:30:00Z"))).body.reminders).toMatchObject([{ issueKey: "NEX-1" }]);
+  });
+
+  it("reports a real failed issue write honestly, then Retry after restart writes only that file", async () => {
+    let { svc, api } = await start({ NEXUS_FAULT_THROW: "review:write:.nexus/issues.json" });
+    const demo = await api.post("/review/demo");
+    expect(demo.status).toBe(200);
+    expect(demo.body.phase).toBe("partial");
+    expect(demo.body.files.map((f: { state: string }) => f.state)).toEqual(["written", "failed"]);
+    expect(await due()).toEqual({ date: "2026-12-05" });
+    await svc.stop();
+    running.splice(0);
+    ({ svc, api } = await start());
+    const incomplete = (await api.get("/review/runs/incomplete")).body.runs;
+    expect(incomplete).toHaveLength(1);
+    const noteBefore = await note();
+    const retried = await api.post(`/review/runs/${incomplete[0].runId}/retry`);
+    expect(retried.body.files.map((f: { state: string }) => f.state)).toEqual(["written", "written"]);
+    expect(await due()).toEqual({ date: "2026-12-03" });
+    expect(await note()).toBe(noteBefore);
+    expect((await api.get("/review/runs/incomplete")).body.runs).toEqual([]);
   });
 
   it("recovers a real crash between the two file writes of a run", async () => {

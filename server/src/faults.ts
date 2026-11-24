@@ -20,6 +20,21 @@ if (envFault) {
   };
 }
 
+// NEXUS_FAULT_THROW ("point" or "point:n") makes the n-th hit throw instead of
+// exiting, simulating an ordinary I/O failure (disk full, file locked) in a real process.
+const throwFault = process.env.NEXUS_FAULT_THROW;
+if (throwFault && !injector) {
+  const m = throwFault.match(/^(.*?)(?::(\d+))?$/);
+  const target = m?.[1] ?? throwFault;
+  const nth = Number(m?.[2] ?? 1);
+  let hits = 0;
+  injector = (point) => {
+    if (point !== target) return;
+    hits += 1;
+    if (hits === nth) throw new Error(`Simulated write failure at ${point}`);
+  };
+}
+
 export function setFaultInjector(fn: Injector | null): void {
   injector = fn;
 }

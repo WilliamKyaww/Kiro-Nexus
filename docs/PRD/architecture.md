@@ -360,11 +360,23 @@ is saved before any write it governs.
       using a second atomic journal write.
    4. When every file is `written`, set the phase to `applied`.
 
-   If a file write fails, mark that file `failed`. Its changes stay
-   `prepared`, the run's phase becomes `partial`, and the remaining files
-   are not attempted. Files already written stay `pending` and are reviewed
-   normally. The user can **Retry** the failed files or **Discard** them,
-   which marks them `rejected` with no write needed.
+   If a file write fails, mark that file `failed` with its error. Its
+   changes stay `prepared`. The remaining files are not attempted and are
+   also marked `failed` ("not attempted"), so a restart never writes them
+   without being asked. The run's phase becomes `partial`. Files already
+   written stay `pending` and are reviewed normally. The API and UI report
+   each file's actual outcome, and a repeated proposal reports the existing
+   run's outcome rather than "already applied".
+   - **Retry** re-plans each failed file against its *current* contents:
+     1. Changes whose `before` no longer matches become `conflicted`
+        (`changed-before-apply`), and nothing is written for them.
+     2. The other changes get fresh `beforeHash` and `afterHash` values,
+        which are journaled before the write, so unrelated newer edits are
+        kept.
+     3. Files already written are never rewritten.
+   - **Discard** marks a failed file `discarded` and its changes
+     `rejected`, with no write. Successful sibling changes are untouched.
+   - Both are idempotent.
 4. **Refresh**: the service emits `file.changed` and `review.updated`. Open
    editors with no unsaved edits reload in place, keeping scroll position and
    selection; editors with unsaved edits keep their buffer and show the

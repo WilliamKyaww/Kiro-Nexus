@@ -79,6 +79,25 @@ human review has happened yet. Task 9 is deliberately left open for slice D.
     the script is verified by hand and the hook marked unverified.
   - _Requirements: R-K5_
 
+- [x] 10. Partial runs: honest outcomes, Retry and Discard (Phase 1 repair 1; added 2026-11-24)
+  - **Defect, reproduced on `2310608`:** the note write succeeded and the
+    issue write failed, but the UI said "Applied 2". The date on disk never
+    changed, and after a restart a repeated demo said "already applied".
+  - **Acceptance:** `partial.test.ts` (7 tests, reading real files and the
+    journal), plus the real-process test in `review-http.test.ts`, show
+    that:
+    - each file's outcome is reported;
+    - a restart writes nothing without being asked, and a repeat reports
+      the failure;
+    - Retry writes only the outstanding file, keeps an unrelated manual
+      edit, conflicts on a same-field edit, and repeating it is a no-op;
+    - Discard preserves the file and the written sibling change;
+    - when the first file fails, the later files are "not attempted".
+
+    The E2E test `b5-review.spec.ts` covers a failed issue write, a
+    restart, then Retry.
+  - _Requirements: 1.3, 2.1, 3.5, 5.1; architecture section 7.3_
+
 - [ ] 9. Deferred to slice D (not tonight)
   - `record.create`, `note.create`, `dependsOn` cascade, correction runs
     with `supersedes`, and "Restore original" for ambiguous conflicts.

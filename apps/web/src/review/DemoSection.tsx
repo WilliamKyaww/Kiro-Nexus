@@ -1,20 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import type { ChangeView } from "@nexus/schema";
+import type { RunOutcome } from "@nexus/schema";
 import { api } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
-import { changeUrl, setReviewUi } from "./review";
+import { changeUrl, describeOutcome, setReviewUi } from "./review";
 
 /** Fixed, clearly labelled operations that exercise the real review journal before an LLM does. */
 export function DemoSection() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const run = useMutation({
-    mutationFn: () => api.post<{ runId: string | null; changes: ChangeView[]; duplicates: string[] }>("/review/demo"),
+    mutationFn: () => api.post<RunOutcome>("/review/demo"),
     onSuccess: async (result) => {
       await client.invalidateQueries();
-      setReviewUi({ message: result.runId ? "Applied 2 demo changes to the real files. Review each one." : "The demo changes were already applied in this workspace.", feedbackFor: null });
-      const first = result.changes.find((c) => c.state === "pending" || c.state === "conflicted");
+      setReviewUi({ message: describeOutcome(result), feedbackFor: null });
+      const first = result.changes.find((c) => c.state === "pending" || c.state === "conflicted" || c.state === "prepared");
       if (first) navigate(changeUrl(first));
     },
   });

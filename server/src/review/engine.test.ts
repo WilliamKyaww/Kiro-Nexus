@@ -80,7 +80,7 @@ describe("propose and apply", () => {
     const note = await readNote();
     const issues = await readIssues();
     const again = await engine.propose(source, ops, "demo");
-    expect(again.runId).toBeNull();
+    expect(again.repeated).toBe(true);
     expect(again.duplicates).toEqual(["demo-1-note-checklist", "demo-1-nex1-due"]);
     expect(await readNote()).toBe(note);
     expect(await readIssues()).toEqual(issues);

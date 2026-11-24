@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import type { ChangeView } from "@nexus/schema";
+import type { ChangeView, RunOutcome } from "@nexus/schema";
 import { api, notePathParam } from "../api";
 
 export const openChangesKey = ["review", "open"] as const;
@@ -10,6 +10,25 @@ export const openChangesKey = ["review", "open"] as const;
 export function useOpenChanges(): ChangeView[] {
   const q = useQuery({ queryKey: openChangesKey, queryFn: () => api.get<{ changes: ChangeView[] }>("/review/changes?state=open") });
   return q.data?.changes ?? [];
+}
+
+export const incompleteRunsKey = ["review", "incomplete"] as const;
+
+export function useIncompleteRuns(): RunOutcome[] {
+  const q = useQuery({ queryKey: incompleteRunsKey, queryFn: () => api.get<{ runs: RunOutcome[] }>("/review/runs/incomplete") });
+  return q.data?.runs ?? [];
+}
+
+const fileLabel = (path: string) => (path === ".nexus/issues.json" ? "the issue data" : path);
+
+/** Plain-language summary of what a run actually wrote, file by file. */
+export function describeOutcome(o: RunOutcome): string {
+  const written = o.files.filter((f) => f.state === "written").length;
+  const failed = o.files.filter((f) => f.state === "failed");
+  if (o.repeated && failed.length === 0) return "These demo changes were already applied in this workspace.";
+  if (failed.length === 0) return `Applied ${o.changes.length} demo change${o.changes.length === 1 ? "" : "s"} to the real files. Review each one.`;
+  const lead = o.repeated ? "These demo changes were proposed before, but not all of them were written. " : "";
+  return `${lead}${written} of ${o.files.length} files were written. Not written: ${failed.map((f) => fileLabel(f.path)).join(", ")}. Use Retry or Discard in the review bar.`;
 }
 
 export function changeUrl(c: ChangeView): string {
@@ -74,5 +93,24 @@ export function useReviewActions() {
     mutationFn: ({ change, text }: { change: ChangeView; text: string }) => api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/feedback`, { text }),
     onSuccess: () => setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change. AI corrections arrive in slice D." }),
   });
-  return { decide, feedback };
+  const runAction = useMutation({
+    mutationFn: ({ runId, action }: { runId: string; action: "retry" | "discard" }) => api.post<RunOutcome>(`/review/runs/${encodeURIComponent(runId)}/${action}`),
+    onSuccess: async (o, { action }) => {
+      const failed = o.files.filter((f) => f.state === "failed");
+      const conflicted = o.files.filter((f) => f.state === "conflicted");
+      setReviewUi({
+        feedbackFor: null,
+        message: action === "discard"
+          ? "Discarded the changes that were never written. The files were not touched."
+          : failed.length
+            ? `Retry failed again: ${failed.map((f) => f.error ?? f.path).join("; ")}`
+            : conflicted.length
+              ? "Retry found newer edits to the same text or field, so it changed nothing there. Review the conflict."
+              : "Retry wrote the outstanding changes. Review them now.",
+      });
+      await refresh();
+    },
+    onError: (e) => setReviewUi({ message: (e as Error).message }),
+  });
+  return { decide, feedback, runAction };
 }

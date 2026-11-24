@@ -36,8 +36,11 @@ export const FileEntry = z.strictObject({
   path: z.string().min(1),
   beforeHash: z.string(),
   afterHash: z.string(),
-  state: z.enum(["planned", "written", "failed", "conflicted"]),
+  /** failed: the write did not happen (Retry or Discard). discarded: the user dropped its unapplied changes. */
+  state: z.enum(["planned", "written", "failed", "conflicted", "discarded"]),
   error: z.string().nullable(),
+  /** Timestamp used for record `updatedAt` when this file's content is (re)computed; defaults to the run's createdAt. */
+  appliedAt: IsoInstant.nullable().optional(),
 });
 
 export const ReviewRun = z.strictObject({
@@ -107,4 +110,19 @@ export interface ChangeView {
   current: unknown;
   feedback: string | null;
   summary: string;
+  /** Actual outcome of this change's file write in its run. */
+  fileState: FileEntry["state"];
+  fileError: string | null;
+  runPhase: ReviewRun["phase"];
+}
+
+/** What a proposal or retry actually did, file by file. */
+export interface RunOutcome {
+  runId: string | null;
+  phase: ReviewRun["phase"] | null;
+  files: Array<{ path: string; state: FileEntry["state"]; error: string | null }>;
+  changes: ChangeView[];
+  duplicates: string[];
+  /** True when every operation had already been proposed: nothing new was written. */
+  repeated: boolean;
 }

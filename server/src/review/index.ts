@@ -50,6 +50,9 @@ export function reviewRoutes(state: AppState) {
       return requireEngine(state).propose({ kind: "fixed-demo", label: DEMO_LABEL }, await demoOperations(service), "demo");
     });
     const id = (request: { params: unknown }) => (request.params as { id: string }).id;
+    app.get("/api/v1/review/runs/incomplete", async () => ({ runs: await requireEngine(state).incompleteRuns() }));
+    app.post("/api/v1/review/runs/:id/retry", async (request) => requireEngine(state).retry(id(request)));
+    app.post("/api/v1/review/runs/:id/discard", async (request) => requireEngine(state).discard(id(request)));
     app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request)));
     app.post("/api/v1/review/changes/:id/reject", async (request) => requireEngine(state).reject(id(request)));
     app.post("/api/v1/review/changes/:id/keep-current", async (request) => requireEngine(state).keepCurrent(id(request)));

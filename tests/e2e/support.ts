@@ -11,10 +11,10 @@ export async function tempDir(prefix: string): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix));
 }
 
-export async function startService(profile: string, workspace?: string, extraArgs: string[] = []): Promise<Service> {
+export async function startService(profile: string, workspace?: string, extraArgs: string[] = [], env: Record<string, string> = {}): Promise<Service> {
   const args = [resolve("server/dist/main.mjs"), "--profile", profile, ...extraArgs];
   if (workspace) args.push("--workspace", workspace);
-  const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, ...env } });
   let stderr = "";
   child.stderr!.on("data", (d) => { stderr += d; });
   const port = await new Promise<number>((res, rej) => {

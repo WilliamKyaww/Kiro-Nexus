@@ -116,3 +116,31 @@ test("reduced motion uses a static outline, decisions work from the keyboard, an
   expect(await nex1Due(ws)).toEqual({ date: "2026-12-05" });
   expect(await noteText(ws)).toContain("- [x] Hein builds the calendar view\n");
 });
+
+test("a failed issue write is reported honestly and Retry after a restart writes only that file", async ({ page, browser }) => {
+  const profile = join(base, "profile");
+  const ws = join(base, "ws");
+  svc = await startService(profile, ws, ["--init-sample"], { NEXUS_FAULT_THROW: "review:write:.nexus/issues.json" });
+  await page.goto(await launchUrl(svc));
+  await page.getByRole("button", { name: "Apply demo changes (fixed, not AI)" }).click();
+  await expect(bar(page)).toContainText("1 of 2 files were written. Not written: the issue data");
+  await expect(bar(page).getByRole("button", { name: "Retry writing" })).toBeVisible();
+  expect(await nex1Due(ws)).toEqual({ date: "2026-12-05" });
+  expect(await noteText(ws)).toContain("- [x] Hein builds the calendar view\n");
+
+  // Restart without the fault: the prompt survives and the date is still unwritten.
+  await svc.stop();
+  svc = await startService(profile);
+  const fresh = await browser.newContext();
+  const page2 = await fresh.newPage();
+  await page2.goto(await launchUrl(svc));
+  await expect(bar(page2).getByRole("group", { name: "Changes that were not written" })).toContainText("issue data");
+  const noteBefore = await noteText(ws);
+  await bar(page2).getByRole("button", { name: "Retry writing" }).click();
+  await expect(bar(page2)).toContainText("Retry wrote the outstanding changes");
+  await expect(bar(page2).getByRole("group", { name: "Changes that were not written" })).toHaveCount(0);
+  expect(await nex1Due(ws)).toEqual({ date: "2026-12-03" });
+  expect(await noteText(ws)).toBe(noteBefore);
+  await expect(bar(page2)).toContainText("Change 1 of 2");
+  await fresh.close();
+});

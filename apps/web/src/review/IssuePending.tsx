@@ -13,10 +13,11 @@ export function IssuePending({ issue }: { issue: IssueView }) {
       {changes.map((c) => (
         <div key={c.changeId} className={`pending-change pending-field-note${c.state === "conflicted" ? " conflicted" : ""}`} data-change-id={c.changeId}>
           <p>
-            <span className="pending-badge">{c.state === "conflicted" ? "Conflict" : "Pending review"}</span>{" "}
+            <span className="pending-badge">{c.state === "conflicted" ? "Conflict" : c.state === "prepared" ? "Not written" : "Pending review"}</span>{" "}
             <strong>{fieldLabel[c.field ?? ""] ?? c.field}</strong>: {describeValue(c.field, c.before)} → <strong>{describeValue(c.field, c.after)}</strong>
             <span className="muted"> ({c.sourceLabel})</span>
           </p>
+          {c.state === "prepared" ? <p className="muted">This change was never written, so the issue still shows its current value. Use Retry or Discard in the review bar.</p> : null}
           {c.state === "pending" ? (
             <div className="row">
               <button type="button" className="primary" disabled={decide.isPending} onClick={() => decide.mutate({ change: c, action: "accept" })}

@@ -16,7 +16,7 @@ export function IssuePage() {
   const [conflict, setConflict] = useState<IssueView | null>(null);
   const [params] = useSearchParams();
   const changeParam = params.get("change");
-  const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field).map((c) => [c.field as string, c]));
+  const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field && c.state !== "prepared").map((c) => [c.field as string, c]));
   const pendingClass = (field: string) => (pendingByField.has(field) ? ` pending-field${pendingByField.get(field)!.state === "conflicted" ? " conflicted" : ""}` : "");
   useEffect(() => {
     if (!changeParam) return;

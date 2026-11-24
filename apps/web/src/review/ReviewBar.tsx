@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { changeUrl, setReviewUi, useOpenChanges, useReviewActions, useReviewUi } from "./review";
+import { changeUrl, setReviewUi, useIncompleteRuns, useOpenChanges, useReviewActions, useReviewUi } from "./review";
 
 /** Persistent bar for moving between changes on different pages (PRD-061, PRD-062). */
 export function ReviewBar() {
   const changes = useOpenChanges();
   const { feedbackFor, message } = useReviewUi();
-  const { decide, feedback } = useReviewActions();
+  const { decide, feedback, runAction } = useReviewActions();
+  const incomplete = useIncompleteRuns();
   const location = useLocation();
   const navigate = useNavigate();
   const [reason, setReason] = useState("");
   const feedbackInput = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (feedbackFor) feedbackInput.current?.focus(); }, [feedbackFor]);
 
-  if (changes.length === 0 && !feedbackFor && !message) return null;
+  if (changes.length === 0 && !feedbackFor && !message && incomplete.length === 0) return null;
   const focused = new URLSearchParams(location.search).get("change");
   const found = changes.findIndex((c) => c.changeId === focused);
   const index = found >= 0 ? found : 0;
@@ -33,6 +34,7 @@ export function ReviewBar() {
           <p className="review-status">
             <strong>Change {index + 1} of {changes.length}</strong>
             <span> · {current.summary}</span>
+            {current.state === "prepared" ? <span className="conflict-tag"> · Not written: {current.fileError ?? "the write did not happen"}</span> : null}
             {current.state === "conflicted" ? <span className="conflict-tag"> · Conflict: {current.conflictReason === "ambiguous" ? "the text appears more than once" : "the text was edited after the change"}</span> : null}
           </p>
           <div className="review-actions">
@@ -51,6 +53,19 @@ export function ReviewBar() {
           </div>
         </div>
       ) : <p className="review-status"><strong>All changes reviewed.</strong></p>}
+      {incomplete.map((run) => (
+        <div key={run.runId} className="incomplete-run" role="group" aria-label="Changes that were not written">
+          <p>
+            <strong>Not written:</strong>{" "}
+            {run.files.filter((f) => f.state === "failed").map((f) => `${f.path === ".nexus/issues.json" ? "issue data" : f.path} (${f.error ?? "unknown error"})`).join("; ")}.
+            {" "}Files already written stay reviewable.
+          </p>
+          <div className="review-actions">
+            <button type="button" className="primary" disabled={runAction.isPending} onClick={() => runAction.mutate({ runId: run.runId!, action: "retry" })}>Retry writing</button>
+            <button type="button" disabled={runAction.isPending} onClick={() => runAction.mutate({ runId: run.runId!, action: "discard" })}>Discard unwritten changes</button>
+          </div>
+        </div>
+      ))}
       <p className="review-message" role="status" aria-live="polite">{message ?? ""}</p>
       {feedbackFor ? (
         <form className="feedback" onSubmit={send} aria-label="Feedback on the rejected change">

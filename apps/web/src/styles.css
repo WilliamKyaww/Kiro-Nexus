@@ -162,3 +162,6 @@ main:focus { outline: none; }
 .result-title { font-weight: 600; color: var(--ink); }
 .result-path { font-size: 0.8rem; color: var(--ink-soft); }
 .result-snippet { margin: 0.15rem 0.5rem 0; font-size: 0.85rem; color: var(--ink-soft); }
+
+.incomplete-run { background: #fbe9e9; border: 1px solid var(--danger); border-radius: 8px; padding: 0.5rem 0.75rem; }
+.incomplete-run p { margin: 0 0 0.4rem; }

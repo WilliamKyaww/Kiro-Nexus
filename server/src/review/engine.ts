@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   IssuesFile, OPEN_STATES, ProposedOperation, ReviewRun, serialise,
-  type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT,
+  type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT, type RunOutcome,
 } from "@nexus/schema";
 import { NexusError } from "../errors";
 import { faultPoint } from "../faults";
@@ -82,6 +82,9 @@ export class ReviewEngine {
         kind: change.kind, file: change.file, state: change.state, conflictReason: change.conflictReason,
         recordKey: change.target.recordKey, field: change.target.field, before: change.before, after: change.after,
         lines, current, feedback: change.feedback?.text ?? null, summary: summarise(change),
+        fileState: run.files.find((f) => f.path === change.file)?.state ?? "planned",
+        fileError: run.files.find((f) => f.path === change.file)?.error ?? null,
+        runPhase: run.phase,
       });
     }
     return out;
@@ -89,7 +92,26 @@ export class ReviewEngine {
 
   // ---------------- Propose and apply ----------------
 
-  async propose(source: Source, operations: unknown[], by: Actor): Promise<{ runId: string | null; changes: ChangeView[]; duplicates: string[] }> {
+  async outcome(run: ReviewRun, duplicates: string[] = []): Promise<RunOutcome> {
+    const ids = new Set(run.changes.map((c) => c.changeId));
+    return {
+      runId: run.runId,
+      phase: run.phase,
+      files: run.files.map((f) => ({ path: f.path, state: f.state, error: f.error })),
+      changes: (await this.views("all")).filter((v) => ids.has(v.changeId)),
+      duplicates,
+      repeated: false,
+    };
+  }
+
+  /** Runs with writes that did not happen, for the Retry / Discard prompt (also after a restart). */
+  async incompleteRuns(): Promise<RunOutcome[]> {
+    const out: RunOutcome[] = [];
+    for (const run of this.runs.values()) if (run.files.some((f) => f.state === "failed")) out.push(await this.outcome(run));
+    return out;
+  }
+
+  async propose(source: Source, operations: unknown[], by: Actor): Promise<RunOutcome> {
     return this.service.exclusive(async () => {
       const ops = operations.map((o, i) => {
         const r = ProposedOperation.safeParse(o);
@@ -100,8 +122,11 @@ export class ReviewEngine {
       const duplicates = ops.filter((o) => known.has(o.opId)).map((o) => o.opId);
       const fresh = ops.filter((o) => !known.has(o.opId));
       if (fresh.length === 0) {
+        // Report the existing run honestly (including any write that never happened).
         const ids = new Set(duplicates.map((d) => known.get(d)));
-        return { runId: null, changes: (await this.views("all")).filter((v) => ids.has(v.changeId)), duplicates };
+        const existing = [...this.runs.values()].find((r) => r.changes.some((c) => ids.has(c.changeId)));
+        if (existing) return { ...(await this.outcome(existing, duplicates)), repeated: true };
+        return { runId: null, phase: null, files: [], changes: [], duplicates, repeated: true };
       }
 
       const errors: Array<{ opId: string; reason: string }> = [];
@@ -174,8 +199,7 @@ export class ReviewEngine {
       faultPoint("review:after-journal");
       await this.applyRun(run, by);
       this.publish({ type: "review.updated" });
-      const ids = new Set(run.changes.map((c) => c.changeId));
-      return { runId: run.runId, changes: (await this.views("all")).filter((v) => ids.has(v.changeId)), duplicates };
+      return this.outcome(run, duplicates);
     });
   }
 
@@ -185,12 +209,13 @@ export class ReviewEngine {
 
   /** Recompute a file's expected content from its current bytes, refusing if it is not at beforeHash. */
   private async expectedContent(run: ReviewRun, file: FileEntry): Promise<{ kind: "note"; content: string } | { kind: "issues"; value: IssuesFileT } | { kind: "changed" }> {
-    const changes = run.changes.filter((c) => c.file === file.path);
+    const changes = run.changes.filter((c) => c.file === file.path && c.state === "prepared");
+    const at = file.appliedAt ?? run.createdAt;
     if (file.path === ISSUES) {
       const bytes = await this.service.readCollectionBytes("issues");
       if (sha256(bytes) !== file.beforeHash) return { kind: "changed" };
       let next = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
-      for (const c of changes) next = setField(next, c.target.recordId!, c.target.field!, c.after, run.createdAt);
+      for (const c of changes) next = setField(next, c.target.recordId!, c.target.field!, c.after, at);
       if (sha256(serialise(IssuesFile, next)) !== file.afterHash) throw new NexusError("INTERNAL", "Recomputed issues do not match the journal.");
       return { kind: "issues", value: next };
     }
@@ -211,32 +236,150 @@ export class ReviewEngine {
     change.history.push({ state, at: now(), by, note });
   }
 
-  private async applyRun(run: ReviewRun, by: Actor): Promise<void> {
+  /** Write one planned file. On failure the file is marked `failed` with the reason; nothing else changes. */
+  private async writePlanned(run: ReviewRun, file: FileEntry, by: Actor): Promise<boolean> {
+    try {
+      faultPoint(`review:write:${file.path}`);
+      const expected = await this.expectedContent(run, file);
+      if (expected.kind === "changed") throw new NexusError("CONFLICT", `${file.path} changed before the edit could be written.`);
+      if (expected.kind === "issues") await this.service.writeCollectionUnlocked("issues", IssuesFile, expected.value);
+      else await this.service.writeNoteUnlocked(file.path, expected.content);
+    } catch (e) {
+      file.state = "failed";
+      file.error = (e as Error).message;
+      return false;
+    }
+    faultPoint("review:after-file-write");
+    file.state = "written";
+    file.error = null;
+    for (const c of run.changes.filter((c) => c.file === file.path && c.state === "prepared")) this.mark(run, c, "pending", by);
+    return true;
+  }
+
+  private settlePhase(run: ReviewRun): void {
+    const outstanding = run.files.some((f) => f.state === "planned" || f.state === "failed");
+    run.phase = outstanding ? "partial" : "applied";
+  }
+
+  private async applyPlanned(run: ReviewRun, by: Actor): Promise<void> {
     run.phase = "applying";
     const planned = run.files.filter((f) => f.state === "planned");
     for (const [index, file] of planned.entries()) {
-      try {
-        const expected = await this.expectedContent(run, file);
-        if (expected.kind === "changed") throw new NexusError("CONFLICT", `${file.path} changed before the edit could be written.`);
-        if (expected.kind === "issues") await this.service.writeCollectionUnlocked("issues", IssuesFile, expected.value);
-        else await this.service.writeNoteUnlocked(file.path, expected.content);
-      } catch (e) {
-        file.state = "failed";
-        file.error = (e as Error).message;
-        run.phase = "partial";
+      const ok = await this.writePlanned(run, file, by);
+      if (!ok) {
+        // Later files are not attempted. They become `failed` too, so a restart never writes them silently.
+        for (const rest of planned.slice(index + 1)) {
+          rest.state = "failed";
+          rest.error = `Not attempted, because ${file.path} could not be written.`;
+        }
+        this.settlePhase(run);
         await this.persist(run);
-        this.log(`review: run partially applied; ${file.path} failed`);
+        this.log(`review: run partially applied; ${planned.length - index} file(s) not written`);
         return;
       }
-      faultPoint("review:after-file-write");
-      file.state = "written";
-      for (const c of run.changes.filter((c) => c.file === file.path && c.state === "prepared")) this.mark(run, c, "pending", by);
-      if (index === planned.length - 1) run.phase = "applied";
-      await this.persist(run);
+      if (index < planned.length - 1) await this.persist(run);
     }
-    if (planned.length === 0) { run.phase = "applied"; await this.persist(run); }
+    this.settlePhase(run);
+    await this.persist(run);
   }
 
+  private async applyRun(run: ReviewRun, by: Actor): Promise<void> {
+    await this.applyPlanned(run, by);
+  }
+
+  /**
+   * Re-plan a failed file against its current contents (architecture 7.3).
+   * Changes whose `before` no longer matches become conflicted; the rest are
+   * recomputed with fresh hashes, so unrelated newer edits are kept.
+   */
+  private async replan(run: ReviewRun, file: FileEntry, at: string): Promise<"planned" | "nothing-left"> {
+    const prepared = run.changes.filter((c) => c.file === file.path && c.state === "prepared");
+    const conflict = (c: ChangeRecord, note: string) => {
+      c.conflictReason = "changed-before-apply";
+      this.mark(run, c, "conflicted", "system", note);
+    };
+    if (file.path === ISSUES) {
+      const bytes = await this.service.readCollectionBytes("issues");
+      let next = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
+      let kept = 0;
+      for (const c of prepared) {
+        const issue = next.issues.find((i) => i.id === c.target.recordId);
+        if (!issue || !sameValue(issue[c.target.field!], c.before) || !validFieldValue(issue, c.target.field!, c.after)) {
+          conflict(c, "retry: the field no longer has the value this change expected");
+          continue;
+        }
+        next = setField(next, issue.id, c.target.field!, c.after, at);
+        kept += 1;
+      }
+      if (kept === 0) return "nothing-left";
+      file.beforeHash = sha256(bytes);
+      file.afterHash = sha256(serialise(IssuesFile, next));
+      file.appliedAt = at;
+      return "planned";
+    }
+    const raw = await this.service.readNoteRaw(file.path);
+    if (!raw) { prepared.forEach((c) => conflict(c, "retry: the note no longer exists")); return "nothing-left"; }
+    let candidates = [...prepared];
+    for (;;) {
+      if (candidates.length === 0) return "nothing-left";
+      const result = applyEdits(raw.content, candidates.map((c) => ({ before: String(c.before), after: String(c.after) })));
+      if (result.ok) {
+        file.beforeHash = raw.revision;
+        file.afterHash = sha256(result.content);
+        file.appliedAt = at;
+        candidates.forEach((c, i) => { c.context = result.placed[i]!.context; });
+        return "planned";
+      }
+      const bad = candidates[result.index]!;
+      conflict(bad, `retry: the text to change is ${result.reason === "missing" ? "no longer there" : "now ambiguous"}`);
+      candidates = candidates.filter((c) => c !== bad);
+    }
+  }
+
+  /** Retry every outstanding (failed) file of a run. Idempotent. */
+  async retry(runId: string): Promise<RunOutcome> {
+    return this.service.exclusive(async () => {
+      const run = this.runs.get(runId);
+      if (!run) throw new NexusError("NOT_FOUND", "That review run does not exist.");
+      const failed = run.files.filter((f) => f.state === "failed");
+      if (failed.length === 0) return this.outcome(run);
+      const at = now();
+      for (const file of failed) {
+        const result = await this.replan(run, file, at);
+        if (result === "nothing-left") {
+          file.state = "conflicted";
+          file.error = "Nothing left to write: the file changed in a way that conflicts with every change.";
+        } else {
+          file.state = "planned";
+          file.error = null;
+        }
+      }
+      await this.persist(run); // new hashes are durable before any write (write-ahead)
+      await this.applyPlanned(run, "user");
+      this.publish({ type: "review.updated" });
+      return this.outcome(run);
+    });
+  }
+
+  /** Drop the changes of every outstanding file without writing. Successful sibling changes are untouched. Idempotent. */
+  async discard(runId: string): Promise<RunOutcome> {
+    return this.service.exclusive(async () => {
+      const run = this.runs.get(runId);
+      if (!run) throw new NexusError("NOT_FOUND", "That review run does not exist.");
+      const failed = run.files.filter((f) => f.state === "failed");
+      if (failed.length === 0) return this.outcome(run);
+      for (const file of failed) {
+        file.state = "discarded";
+        for (const c of run.changes.filter((c) => c.file === file.path && c.state === "prepared")) {
+          this.mark(run, c, "rejected", "user", "discarded: never written to the file");
+        }
+      }
+      this.settlePhase(run);
+      await this.persist(run);
+      this.publish({ type: "review.updated" });
+      return this.outcome(run);
+    });
+  }
   // ---------------- Decisions ----------------
 
   async accept(changeId: string): Promise<ChangeView> {
@@ -350,7 +493,7 @@ export class ReviewEngine {
               changes.filter((c) => c.state === "prepared").forEach((c) => { c.conflictReason = "changed-before-apply"; this.mark(run, c, "conflicted", "system", "file changed before the edit was written"); });
             }
           }
-          run.phase = run.files.every((f) => f.state === "written" || f.state === "conflicted") ? "applied" : "partial";
+          this.settlePhase(run);
         }
         for (const change of run.changes.filter((c) => c.state === "rejecting")) {
           touched = true;
