@@ -36,12 +36,17 @@
       key goes to that service over its local API, and from there only to
       the provider.
    2. It probes tool calling and structured output.
-   3. It asks "Which action from the kickoff still has no issue?"
-   4. It checks the answer: a recorded fact must name "Will writes the
-      judge instructions" as having no issue and cite the kickoff's
-      Actions heading, and a fact or discrepancy must cite NEX-1 for the
-      calendar work. Both citation targets must exist.
-   5. It stops the service and deletes the temporary profile, whatever
+   3. It asks "Which action from the kickoff still has no issue?" through
+      the normal Ask path. Nexus must confirm, from the evidence of that
+      run, that "Will writes the judge instructions" is untracked and
+      that NEX-1 tracks "Hein builds the calendar view". Both must come
+      from the kickoff's Actions heading, and both citations must open.
+   4. It creates "Write the judge instructions" through the ordinary issue
+      API, which makes NEX-2, then asks again in the same conversation.
+      NEX-2 must now track the judge instructions.
+   5. Before and after each Ask, it hashes the notes, `projects.json` and
+      `issues.json`, and fails if Ask changed any of them.
+   6. It stops the service and deletes the temporary profile, whatever
       the outcome. The key, any fragment of it and key-shaped strings are
       removed from the console output and from the report in
       `.tmp/live-check/`.

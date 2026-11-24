@@ -5,7 +5,18 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join, relative } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { startProviderDouble, type ProviderDouble } from "../../tools/provider-double/server.mjs";
+import { evaluateTurn } from "../../scripts/live-ask-check.mjs";
 import { apiSession, launchUrl, startService, tempDir, type Service } from "./support";
+
+/** The live check's acceptance for one turn, applied to the stored conversation (shared logic). */
+async function journeyChecks(ws: string, turn: 1 | 2): Promise<string[]> {
+  const dir = join(ws, ".nexus", "conversations");
+  const [file] = await readdir(dir);
+  const conversation = JSON.parse(await readFile(join(dir, file!), "utf8"));
+  const answers = conversation.messages.filter((m: { role: string }) => m.role === "assistant");
+  const issues = JSON.parse(await readFile(join(ws, ".nexus", "issues.json"), "utf8")).issues.map((i: { key: string }) => i.key);
+  return evaluateTurn(answers[turn - 1], turn, { actionsHeadingExists: true, existingIssues: new Set(issues) }).filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`);
+}
 
 test.use({ trace: "off", screenshot: "off" }); // a fake key is typed in Settings
 const KEY = "nexus-fake-e2e-key-5d1c8a";
@@ -81,6 +92,7 @@ test("the kickoff question is answered from both sources, citations open and ret
   await expect(answer.getByRole("region", { name: "Suggestions (not established facts)" })).toContainText("Create an issue for “Will writes the judge instructions”.");
   await expect(answer).toContainText("Consulted:");
   expect(await workspaceHashes(ws)).toEqual(before);
+  expect(await journeyChecks(ws, 1)).toEqual([]); // the same acceptance as npm run live:check
 
   // Citations open the exact heading and the issue, and lead back.
   await facts.getByRole("link", { name: "Kickoff, 24 November 2026 › Actions" }).first().click();
@@ -107,6 +119,7 @@ test("the kickoff question is answered from both sources, citations open and ret
   await expect(second).toContainText("“Will writes the judge instructions” is tracked by NEX-2");
   await expect(second).not.toContainText("has no matching issue");
   expect(await workspaceHashes(ws)).toEqual(afterManual);
+  expect(await journeyChecks(ws, 2)).toEqual([]);
 
   // The conversation is saved in the workspace and survives a restart.
   const files = await readdir(join(ws, ".nexus", "conversations"));

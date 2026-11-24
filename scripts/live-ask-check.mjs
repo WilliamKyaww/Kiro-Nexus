@@ -23,10 +23,11 @@
 // structured output; 6 the transport worked but the provider was the test double
 // (a fixture never counts as a live pass); 7 other provider error.
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { redactSecrets, sanitiseDeep, sanitiseDiagnostic } from "../server/src/providers/sanitise.mjs";
@@ -46,27 +47,63 @@ class CheckError extends Error {
 
 const providerExit = (code) => ({ PROVIDER_AUTH: EXIT.auth, PROVIDER_TIMEOUT: EXIT.timeout, CANCELLED: EXIT.timeout }[code] ?? EXIT.provider);
 
-const ABSENCE = /\b(no\b[^.]{0,30}\bissues?\b|not (yet )?(been )?(tracked|covered|created)|untracked|without (an? )?(matching |corresponding )?issue|lacks? (an? )?issue|missing (an? )?issue)/i;
+/** SHA-256 of every note and of the project and issue data (conversations, lock and state excluded). */
+export async function workspaceHashes(dir) {
+  const out = {};
+  const walk = async (d) => {
+    for (const entry of await readdir(d, { withFileTypes: true })) {
+      const p = join(d, entry.name);
+      const rel = relative(dir, p).replace(/\\/g, "/");
+      if (entry.isDirectory()) {
+        if (rel === ".nexus/conversations" || rel === ".nexus/state" || rel === ".nexus/reviews") continue;
+        await walk(p);
+      } else if (rel.endsWith(".md") || rel === ".nexus/issues.json" || rel === ".nexus/projects.json") {
+        out[rel] = createHash("sha256").update(await readFile(p)).digest("hex");
+      }
+    }
+  };
+  await walk(dir);
+  return out;
+}
 
-/** Pure evaluation of a stored answer against the Q1 acceptance (also used by tests). */
-export function evaluateAnswer(message, { actionsHeadingExists, nex1Exists }) {
+/** The issue created between the two turns, through the ordinary issue API. */
+export const NEW_ISSUE_TITLE = "Write the judge instructions";
+
+/**
+ * Pure evaluation of one stored answer in the two-turn journey (also used by the browser
+ * test). It reads the structured tracking entries, which Nexus has already checked against
+ * the run's evidence, so the wording of a sentence cannot pass or fail it.
+ *   turn 1: the judge-instructions action is untracked, and NEX-1 tracks the calendar action;
+ *   turn 2 (after NEX-2 is created): NEX-2 tracks the judge instructions, NEX-1 still the calendar.
+ */
+export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssues }) {
   const checks = [];
-  const add = (name, ok, detail) => checks.push({ name, ok, detail });
+  const add = (name, ok, detail) => checks.push({ name: `Turn ${turn}: ${name}`, ok, detail });
   const a = message?.answer;
   add("answer completed", message?.status === "complete" && !!a, message?.status ?? "no answer");
   if (!a) return checks;
   add("evidence sufficient", !a.insufficientEvidence, a.insufficientEvidence ? (a.insufficientReason ?? "insufficient evidence") : "ok");
   const cites = a.citations ?? {};
   const isActions = (h) => cites[h]?.target?.kind === "note" && cites[h].target.path === NOTE_PATH && cites[h].target.headingSlug === "actions";
-  const isNex1 = (h) => cites[h]?.target?.kind === "issue" && cites[h].target.key === "NEX-1";
-  const facts = a.facts ?? [];
-  const missing = facts.find((f) => /judge/i.test(f.text) && /instruction/i.test(f.text) && ABSENCE.test(f.text));
-  add("names the judge-instructions action as missing (as a recorded fact)", !!missing, missing ? missing.text : "no recorded fact says the judge-instructions action has no issue");
-  add("that fact cites the Actions heading", !!missing && missing.sources.some(isActions), missing ? missing.sources.join(", ") : "n/a");
-  const tracked = [...facts, ...(a.discrepancies ?? [])].find((f) => f.sources.some(isNex1));
-  add("cites NEX-1 as tracking the calendar work", !!tracked && /calendar/i.test(tracked.text), tracked ? tracked.text : "no fact or discrepancy cites NEX-1");
+  const isIssue = (key) => (h) => cites[h]?.target?.kind === "issue" && cites[h].target.key === key;
+  const entries = (a.tracking ?? []);
+  const describe = (list) => list.length ? list.map((t) => `${t.status}${t.issues.length ? ` by ${t.issues.map((h) => cites[h]?.target?.key ?? h).join(", ")}` : ""}${t.confirmed ? "" : ` (not confirmed: ${t.problem})`}`).join("; ") : "no tracking entry for this action";
+  const judge = entries.filter((t) => /judge/i.test(t.action) && /instruction/i.test(t.action));
+  const calendar = entries.filter((t) => /calendar/i.test(t.action));
+  const judgeIssue = turn === 1 ? null : "NEX-2";
+  const judgeOk = (t) => t.confirmed && isActions(t.source) && (judgeIssue === null ? t.status === "untracked" : t.status === "tracked" && t.issues.some(isIssue(judgeIssue)));
+  const calendarOk = (t) => t.confirmed && isActions(t.source) && t.status === "tracked" && t.issues.some(isIssue("NEX-1"));
+  add(judgeIssue === null
+    ? "Will's judge instructions are untracked, from the kickoff's Actions heading, confirmed by the evidence"
+    : "Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence", judge.some(judgeOk), describe(judge));
+  add("Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence", calendar.some(calendarOk), describe(calendar));
+  // A correct entry must not sit beside a confirmed entry that says the opposite.
+  const contradictions = [...judge.filter((t) => t.confirmed && !judgeOk(t)), ...calendar.filter((t) => t.confirmed && !calendarOk(t))];
+  add("no confirmed entry contradicts these", contradictions.length === 0, contradictions.length ? describe(contradictions) : "none");
   add("the Actions heading citation opens", Object.keys(cites).some(isActions) && actionsHeadingExists, actionsHeadingExists ? "heading exists" : "heading not found");
-  add("the NEX-1 citation opens", Object.keys(cites).some(isNex1) && nex1Exists, nex1Exists ? "issue exists" : "issue not found");
+  for (const key of judgeIssue === null ? ["NEX-1"] : ["NEX-1", judgeIssue]) {
+    add(`the ${key} citation opens`, Object.keys(cites).some(isIssue(key)) && existingIssues.has(key), existingIssues.has(key) ? (Object.keys(cites).some(isIssue(key)) ? "cited and exists" : "not cited") : "issue not found");
+  }
   return checks;
 }
 
@@ -140,7 +177,7 @@ async function main() {
   const bundle = join(repoRoot, "server", "dist", "main.mjs");
   const report = {
     date: new Date().toISOString(), baseUrl, model, provider: (() => { try { return new URL(baseUrl).host; } catch { return baseUrl; } })(),
-    question: QUESTION, verdict: "error", exitCode: EXIT.setup, liveProvider: null, capabilities: null, checks: [], answer: null, error: null, servicePid: null,
+    question: QUESTION, verdict: "error", exitCode: EXIT.setup, liveProvider: null, capabilities: null, checks: [], turns: [], error: null, servicePid: null,
   };
   let child = null;
   let base = null;
@@ -245,34 +282,56 @@ async function main() {
     }
 
     const conversation = await api("POST", "/conversations", { body: {}, expect: [201] });
-    const { runId } = await api("POST", `/conversations/${conversation.id}/ask`, { body: { question: QUESTION }, expect: [202] });
-    if (!runId) throw new CheckError(EXIT.setup, "The service accepted the question but returned no run ID.");
-    const deadline = Date.now() + answerTimeoutMs;
-    let message = null;
-    while (!message) {
-      if (Date.now() > deadline) {
-        await api("POST", `/ask-runs/${runId}/cancel`, { body: {} }).catch(() => undefined);
-        throw new CheckError(EXIT.timeout, `No answer within ${Math.round(answerTimeoutMs / 1000)} s. The run was cancelled.`);
+    /** Ask in the conversation through the normal Ask path and wait (bounded) for the stored answer. */
+    const askAndWait = async (question) => {
+      const { runId } = await api("POST", `/conversations/${conversation.id}/ask`, { body: { question }, expect: [202] });
+      if (!runId) throw new CheckError(EXIT.setup, "The service accepted the question but returned no run ID.");
+      const deadline = Date.now() + answerTimeoutMs;
+      for (;;) {
+        if (Date.now() > deadline) {
+          await api("POST", `/ask-runs/${runId}/cancel`, { body: {} }).catch(() => undefined);
+          throw new CheckError(EXIT.timeout, `No answer within ${Math.round(answerTimeoutMs / 1000)} s. The run was cancelled.`);
+        }
+        const c = await api("GET", `/conversations/${conversation.id}`);
+        const message = c.messages.find((m) => m.role === "assistant" && m.runId === runId && m.status !== "running");
+        if (message) return message;
+        await new Promise((r) => setTimeout(r, POLL_MS));
       }
-      const c = await api("GET", `/conversations/${conversation.id}`);
-      message = c.messages.find((m) => m.role === "assistant" && m.runId === runId && m.status !== "running") ?? null;
-      if (!message) await new Promise((r) => setTimeout(r, POLL_MS));
-    }
-    report.answer = { status: message.status, error: message.error, meta: message.meta, answer: message.answer };
-    fixture ||= message.meta?.fixture === true;
-    report.liveProvider = !fixture;
-    if (message.status !== "complete") {
-      const code = message.error?.code ?? "UNKNOWN";
-      throw new CheckError(providerExit(code), `The question was not answered (${code}): ${message.error?.message ?? ""}`);
-    }
-
+    };
+    const issueKeys = async () => new Set(((await api("GET", "/issues"))?.issues ?? []).map((i) => i.key));
     const note = await api("GET", `/notes/content?path=${encodeURIComponent(NOTE_PATH)}`);
     const actionsHeadingExists = (note?.headings ?? []).some((h) => h.slug === "actions");
-    const nex1Exists = await api("GET", "/issues/NEX-1").then(() => true, () => false);
-    report.checks = evaluateAnswer(message, { actionsHeadingExists, nex1Exists });
-    for (const c of report.checks) say(`${c.ok ? "PASS" : "FAIL"}  ${c.name}${c.ok ? "" : `: ${c.detail}`}`);
-    const failed = report.checks.filter((c) => !c.ok);
-    if (failed.length) throw new CheckError(EXIT.checkFailed, `${failed.length} answer check${failed.length === 1 ? "" : "s"} failed.`);
+    report.turns = [];
+    report.checks = [];
+
+    for (const turn of [1, 2]) {
+      if (turn === 2) {
+        // The user's manual step between the turns: create the missing issue through the issue API.
+        const project = ((await api("GET", "/projects"))?.projects ?? []).find((p) => p.key === "NEX");
+        if (!project) throw new CheckError(EXIT.setup, "The disposable sample has no NEX project.");
+        const created = await api("POST", "/issues", { body: { projectId: project.id, title: NEW_ISSUE_TITLE }, expect: [201] });
+        say(`Created ${created.key} "${NEW_ISSUE_TITLE}" through the issue API.`);
+      }
+      const before = await workspaceHashes(ws);
+      const message = await askAndWait(QUESTION);
+      const after = await workspaceHashes(ws);
+      const changed = Object.keys({ ...before, ...after }).filter((k) => before[k] !== after[k]);
+      report.turns.push({ turn, question: QUESTION, status: message.status, error: message.error, meta: message.meta, answer: message.answer, changedByAsk: changed });
+      fixture ||= message.meta?.fixture === true;
+      report.liveProvider = !fixture;
+      if (message.status !== "complete") {
+        const code = message.error?.code ?? "UNKNOWN";
+        throw new CheckError(providerExit(code), `Turn ${turn} was not answered (${code}): ${message.error?.message ?? ""}`);
+      }
+      const checks = [
+        ...evaluateTurn(message, turn, { actionsHeadingExists, existingIssues: await issueKeys() }),
+        { name: `Turn ${turn}: Ask left the notes and issues unchanged`, ok: changed.length === 0, detail: changed.length ? `changed: ${changed.join(", ")}` : "byte-for-byte unchanged" },
+      ];
+      report.checks.push(...checks);
+      for (const c of checks) say(`${c.ok ? "PASS" : "FAIL"}  ${c.name}${c.ok ? "" : `: ${c.detail}`}`);
+      const failed = checks.filter((c) => !c.ok);
+      if (failed.length) throw new CheckError(EXIT.checkFailed, `${failed.length} check${failed.length === 1 ? "" : "s"} failed in turn ${turn}.`);
+    }
     if (fixture) throw new CheckError(EXIT.fixture, "The transport and checks worked, but the provider is the local test double, which is a fixture and never counts as a live pass.");
     report.verdict = "live pass";
     report.exitCode = EXIT.pass;

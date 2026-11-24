@@ -261,3 +261,26 @@ acceptance condition has been seen to pass.
     - `coverage.test.ts`, `ask.test.ts`, `ask-http.test.ts` and
       `c4-ask-proof.spec.ts` pass with the new contract.
   - **Not verified:** a live model.
+- [x] 8. The live check proves the two-turn journey (requirement 9; run 4)
+  - **Defects (reproduced by Codex on the old evaluator):**
+    - "NEX-1 does not track the calendar work" scored 7/7 next to a
+      correct missing-action sentence;
+    - a correct answer failed because its first NEX-1 citation described
+      the status.
+  - **Fix:** `evaluateTurn` reads the structured tracking entries, which
+    Nexus has already checked against the run's evidence. It also fails if
+    a confirmed entry contradicts the expected one. The CLI runs:
+    1. turn 1;
+    2. NEX-2 created with `POST /issues`;
+    3. turn 2 in the same conversation.
+
+    It hashes the notes and the issue and project data around each Ask.
+    The browser journey in `c4-ask-proof.spec.ts` applies the same
+    `evaluateTurn` to the stored conversation.
+  - **Verified by Kiro:** `live-check-cli.test.ts` (14 tests). Against the
+    double, the real CLI passes all 17 checks over two turns, with no
+    files changed by Ask and exit 6. `-narrow` passes the journey;
+    `-heading`, `-unsure` and `-nocite` fail turn 1 with exit 1; the other
+    exit statuses are unchanged. Both evaluator bugs have regression tests.
+  - **Not done:** a live run. Q1 stays open until Will's free-provider run
+    exits 0.
