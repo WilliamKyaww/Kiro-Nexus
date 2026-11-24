@@ -13,6 +13,7 @@
 | What exactly does a slice require, and how is it built? | `.kiro/specs/<slice>/requirements.md`, `design.md` |
 | Which tasks remain in a slice? | `.kiro/specs/<slice>/tasks.md` (the only task checklist) |
 | Standing Kiro guidance | `.kiro/steering/` |
+| How can judges try the AI, and what has been tested live? | `docs/judge-ai-route.md` |
 | Are we ready to submit? | `docs/submission-checklist.md` |
 | What happened that matters later? | `docs/journal/YYYY-MM-DD.md` |
 | What did an independent reviewer find? | `docs/reviews/YYYY-MM-DD-topic.md` |

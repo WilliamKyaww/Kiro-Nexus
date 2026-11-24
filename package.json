@@ -23,7 +23,8 @@
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
     "scan:secrets": "node scripts/secret-scan.mjs",
     "double": "node tools/provider-double/server.mjs 47200",
-    "live:check": "node scripts/live-ask-check.mjs"
+    "live:check": "node scripts/live-ask-check.mjs",
+    "demo:ask": "node scripts/build.mjs && node scripts/launch.mjs --profile .tmp/ask-demo/profile --workspace .tmp/ask-demo/workspace --sample --port 47110"
   },
   "dependencies": {
     "@fastify/static": "10.1.12",

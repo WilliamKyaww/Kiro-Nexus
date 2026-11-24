@@ -3,6 +3,7 @@
 //   node scripts/launch.mjs --try      disposable copy of the fictional sample in .tmp/try (port 47100)
 //   node scripts/launch.mjs --reset-try  delete .tmp/try
 // Options: --workspace <dir> --profile <dir> --port <n> --no-open
+//          --sample   copy the fictional sample into --workspace if that folder is missing
 import { spawn } from "node:child_process";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -39,7 +40,7 @@ if (existing && isAlive(existing.pid)) {
 
 const args = [join(repoRoot, "server", "dist", "main.mjs"), "--profile", profile, "--port", String(port)];
 if (workspace) args.push("--workspace", workspace);
-if (tryMode) args.push("--init-sample");
+if (tryMode || process.argv.includes("--sample")) args.push("--init-sample");
 const child = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "inherit"] });
 
 createInterface({ input: child.stdout }).on("line", async (line) => {
@@ -57,7 +58,8 @@ createInterface({ input: child.stdout }).on("line", async (line) => {
   console.log(`Nexus is running at http://127.0.0.1:${msg.port}/`);
   if (tryMode) console.log(`Workspace (disposable copy of the fictional sample): ${tryPaths.workspace}`);
   console.log(`Profile: ${profile}`);
-  console.log(`New browser session: npm run open${tryMode ? " -- --try" : ""}`);
+  const openArgs = tryMode ? " -- --try" : arg("profile") ? ` -- --profile "${arg("profile")}"` : "";
+  console.log(`New browser session: npm run open${openArgs}`);
   console.log("Stop: press Ctrl+C here.");
   if (url && !process.argv.includes("--no-open")) openInBrowser(url);
   else if (url) console.log(`Launch link (single use, valid for 2 minutes): ${url}`);

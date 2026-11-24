@@ -10,9 +10,13 @@ Frankenstein category of Kiroween 2026.
 - notes, projects, issues and heading links, which persist;
 - section search;
 - detection of outside edits, without losing unsaved text;
-- per-change review of edits, demonstrated with fixed operations (not AI).
+- per-change review of edits, demonstrated with fixed operations (not AI);
+- read-only Ask: questions answered from your notes and issues, with
+  citations, through any OpenAI-compatible provider. So far it has been
+  tested only against a local test double, which is a fixture and not AI.
+  No live provider has been checked yet.
 
-The board, calendar, reminders and AI arrive in later slices; see
+The board, calendar, reminders and agent edits arrive in later slices; see
 `STATE.md` and `BACKLOG.md`.
 
 ## Requirements
@@ -70,6 +74,55 @@ single-writer lock at work.
 
 Start again from a clean sample with `npm run try:reset`.
 
+## Try Ask (read-only AI)
+
+Ask answers questions from the open workspace and never changes your notes
+or issues. It saves only the conversation, in `.nexus/conversations/`.
+
+### With the local test double (no account, no key)
+
+The test double is a fixed, rule-based fixture, not AI. Every answer it
+gives is labelled as such. Use it to see the interface.
+
+```powershell
+npm run double       # terminal 1: the test double on 127.0.0.1:47200
+npm run demo:ask     # terminal 2: build, then open a separate copy of the sample (.tmp/ask-demo)
+```
+
+1. In **Settings → Add an OpenAI-compatible provider**, enter:
+   - Name: `Local test double`
+   - Base URL: `http://127.0.0.1:47200/v1`
+   - Model: `nexus-test-double`
+   - API key: any text
+
+   Then select **Add provider**. Nexus tests it and reports "Tool calling:
+   Yes".
+2. On **Home**, paste "Which action from the kickoff still has no issue?"
+   and select **Send**. The answer says that "Will writes the judge
+   instructions" has no matching issue, and that NEX-1 tracks "Hein builds
+   the calendar view".
+3. Open the citations *Kickoff, 24 November 2026 › Actions* and *NEX-1
+   Build calendar view*. Each one opens its target. **← Back to
+   conversation** returns you to the answer.
+4. In **Projects → NEX**, create the issue "Write the judge instructions".
+   Go back to the conversation from Home and ask again. This time the
+   answer says the action is tracked by NEX-2.
+
+`npm run demo:ask` uses its own profile and workspace, so it does not
+affect `npm run try`. Stop it with Ctrl+C. To start again from a fresh
+sample, delete `.tmp/ask-demo`.
+
+### With a real provider
+
+Choose the Groq template in Settings, or enter any OpenAI-compatible
+endpoint. Base URLs must use HTTPS; plain HTTP is allowed only for
+`localhost` and `127.0.0.1`. In the browser, the key is held in service
+memory for the session only. The desktop app encrypts the key with Windows
+protection (`safeStorage`), outside the workspace. Free plans may use what
+you send for training, so use the fictional sample until you are happy
+with that. `docs/judge-ai-route.md` describes a scripted live check
+(`npm run live:check`) and the routes proposed for judges.
+
 ## Your own workspace
 
 ```powershell
@@ -94,7 +147,8 @@ Nexus from its launcher". In that case, run `npm run open`. See
 ```powershell
 npm run typecheck
 npm test             # unit and integration tests (runs the real service process)
-npm run test:e2e     # builds, then Playwright: browser journey in Edge plus Electron smoke test
+npm run test:e2e     # builds, then Playwright: browser journeys in Edge plus Electron tests
+npm run scan:secrets # looks for the test keys and real key shapes in files, builds and test output
 npm run mcp:smoke    # dev tooling: Playwright MCP smoke test against the wireframe
 ```
 
