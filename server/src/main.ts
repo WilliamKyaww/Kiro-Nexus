@@ -84,6 +84,9 @@ process.stdout.write(JSON.stringify({ event: "ready", port, pid: process.pid }) 
 
 process.on("SIGINT", () => void shutdown(0));
 process.on("SIGTERM", () => void shutdown(0));
+// Closing the console window (for example "Start Nexus.bat") sends SIGHUP on Windows, which
+// otherwise ends the process at once and leaves the workspace lock behind.
+process.on("SIGHUP", () => void shutdown(0));
 process.on("message", (m: unknown) => { if ((m as { type?: string })?.type === "shutdown") void shutdown(0); });
 // Electron utilityProcess channel.
 const parentPort = (process as unknown as { parentPort?: { on: (e: string, cb: (m: { data: unknown }) => void) => void; postMessage: (m: unknown) => void } }).parentPort;

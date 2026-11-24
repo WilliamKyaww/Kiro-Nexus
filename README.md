@@ -27,6 +27,16 @@ The board, calendar, reminders and agent edits arrive in later slices; see
 
 ## Try it
 
+**One click (Windows):** double-click `Start Nexus.bat` in the repository folder.
+
+- It checks for Node.js, installs the dependencies the first time, builds Nexus and opens
+  it in your browser.
+- On the first run, the Workspace page lets you choose a folder or copy the fictional
+  sample.
+- To stop Nexus, press Ctrl+C in its window, or close the window.
+
+From a terminal instead:
+
 ```powershell
 npm install
 npm run try          # build, copy the fictional sample to .tmp/try, open the browser
