@@ -17,6 +17,11 @@ export function installReview(state: AppState): void {
   state.onClose.push(async () => { engines.delete(state); });
 }
 
+/** The engine of the workspace being opened, for later open hooks (state.service is not set yet). */
+export function engineFor(state: AppState): ReviewEngine | undefined {
+  return engines.get(state);
+}
+
 export function requireEngine(state: AppState): ReviewEngine {
   const engine = engines.get(state);
   if (!engine || !state.service) throw new NexusError("NO_WORKSPACE", "No workspace is open.");

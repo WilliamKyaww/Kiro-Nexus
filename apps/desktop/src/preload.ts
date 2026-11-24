@@ -8,4 +8,10 @@ contextBridge.exposeInMainWorld("nexusNative", {
   keyStorage: (): Promise<"os-protected" | "session"> => ipcRenderer.invoke("nexus:key-storage"),
   setProviderKey: (profileId: string, key: string): Promise<"os-protected" | "session"> => ipcRenderer.invoke("nexus:set-provider-key", profileId, key),
   deleteProviderKey: (profileId: string): Promise<boolean> => ipcRenderer.invoke("nexus:delete-provider-key", profileId),
+  /** B4: a click on a native reminder notification; the path is a /notifications/open link. */
+  onNavigate: (listener: (path: string) => void): (() => void) => {
+    const handler = (_event: unknown, path: unknown) => { if (typeof path === "string" && path.startsWith("/notifications/open?")) listener(path); };
+    ipcRenderer.on("nexus:navigate", handler);
+    return () => { ipcRenderer.removeListener("nexus:navigate", handler); };
+  },
 });

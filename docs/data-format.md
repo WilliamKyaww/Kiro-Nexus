@@ -132,6 +132,74 @@ When a heading text repeats, the copies get de-duplicated slugs such as
 - **Outside deletion while a draft is open** keeps the draft and offers
   "Recreate with my text".
 
+## Reminders (B4)
+
+Schemas: `packages/schema/src/reminders.ts`. Spec: `.kiro/specs/reminders/`.
+
+### `reminders.json` (user data)
+
+```json
+{ "schemaVersion": 1, "enabled": true, "allDayTime": "09:00", "timedOffsetMinutes": 60, "nativeNotifications": true }
+```
+
+- Created when reminder settings are first saved. Without it, the defaults
+  shown apply.
+- `allDayTime` is the local time, in the workspace zone, at which an all-day
+  due date reminds.
+- `timedOffsetMinutes` is how long before a timed due date, or a timed event
+  start, the reminder fires.
+- `nativeNotifications` is used by the desktop app only.
+
+### `calendar.json` (shared event record)
+
+```json
+{ "schemaVersion": 1, "events": [
+  { "id": "evt_…", "title": "Demo rehearsal", "start": { "dateTime": "2026-12-02T15:00:00Z", "timeZone": "Europe/London" }, "end": null, "reminder": true }
+] }
+```
+
+- Hein's calendar slice creates and edits events. Reminders only read this
+  file.
+- `start` and `end` use the same shape as an issue's `due`.
+- `reminder: false` turns off that event's reminder.
+- A missing file means there are no events. A file that is not valid is
+  skipped, and the log says so.
+- The scheduler reads it again on every tick, at least every 30 seconds.
+
+### `state/deliveries.json` (service state, not user data)
+
+One record per reminder occurrence, shared by every surface (DEC-009):
+
+```json
+{ "schemaVersion": 1, "seenUpTo": "2026-12-05T09:00:30.000Z", "deliveries": [
+  { "id": "dlv_…", "key": "issue:iss_…:allday-0900:2026-12-05T09:00:00.000Z", "kind": "issue",
+    "targetId": "iss_…", "targetKey": "NEX-1", "title": "Build calendar view", "detail": "Due today",
+    "workspaceId": "wsp_…", "rule": "allday-0900", "scheduledAt": "2026-12-05T09:00:00.000Z",
+    "status": "delivered", "deliveredAt": "2026-12-05T09:00:30.000Z", "batch": null }
+] }
+```
+
+- `key` is the target, the rule and the scheduled instant. A key that is
+  already in the log is never delivered again.
+- `status`:
+  - `delivering` is written before a reminder is shown;
+  - `delivered` is written after;
+  - `missed` means it came due while Nexus was closed, or a crash left it at
+    `delivering`.
+- `batch` names the start-up that recorded a missed reminder. "While you were
+  away" shows only the current start-up's batch.
+- `seenUpTo` drives the unseen count on the rail.
+- Old entries are pruned beyond the newest 500, but only once they are more
+  than 60 days past.
+- If this file is not valid, Nexus delivers no reminders rather than risk a
+  duplicate.
+
+### `state/scheduler.json` (service state)
+
+`{ "schemaVersion": 1, "lastTickAt": "…" }` records the end of the last
+period in which Nexus was delivering reminders. Occurrences between it and
+the next start count as missed.
+
 ## `lock`
 
 `lock` holds `{ pid, instanceId, port, startedAt }`.

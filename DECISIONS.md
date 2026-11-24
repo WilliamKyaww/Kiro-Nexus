@@ -539,3 +539,37 @@ status control.
   itself.
 - *Matching by position or slug.* This is what broke on collisions and changed
   heading counts (R4-8).
+
+## DEC-025: Reminders are computed each tick from accepted data, with a test clock behind the control secret
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 5 stage 2, B4 under Will's
+  authorisation; awaiting human review). Builds on DEC-009.
+
+**Decision.**
+- **Computing reminders.** The scheduler keeps no schedule of its own. Each tick
+  computes every occurrence from accepted issues, the events in `calendar.json`
+  and the settings. It delivers those that came due since the last tick and have
+  no log entry.
+  - An accepted date, a manual edit or a changed setting therefore needs no
+    rescheduling. A data change makes it tick within 250 ms.
+  - Occurrences that came due while Nexus was closed are recorded as missed on
+    the next start, in that start-up's batch. They are shown once, under "While
+    you were away", and never delivered.
+- **Defaults.** An all-day date reminds at 09:00 in the workspace zone. A timed
+  due date or event reminds 60 minutes before. Both can be changed in Settings,
+  per workspace.
+- **Surfaces.** In-app notifications go to every tab over the event stream. The
+  desktop app adds the native notification from the same delivery, over the
+  `utilityProcess` port. Every surface opens a reminder through
+  `/notifications/open`, which checks the workspace and the item first.
+- **Test clock.** `NEXUS_TEST_CLOCK` freezes the clock for tests. Only the process
+  that started the service can move it (`POST /api/v1/control/clock`, which
+  needs the control secret). Without the variable the route does not exist.
+
+**Alternatives.**
+- *A persistent schedule, updated on every change.* It can drift from the data,
+  and every change path would have to update it.
+- *A clock route available to browser sessions.* Any page with a session could
+  then trigger or suppress reminders.
+- *Delivering missed reminders on start.* After a long absence that would flood
+  the user, and it would show a reminder whose time had passed as if it were new.

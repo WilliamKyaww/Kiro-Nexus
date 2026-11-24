@@ -12,6 +12,7 @@ import { SessionManager } from "./security/session";
 import { AppState } from "./state";
 import { extraPlugins, extraStartup } from "./plugins";
 import { handleParentMessage } from "./providers";
+import { setNativeStatus } from "./scheduler";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -85,8 +86,17 @@ process.on("SIGINT", () => void shutdown(0));
 process.on("SIGTERM", () => void shutdown(0));
 process.on("message", (m: unknown) => { if ((m as { type?: string })?.type === "shutdown") void shutdown(0); });
 // Electron utilityProcess channel.
-const parentPort = (process as unknown as { parentPort?: { on: (e: string, cb: (m: { data: unknown }) => void) => void } }).parentPort;
+const parentPort = (process as unknown as { parentPort?: { on: (e: string, cb: (m: { data: unknown }) => void) => void; postMessage: (m: unknown) => void } }).parentPort;
 parentPort?.on("message", (m) => {
-  if ((m.data as { type?: string })?.type === "shutdown") void shutdown(0);
+  const data = m.data as { type?: string; available?: unknown; reason?: unknown };
+  if (data?.type === "shutdown") void shutdown(0);
+  else if (data?.type === "native-notifications") setNativeStatus(state, { available: data.available === true, reason: typeof data.reason === "string" ? data.reason.slice(0, 200) : null });
   else handleParentMessage(state, m.data);
 });
+// B4: every delivered reminder also goes to Electron main, which shows the native notification.
+// It is the same delivery record the browser shows; main only adds a surface.
+if (parentPort) {
+  state.bus.on("event", (e: { type: string; delivery?: unknown; native?: unknown }) => {
+    if (e.type === "notification") parentPort.postMessage({ type: "notification", delivery: e.delivery, native: e.native !== false });
+  });
+}

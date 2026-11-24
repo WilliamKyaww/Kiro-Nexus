@@ -35,7 +35,8 @@ const CSP = [
 ].join("; ");
 
 /** Routes that need no session token. Everything else under /api/ does. */
-const controlRoutes = new Set(["POST /api/v1/launch-codes", "POST /api/v1/shutdown"]);
+// /control/clock exists only when the service was started with NEXUS_TEST_CLOCK (B4 tests).
+const controlRoutes = new Set(["POST /api/v1/launch-codes", "POST /api/v1/shutdown", "POST /api/v1/control/clock"]);
 const openRoutes = new Set(["POST /api/v1/session"]);
 
 export function parseBody<T>(schema: z.ZodType<T>, value: unknown): T {

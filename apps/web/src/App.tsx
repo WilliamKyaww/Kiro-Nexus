@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import type { WorkspaceView } from "@nexus/schema";
 import { api, onSessionChange, subscribeEvents, type SessionState } from "./api";
 import { HomePage } from "./pages/HomePage";
@@ -13,6 +13,8 @@ import { WorkspacePage } from "./pages/WorkspacePage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ConversationPage } from "./pages/ConversationPage";
+import { NotificationsPage, OpenNotificationPage } from "./pages/NotificationsPage";
+import { useNotifications } from "./notifications/notifications";
 import { setProgress } from "./ask/ask";
 import { extraShell } from "./slices";
 
@@ -87,10 +89,20 @@ function useLiveUpdates(): boolean {
   return connected;
 }
 
+/** How many delivered reminders the Notifications list has not shown yet (B4). */
+function UnseenBadge() {
+  const view = useNotifications();
+  const n = view.data?.unseen ?? 0;
+  return n > 0 ? <span className="badge" aria-label={`${n} new`}>{n}</span> : null;
+}
+
 function Shell() {
   const workspace = useQuery({ queryKey: ["workspace"], queryFn: () => api.get<WorkspaceView>("/workspace") });
   const connected = useLiveUpdates();
   const location = useLocation();
+  const navigate = useNavigate();
+  // A click on a native desktop notification arrives here (B4). Main allows only reminder paths.
+  useEffect(() => window.nexusNative?.onNavigate?.((path) => { if (path.startsWith("/notifications/open?")) navigate(path); }), [navigate]);
   const ws = workspace.data?.workspace;
   const needsWorkspace = workspace.isSuccess && !ws && location.pathname !== "/workspace";
 
@@ -102,7 +114,7 @@ function Shell() {
           <p className="brand">Nexus</p>
           <ul>
             {sections.map((s) => (
-              <li key={s.to}><NavLink to={s.to} end={s.end}>{s.label}</NavLink></li>
+              <li key={s.to}><NavLink to={s.to} end={s.end}>{s.label}{s.to === "/notifications" ? <UnseenBadge /> : null}</NavLink></li>
             ))}
           </ul>
           <div className="rail-footer">
@@ -124,7 +136,8 @@ function Shell() {
               <Route path="/projects/:key" element={<BoardPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
               <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/notifications" element={<PlaceholderPage title="Notifications" body="Reminders are not available yet. A due date that is still awaiting review will never trigger a reminder." />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/notifications/open" element={<OpenNotificationPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<PlaceholderPage title="Not found" body="This page does not exist." />} />
             </Routes>

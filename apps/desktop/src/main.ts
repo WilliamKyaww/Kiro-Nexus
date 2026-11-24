@@ -1,8 +1,8 @@
 // Electron main: starts the local service in a utilityProcess, mints a launch
 // code and loads the same web UI in a sandboxed window (architecture 4.2).
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
@@ -29,10 +29,14 @@ function startService(): Promise<number> {
     });
     service = child;
     child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[service] ${d}`));
+    child.on("message", (m: unknown) => {
+      const msg = m as { type?: string; delivery?: NativeDelivery; native?: boolean };
+      if (msg?.type === "notification" && msg.delivery) showNativeNotification(msg.delivery, msg.native !== false);
+    });
     createInterface({ input: child.stdout! }).on("line", (line) => {
       try {
         const msg = JSON.parse(line) as { event?: string; port?: number; code?: string };
-        if (msg.event === "ready" && msg.port) { sendStoredKeys(child); resolveStart(msg.port); }
+        if (msg.event === "ready" && msg.port) { sendStoredKeys(child); child.postMessage({ type: "native-notifications", ...nativeStatus() }); resolveStart(msg.port); }
         if (msg.event === "error") reject(new Error(`The Nexus service could not start (${msg.code}).`));
       } catch { /* not a control line */ }
     });
@@ -94,6 +98,51 @@ ipcMain.handle("nexus:delete-provider-key", (event, profileId: unknown) => {
   service?.postMessage({ type: "provider-key-delete", profileId });
   return true;
 });
+
+// ---------- Reminders (B4, PRD-043): the native surface for the service's delivery record ----------
+interface NativeDelivery { id: string; kind: string; title: string; detail: string; targetKey: string | null; workspaceId: string }
+const notifyLog = process.env.NEXUS_E2E_NOTIFY_LOG ?? null;
+
+/**
+ * Whether native notifications can be shown. Windows grants them without a prompt, but they
+ * can be unsupported. NEXUS_NATIVE_NOTIFICATIONS=denied simulates a denial for tests.
+ */
+function nativeStatus(): { available: boolean; reason: string | null } {
+  if (process.env.NEXUS_NATIVE_NOTIFICATIONS === "denied") return { available: false, reason: "notifications are not allowed for Nexus (simulated for a test)." };
+  if (!Notification.isSupported()) return { available: false, reason: "this system does not support desktop notifications." };
+  return { available: true, reason: null };
+}
+
+const validDelivery = (d: NativeDelivery) => /^dlv_[0-9A-HJKMNP-TV-Z]{26}$/.test(d.id) && /^wsp_[0-9A-HJKMNP-TV-Z]{26}$/.test(d.workspaceId);
+const reminderPath = (d: NativeDelivery) => `/notifications/open?id=${encodeURIComponent(d.id)}&ws=${encodeURIComponent(d.workspaceId)}`;
+const shown = new Map<string, NativeDelivery>();
+
+/** A click (real, or simulated by a test) focuses the window and opens the reminder's item. */
+function openReminder(id: string): void {
+  const d = shown.get(id);
+  if (!d || !mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  mainWindow.webContents.send("nexus:navigate", reminderPath(d));
+}
+
+function showNativeNotification(d: NativeDelivery, enabled: boolean): void {
+  if (!enabled || !validDelivery(d) || !nativeStatus().available) return; // the in-app route still shows it
+  shown.set(d.id, d);
+  const title = d.kind === "test" ? "Test reminder" : `Reminder${d.targetKey && d.kind === "issue" ? `: ${d.targetKey}` : ""}`;
+  const body = d.kind === "test" ? d.detail : `${d.title}. ${d.detail}`;
+  if (notifyLog) {
+    // Tests record the notification instead of showing an operating-system toast.
+    appendFileSync(notifyLog, JSON.stringify({ id: d.id, title, body, at: new Date().toISOString() }) + "\n");
+    return;
+  }
+  const n = new Notification({ title, body: body.slice(0, 250) });
+  n.on("click", () => openReminder(d.id));
+  n.show();
+}
+// For tests: simulate the operating system's click on a native notification.
+(app as unknown as NodeJS.EventEmitter).on("nexus:test-notification-click", (id: string) => openReminder(id));
 
 async function launchUrl(port: number): Promise<string> {
   const res = await fetch(`http://127.0.0.1:${port}/api/v1/launch-codes`, { method: "POST", headers: { authorization: `Bearer ${controlSecret}` } });

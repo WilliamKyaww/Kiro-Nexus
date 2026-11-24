@@ -35,7 +35,8 @@ async function workspaceHashes(dir: string): Promise<Record<string, string>> {
     for (const name of await readdir(d)) {
       const p = join(d, name);
       const rel = relative(dir, p).replace(/\\/g, "/");
-      if (rel.startsWith(".nexus/conversations") || rel === ".nexus/lock") continue;
+      // state/ is the service's own reminder state (B4), written by the scheduler, not by Ask.
+      if (rel.startsWith(".nexus/conversations") || rel.startsWith(".nexus/state") || rel === ".nexus/lock") continue;
       if ((await stat(p)).isDirectory()) await walk(p);
       else out[rel] = createHash("sha256").update(await readFile(p)).digest("hex");
     }

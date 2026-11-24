@@ -68,7 +68,7 @@ async function waitForAnswer(api: ReturnType<typeof client>, conversationId: str
 describe("Ask over HTTP", () => {
   it("answers, stores only the conversation, and pins the model", async () => {
     const { api } = await setup();
-    const before = await hashes(ws, /^\.nexus\/conversations/);
+    const before = await hashes(ws, /^\.nexus\/(conversations|state)/);
     const conv = (await api.post("/conversations", {})).body;
     const started = await api.post(`/conversations/${conv.id}/ask`, { question: "Which action from the kickoff still has no issue?" });
     expect(started.status).toBe(202);
@@ -78,7 +78,7 @@ describe("Ask over HTTP", () => {
     expect(answer.meta).toMatchObject({ model: "nexus-test-double", fixture: true, mode: "tools" });
     expect(answer.answer.facts.map((f: { text: string }) => f.text).join("\n")).toMatch(/judge instructions.*has no matching issue/);
     expect(c.title).toBe("Which action from the kickoff still has no issue?");
-    expect(await hashes(ws, /^\.nexus\/conversations/)).toEqual(before);
+    expect(await hashes(ws, /^\.nexus\/(conversations|state)/)).toEqual(before);
     const stored = await readFile(join(ws, ".nexus", "conversations", `${conv.id}.json`), "utf8");
     expect(stored).not.toContain(KEY);
     expect((await api.get("/conversations")).body.conversations).toMatchObject([{ id: conv.id, messages: 2 }]);

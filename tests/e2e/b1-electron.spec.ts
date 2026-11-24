@@ -38,7 +38,8 @@ test("desktop window is sandboxed, shows the same UI and keeps a note across rel
   });
   expect(prefs).toEqual({ sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true });
   expect(await win.evaluate(() => typeof (window as unknown as { require?: unknown }).require)).toBe("undefined");
-  expect(await win.evaluate(() => Object.keys(window.nexusNative ?? {}).sort())).toEqual(["appInfo", "deleteProviderKey", "keyStorage", "pickWorkspaceFolder", "setProviderKey"]);
+  // onNavigate (B4) only receives reminder paths from main; it cannot reach anything else.
+  expect(await win.evaluate(() => Object.keys(window.nexusNative ?? {}).sort())).toEqual(["appInfo", "deleteProviderKey", "keyStorage", "onNavigate", "pickWorkspaceFolder", "setProviderKey"]);
 
   await win.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Notes" }).click();
   await win.getByRole("textbox", { name: "Title" }).fill("Desktop note");

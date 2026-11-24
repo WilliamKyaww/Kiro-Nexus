@@ -338,6 +338,39 @@ export class WorkspaceService {
     return names.filter((n) => /^cnv_[0-9A-HJKMNP-TV-Z]{26}\.json$/.test(n)).map((n) => n.slice(0, -5));
   }
 
+  // ---------------- Reminder data (B4) ----------------
+
+  /** `.nexus/reminders.json` (settings, user data) or `.nexus/calendar.json` (events, read here). */
+  async readDataFile(name: "reminders.json" | "calendar.json"): Promise<string | null> {
+    return readFile(join(this.root, ".nexus", name), "utf8").catch(() => null);
+  }
+
+  async writeDataFile(name: "reminders.json", bytes: string): Promise<void> {
+    await this.exclusive(async () => {
+      try {
+        await atomicWrite(join(this.root, ".nexus", name), bytes);
+      } catch (e) {
+        throw new NexusError("WRITE_FAILED", `Could not write ${name}: ${(e as Error).message}`);
+      }
+      this.emit({ type: "file.changed", path: `.nexus/${name}`, source: "nexus", revision: sha256(bytes) });
+    });
+  }
+
+  /** `.nexus/state/<name>`: the delivery log and the scheduler's last tick (not user data). */
+  async readStateFile(name: "deliveries.json" | "scheduler.json"): Promise<string | null> {
+    return readFile(join(this.root, ".nexus", "state", name), "utf8").catch(() => null);
+  }
+
+  async writeStateFile(name: "deliveries.json" | "scheduler.json", bytes: string): Promise<void> {
+    await this.exclusive(async () => {
+      try {
+        await atomicWrite(join(this.root, ".nexus", "state", name), bytes);
+      } catch (e) {
+        throw new NexusError("WRITE_FAILED", `Could not write the reminder state: ${(e as Error).message}`);
+      }
+    });
+  }
+
   // ---------------- Review journal ----------------
 
   journalDir(): string {

@@ -234,6 +234,26 @@ a.button.primary:hover { background: #0b544d; }
 .confirm-related p { margin: 0 0 0.3rem; }
 .confirm-related ul { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
 .cal-time { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--ink-soft); }
+
+/* Reminders (B4). Placeholder styling: Hein owns the final design. */
+.toasts { position: fixed; top: 1rem; right: 1rem; z-index: 30; display: grid; gap: 0.5rem; width: min(22rem, calc(100vw - 2rem)); }
+.toast { background: var(--panel); border: 1px solid var(--accent); border-left-width: 4px; border-radius: 8px; padding: 0.6rem 0.8rem; box-shadow: 0 4px 16px rgb(0 0 0 / 0.12); }
+.toast.test { border-color: var(--pending); }
+.toast p { margin: 0 0 0.3rem; overflow-wrap: anywhere; }
+.toast-title { font-size: 0.85rem; }
+/* On a narrow screen, show only the newest reminder; the Notifications list has them all. */
+@media (max-width: 600px) {
+  .toasts { top: auto; bottom: calc(var(--review-bar-h, 0px) + 0.75rem); right: 0.75rem; left: 0.75rem; width: auto; }
+  .toast:not(:first-child) { display: none; }
+}
+.badge { display: inline-block; margin-left: 0.4rem; min-width: 1.3rem; padding: 0 0.35rem; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.75rem; font-weight: 700; text-align: center; }
+.deliveries { list-style: none; padding: 0; display: grid; gap: 0.4rem; max-width: 52rem; }
+.delivery { overflow-wrap: anywhere; }
+.delivery.missed a { color: var(--pending); }
+.away { background: var(--pending-bg); border: 1px solid var(--pending); border-radius: 10px; padding: 0.5rem 1rem; margin: 1rem 0; max-width: 52rem; }
+.reminder-settings { display: grid; gap: 0.6rem; max-width: 26rem; }
+.reminder-settings label { display: grid; gap: 0.2rem; }
+.reminder-settings label.check { display: flex; gap: 0.5rem; align-items: center; }
 .due-zone { font-size: 0.82rem; margin: 0.2rem 0; max-width: 22rem; }
 .links .linked li.pending-field { background: var(--pending-bg); outline: 1px solid var(--pending); border-radius: 4px; padding: 0.1rem 0.3rem; }
 

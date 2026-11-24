@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
-import type { WorkspaceView } from "@nexus/schema";
+import type { ReminderSettings, WorkspaceView } from "@nexus/schema";
 import { ApiError, api } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
+import { notificationsKey, useNotifications } from "../notifications/notifications";
 
 type Cap = "unknown" | "yes" | "no" | "error";
 export interface ProviderView {
@@ -92,6 +93,48 @@ export function SettingsPage() {
       </ul>
       {providers.isSuccess && providers.data.profiles.length === 0 ? <p className="muted">No provider yet. AI is off.</p> : null}
       {providers.data ? <AddProvider templates={providers.data.templates} onAdded={(text) => { setMessage(text); void refresh(); }} testAfter={(id) => test.mutate(id)} /> : null}
+
+      <RemindersSettings />
+    </section>
+  );
+}
+
+/** B4 requirement 5.1: when ordinary reminders fire. Saved in the workspace (.nexus/reminders.json). */
+function RemindersSettings() {
+  const client = useQueryClient();
+  const view = useNotifications();
+  const [draft, setDraft] = useState<Partial<ReminderSettings> | null>(null);
+  const save = useMutation({
+    mutationFn: (patch: Partial<ReminderSettings>) => api.put<ReminderSettings>("/reminders/settings", patch),
+    onSuccess: () => { setDraft(null); void client.invalidateQueries({ queryKey: notificationsKey }); },
+  });
+  const s = view.data?.settings;
+  if (!s) return null;
+  const value = { ...s, ...draft };
+  const set = (patch: Partial<ReminderSettings>) => setDraft((d) => ({ ...d, ...patch }));
+  const native = view.data?.native ?? null;
+  return (
+    <section aria-labelledby="reminders-h" id="reminders">
+      <h2 id="reminders-h">Reminders</h2>
+      <p className="muted">Reminders are delivered only while Nexus is running, from accepted dates only. These settings belong to this workspace.</p>
+      <form className="reminder-settings" aria-label="Reminder settings" onSubmit={(e) => { e.preventDefault(); if (draft) save.mutate(draft); }}>
+        <label className="check"><input type="checkbox" checked={value.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> Send reminders for due dates and events</label>
+        <label>Time on an all-day due date
+          <input type="time" value={value.allDayTime} onChange={(e) => set({ allDayTime: e.target.value })} required />
+        </label>
+        <label>Minutes before a timed due date or event
+          <input type="number" min={0} max={10080} value={value.timedOffsetMinutes} onChange={(e) => set({ timedOffsetMinutes: Number(e.target.value) })} required />
+        </label>
+        {native ? (
+          <label className="check"><input type="checkbox" checked={value.nativeNotifications} onChange={(e) => set({ nativeNotifications: e.target.checked })} disabled={!native.available} /> Also show desktop notifications{native.available ? "" : ` (unavailable: ${native.reason ?? "not supported"})`}</label>
+        ) : null}
+        <div className="row">
+          <button type="submit" className="primary" disabled={!draft || save.isPending}>Save reminder settings</button>
+          <span className="muted" role="status">{save.isSuccess && !draft ? "Saved." : draft ? "Unsaved changes" : ""}</span>
+        </div>
+        {save.error ? <ErrorNote error={save.error} /> : null}
+      </form>
+      <p><Link to="/notifications">Notifications and the test reminder</Link></p>
     </section>
   );
 }
