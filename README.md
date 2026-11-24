@@ -104,9 +104,19 @@ npm run demo:ask     # terminal 2: build, then open a separate copy of the sampl
 3. Open the citations *Kickoff, 24 November 2026 › Actions* and *NEX-1
    Build calendar view*. Each one opens its target. **← Back to
    conversation** returns you to the answer.
-4. In **Projects → NEX**, create the issue "Write the judge instructions".
+4. In the same conversation, ask the follow-up "Which of those is already
+   tracked?" The answer names only NEX-1. Ask uses the last few questions
+   in the conversation as context, and checks the workspace again for
+   each answer.
+5. In **Projects → NEX**, create the issue "Write the judge instructions".
    Go back to the conversation from Home and ask again. This time the
    answer says the action is tracked by NEX-2.
+
+If Ask could not read every issue record, an answer that says something
+has no issue appears under **Not confirmed**, with how many records it
+read. A conversation answers one question at a time. If you send a
+question from another window while an answer is running, Nexus refuses it
+with a message and keeps your typed question.
 
 `npm run demo:ask` uses its own profile and workspace, so it does not
 affect `npm run try`. Stop it with Ctrl+C. To start again from a fresh

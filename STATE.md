@@ -1,14 +1,19 @@
 # State
 
-- **Date updated:** 2026-11-24 (repair and Ask run finished; waiting for
-  Will and Hein)
-- **Active phase:** none. Phase 1 (the four repairs) and Phase 2 (slice C,
-  read-only Ask) are complete and committed locally. Slice C's live check
-  (task 5) is waiting for Will's free key.
-- **Last spec:** `.kiro/specs/ask-readonly/`. Tasks 1 to 4 are done; task 5
-  is partly done.
-- **Baseline:** `2310608`, reviewed by Will. Will reproduced the Phase 1
-  defects on it independently.
+- **Date updated:** 2026-11-24 (corrective pass finished; waiting for Will
+  and Hein)
+- **Active phase:** none. The corrective pass on `e61a3d4` is complete:
+  six fixes, each committed separately. Slice C's live check (task 5) is
+  waiting for Will's free key.
+- **Last spec:** `.kiro/specs/ask-readonly/`. Tasks 1 to 4 and 6 are done;
+  task 5 (the live check) is partly done.
+- **Baselines:**
+  - `2310608` for Phase 1: Will ran the app and reported the defects,
+    Codex independently reproduced them, and Kiro implemented and tested
+    the fixes (`docs/reviews/2026-11-24-phase1-defects.md`).
+  - `e61a3d4` for the corrective pass: independently reviewed, with six
+    defects reported by Will
+    (`docs/reviews/2026-11-24-e61a3d4-corrective.md`).
 - **PRD:** approved by Will at `7b775cd`, with amendments 1 to 4 (DEC-011
   to DEC-014).
 
@@ -17,6 +22,10 @@
 - **Standing:** local milestone commits under DEC-004. Stage only the
   relevant files by name, review the staged diff, add no AI trailers, report
   the short hash, and never push.
+- **Corrective pass on `e61a3d4` (granted by Will on 2026-11-24): used
+  up.** Items 1 to 6 are delivered (the milestone log below). Its
+  boundaries matched the repair and Ask run below. Agent edits, reminders,
+  deployment and pushing still need separate authorisation.
 - **Repair and Ask run (granted by Will on 2026-11-24): used up.** Both
   phases are delivered. Its scope, kept for the record:
   - **Phase 1.** Reproduce, add regression coverage for, fix, verify and
@@ -67,8 +76,9 @@
 | C. B5 change journal and review UI | Done | `556b1ca` | Tests passed (64 unit and integration, 6 E2E). Real crash recovery, property tests and a mutation check passed. The Kiro hooks fire and record PASS or FAIL |
 | D. B2 search and outside edits | Done | `2310608` | 71 unit and integration tests, stable across 3 runs. 8 E2E tests, 24 of 24 across 3 repeats |
 
-Will reviewed the overnight work up to `2310608` and reproduced the Phase 1
-defects on it.
+Will ran the overnight build up to `2310608` and reported the Phase 1
+defects. Codex independently reproduced them, and Kiro implemented and
+tested the fixes.
 
 ## Milestone log (repair and Ask run)
 
@@ -101,14 +111,48 @@ passed 8 of 8 on its own and in the next full sweep. The cause is unknown,
 so treat it as a possible flake.
 
 Every check in this run was done by Kiro, and every answer came from the
-test double. **No human has reviewed this run yet.**
+test double. `e61a3d4` was then independently reviewed, which led to the
+corrective pass below.
+
+## Milestone log (corrective pass on `e61a3d4`)
+
+Each defect was reproduced by Kiro before it was fixed. The details are in
+`docs/reviews/2026-11-24-e61a3d4-corrective.md` and slice C task 6.
+
+| Item | Commit | Evidence |
+| --- | --- | --- |
+| 1. The live check reaches the provider and fails honestly | `9c77f9c` | `live-check-cli.test.ts`: the real CLI against the double gives exit 6 (fixture) with 7 of 7 checks passing; each failure class has its own status; the service process has gone afterwards |
+| 2. Provider diagnostics sanitised; masked key prompt | `0652062` | `sanitise.test.ts`: a sentinel key and a 16-character fragment are absent from the API, `providers.json`, `service.log`, the conversation, stderr and the CLI report and output |
+| 3. Absence claims need full issue coverage; accepted-text snippets | `93310e4` | `coverage.test.ts` (both modes, 51 issues) and the "Not confirmed" browser test |
+| 4. One question at a time per conversation, until saved | `9aa6eba` | `ask-http.test.ts`: two simultaneous sends, a burst of six, a delayed final save, and the files checked after a restart |
+| 5. Issue fields typed during a save stay unsaved and visible | `07d38ec` | `acknowledge.test.ts` and `b1-issue-edits.spec.ts` (delayed save); the field-merge and link tests still pass |
+| 6. Follow-ups use the same conversation | `1c4cd75` | `ask-http.test.ts` (both modes), `context.test.ts` and the follow-up browser test |
+
+**Checks (Kiro, at `1c4cd75`; the documentation commit after it changes no
+code):**
+
+- `npm run typecheck` reported no errors.
+- `npm test` passed 139 of 139.
+- `npm run test:e2e` passed 29 of 29, and 58 of 58 with `--repeat-each=2`.
+- `npm run scan:secrets` passed.
+- `ask-http.test.ts` ran 33 times: 32 passed, and one run failed after
+  51 s with no output captured. The failure has not recurred, and the
+  cause is unknown.
+
+**No human has reviewed the corrective pass yet.**
 
 ## Unverified
 
 - **Live AI (Q1).** No free provider was configured, and Kiro did not look
   for credentials. Nothing shows how a real model handles the tools,
-  citations or the kickoff question. The Groq template is a candidate
-  only.
+  paging, citations, follow-up context or the kickoff question. The Groq
+  template is a candidate only.
+- **Masked key prompt in a real console.** It was tested with a simulated
+  terminal; Will's PowerShell window has not been tried.
+- **Absence wording.** "Not confirmed" relies on a wording heuristic for
+  claims that no issue tracks something. A real model may phrase an
+  absence claim in a way the heuristic misses, which would leave it under
+  "Recorded facts" when coverage is incomplete.
 - **Team route (Q5, PRD-091).** Proposed in `docs/judge-ai-route.md`, but
   neither decided nor built.
 - **Packaged build.** There is no Windows zip yet (slice E). The Electron
@@ -123,18 +167,22 @@ test double. **No human has reviewed this run yet.**
 
 ## Human actions pending
 
-1. **Will: run the live check** with a free Groq key (steps in
-   `docs/judge-ai-route.md`):
-   `npm run build`, then `npm run live:check`, and paste the key at the
-   masked prompt. The result is written to `.tmp/live-check/`, sanitised.
-   Close Q1 only on exit 0 (a live pass).
-2. **Will: decide Q5**, the judge route (PRD-091). The deadline in the PRD
+1. **Will: run the live check** with a free Groq key (steps and exit
+   statuses in `docs/judge-ai-route.md`). In a PowerShell window in the
+   repository, run `npm run build`, then `npm run live:check`, and paste
+   the key at the masked prompt. Check the exit status with
+   `$LASTEXITCODE`. The result is written to `.tmp/live-check/`,
+   sanitised. Close Q1 only on exit 0 (a live pass).
+2. **Will: add the reviewer's name** to
+   `docs/reviews/2026-11-24-e61a3d4-corrective.md`. The review of
+   `e61a3d4` is recorded without attribution.
+3. **Will: decide Q5**, the judge route (PRD-091). The deadline in the PRD
    is 1 December.
-3. **Register Playwright MCP in Kiro.** Kiro's policy blocks agent writes to
+4. **Register Playwright MCP in Kiro.** Kiro's policy blocks agent writes to
    `.kiro/settings/`. The exact steps and JSON are in `docs/tooling.md`.
    Then confirm that Kiro discovers the server, and run one tool call.
-4. **Final rules recheck before submission** (`docs/submission-checklist.md`).
-5. **Choose an open-source licence** (the README says "to be chosen").
+5. **Final rules recheck before submission** (`docs/submission-checklist.md`).
+6. **Choose an open-source licence** (the README says "to be chosen").
 
 ## Assumptions to check
 
@@ -155,6 +203,10 @@ test double. **No human has reviewed this run yet.**
 | 13 | When a search for every word finds nothing, search falls back to any word, because questions rarely match every word | Will |
 | 14 | The composer's submit button is called **Send**, so it does not clash with the Ask/Edit switch. Edit is shown but disabled until slice D | Hein |
 | 15 | In the browser, provider keys are held in service memory for the session only, so a browser user re-enters the key after a restart | Will |
+| 16 | Follow-up context is the last 3 answered turns, capped at 4,000 characters, sent as plain text with citation labels and no handles | Will |
+| 17 | Retrieval-first mode reads at most 200 issues. Tool mode pages 50 at a time within its 8-step limit, so about 250 at most unless the model makes a targeted lookup. Beyond that, absence claims show as "Not confirmed" | Will |
+| 18 | A send to a busy conversation is refused (409) rather than queued; the composer keeps the typed question for a later send | Will, Hein |
+| 19 | "Not confirmed (Nexus did not read every record)" is a separate answer section. Its styling is a placeholder for Hein | Hein |
 
 ## Blockers and risks
 
@@ -169,23 +221,23 @@ test double. **No human has reviewed this run yet.**
 
 ## Next action
 
-- **Will:** try Ask with the README section "Try Ask" (`npm run double`,
-  then `npm run demo:ask`). Then run `npm run live:check` with a free Groq
-  key, and record the result in `docs/judge-ai-route.md` and here.
+- **Will:** run `npm run live:check` with a free Groq key and record the
+  exit status and report in `docs/judge-ai-route.md` and here. Close Q1
+  only on exit 0.
 - **Hein:** write and run the B3 board and calendar spec against
   `docs/data-format.md` and the review states in
   `packages/schema/src/review.ts`.
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. The repair
-> and Ask authorisation is spent, so do not start a new slice until Will or
-> Hein names one. To check that everything still works, run
+> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. The
+> corrective-pass authorisation is spent, so do not start a new slice
+> until Will or Hein names one. To check that everything still works, run
 > `npm run typecheck`, `npm test`, `npm run test:e2e` and
-> `npm run scan:secrets`. The expected totals are 100 and 26 passing. If
+> `npm run scan:secrets`. The expected totals are 139 and 29 passing. If
 > Will supplies a live-check result, record it in slice C task 5 and in
-> `docs/judge-ai-route.md`, and close Q1 only if a real free call
-> succeeded. When a slice is authorised:
+> `docs/judge-ai-route.md`, and close Q1 only on exit 0 from a real free
+> provider. When a slice is authorised:
 >
 > 1. Write its native spec under `.kiro/specs/<slice>/`.
 > 2. Follow the working loop in `AGENTS.md`.

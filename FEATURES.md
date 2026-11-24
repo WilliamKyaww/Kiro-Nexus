@@ -155,8 +155,10 @@ proposals arrive in slice D and will use the same engine.
 
 ### Phase 1 repairs (verified by Kiro, 2026-11-24; no human review yet)
 
-Will reproduced each of these defects on `2310608`, and Kiro reproduced
-them again before fixing them.
+Will ran the app and reported these defects on `2310608`, and Codex
+independently reproduced them. Kiro reproduced them again in disposable
+workspaces, then implemented and tested the fixes
+(`docs/reviews/2026-11-24-phase1-defects.md`).
 
 - **Partial review runs are honest** (`63cdc5b`).
   - Each file's real outcome is shown.
@@ -271,6 +273,67 @@ is open). Spec: `.kiro/specs/ask-readonly/`.
     Kiro also inspected screenshots of the running app at 1360 × 900 and
     390 px wide.
 
+### Corrective pass on `e61a3d4` (verified by Kiro, 2026-11-24, against the test double only; no human review yet)
+
+Will reported six defects against the reviewed baseline `e61a3d4`. Kiro
+reproduced each one, fixed it and committed it separately
+(`docs/reviews/2026-11-24-e61a3d4-corrective.md`). Live AI behaviour is
+still untested.
+
+- **The live check reaches the provider and fails honestly** (`9c77f9c`).
+  - `npm run live:check` checks every response and bounds start-up,
+    requests and the answer wait. It stops its service on every path.
+  - Its exit status shows the outcome: 0 live pass, 1 an answer check
+    failed, 2 set-up, 3 key rejected, 4 timeout, 5 no usable capability,
+    6 the test double answered (never a live pass), 7 other provider error.
+  - The report checks that a recorded fact names the judge-instructions
+    action as missing and cites the Actions heading, that NEX-1 is cited
+    for the calendar work, and that both citation targets exist.
+  - Evidence: `live-check-cli.test.ts` runs the real CLI. Against the
+    double it gives exit 6 with all 7 checks passing, and each failure
+    class gives its own status. The service process has gone afterwards.
+- **Keys stay out of diagnostics** (`0652062`).
+  - Provider error text is sanitised before Nexus shows, logs or saves it.
+    The sanitiser removes the key, any 8-character fragment of it,
+    key-shaped strings and control characters.
+  - The live check reads the key at a masked prompt.
+  - Evidence: `sanitise.test.ts`, with a synthetic sentinel key and a
+    double that echoes it. The sentinel and its fragments are absent from
+    the HTTP responses, `providers.json`, `service.log`, the conversation
+    file, stderr, and the CLI report and output. The prompt was tested with
+    a simulated terminal only.
+- **Absence claims need full coverage** (`93310e4`).
+  - Issue queries page and support word-based lookups.
+  - An answer that says no issue tracks something, made before every
+    issue record was read, is shown under "Not confirmed" with "Nexus read
+    50 of 51 issues…".
+  - Search snippets show accepted note text, with pending edits marked as
+    proposed.
+  - Evidence: `coverage.test.ts`, in both modes, with 51 issues: a match at
+    NEX-51, a genuinely missing task, a claim that stays qualified, and a
+    pending checklist tick. `c4-ask-proof.spec.ts` shows the qualifier in
+    the browser.
+- **One question at a time per conversation** (`9aa6eba`).
+  - A second simultaneous send gets 409 with "This conversation is
+    already answering a question…", until the first answer is saved.
+  - Evidence: `ask-http.test.ts`, with two sessions sending at once, a
+    burst of six, a delayed final save, and the conversation files checked
+    after a restart.
+- **Issue fields typed during a save stay** (`07d38ec`).
+  - A save acknowledges only the submitted values. Later typing stays as
+    "Unsaved changes", and a second save writes it.
+  - Evidence: `acknowledge.test.ts` and `b1-issue-edits.spec.ts`, with the
+    save delayed by 1.2 s. The earlier field-merge and link tests still
+    pass.
+- **Follow-ups use the same conversation** (`1c4cd75`).
+  - "Which of those is already tracked?" after the kickoff question names
+    NEX-1, using the last 3 answered turns as context: plain text, no
+    handles, at most 4,000 characters. Evidence and citations are checked
+    again each run.
+  - After NEX-2 is created by hand, the next follow-up reports it.
+  - Evidence: `ask-http.test.ts` (both modes), `context.test.ts` and
+    `c4-ask-proof.spec.ts`.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
@@ -280,10 +343,10 @@ is open). Spec: `.kiro/specs/ask-readonly/`.
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - `npm test` passes 100 tests (latest run at `65f951a`).
-  - `npm run test:e2e` passes 26 tests in Edge and Electron. A sweep with
-    `--repeat-each=2` passed 52 of 52; one earlier sweep had a single
-    unexplained failure (see `STATE.md`).
+  - `npm test` passes 139 tests (corrective pass, at `1c4cd75`).
+  - `npm run test:e2e` passes 29 tests in Edge and Electron, and 58 of 58
+    with `--repeat-each=2`. Two flaky observations remain unexplained (see
+    `STATE.md`).
   - `npm run scan:secrets` passes.
 - **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on agent edits and on file saves, and record PASS or FAIL. See `docs/tooling.md`.
 - **Dev tooling** (Kiro, 2026-11-24): see `docs/tooling.md`.

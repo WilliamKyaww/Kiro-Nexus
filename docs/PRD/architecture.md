@@ -383,8 +383,18 @@ is saved before any write it governs.
    conflict banner (PRD-023). The UI then navigates to the first change and
    highlights its target, then leaves a persistent "Pending review" marker.
 
-Notes autosave (debounced about 1 s) and the UI flushes pending saves before
-starting an Edit run, so agent changes rarely meet unsaved buffers.
+Notes do not autosave. The editor writes a note only when the user selects
+**Save** or presses Ctrl+S. A save acknowledges only the text it submitted,
+so anything typed while it is in flight stays as "Unsaved changes". Issue
+fields follow the same rule. Until saved, a note draft is kept in the tab's
+session storage across navigation and reloads, but not after the tab is
+closed. When an agent change lands on a note that has a draft, the draft is
+kept, and the banner offers "Load the new version (discard mine)" or
+"Compare and choose", which leads to "Overwrite with mine". Edit
+runs do not exist yet; slice D must decide whether to ask the user to save
+open drafts before an Edit run starts. (Corrected on 2026-11-24 in the
+corrective pass. The earlier text described a debounced autosave that was
+never built.)
 
 ### 7.4 Decisions (R-C3, R-C4)
 

@@ -5,7 +5,8 @@ tasks live in its spec's `tasks.md`; do not copy them here. Move behaviour
 to `FEATURES.md` once it has been verified. Requirement IDs refer to
 `docs/PRD/structure.md` (`PRD-xxx`) and to the intake (`R-*`).
 
-Done on 24 November 2026 (see `FEATURES.md`):
+Done on 24 November 2026 (see `FEATURES.md`), including the corrective
+pass on `e61a3d4`:
 
 - the PRD and its amendments;
 - the B1 workspace core;
@@ -42,8 +43,9 @@ Done on 24 November 2026 (see `FEATURES.md`):
   and "Restore original" for an ambiguous conflict.
 - [~] **C Provider settings and read-only AI** (PRD-050 to PRD-055, PRD-074
   to PRD-076). Owner: Will. Spec: `.kiro/specs/ask-readonly/`. Done:
-  tasks 1 to 4, verified against the test double only. Remaining: task 5,
-  the live check with a real free key, which closes Q1 if it passes. The
+  tasks 1 to 4 and the corrective task 6, verified against the test double
+  only. Remaining: task 5, the live check with a real free key, which
+  closes Q1 only on exit 0. The
   team route (Q5, PRD-091) is proposed in `docs/judge-ai-route.md` but not
   decided or built.
 - [ ] **D Agent edits, correction and personalised reminders** (PRD-042,
