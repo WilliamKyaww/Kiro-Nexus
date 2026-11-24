@@ -1,0 +1,149 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "react-router";
+import type { IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
+import { ApiError, api, notePathParam } from "../api";
+import { ErrorNote } from "../components/ErrorNote";
+import { priorityLabel, statusLabel } from "../format";
+import { extraIssue } from "../issueSlots";
+
+export function IssuePage() {
+  const { key = "" } = useParams();
+  const client = useQueryClient();
+  const issue = useQuery({ queryKey: ["issue", key], queryFn: () => api.get<IssueView>(`/issues/${encodeURIComponent(key)}`) });
+  const [form, setForm] = useState<IssuePatch | null>(null);
+  const [conflict, setConflict] = useState<IssueView | null>(null);
+
+  const update = useMutation({
+    mutationFn: (input: { baseRevision: number; patch: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
+    onSuccess: (saved) => {
+      client.setQueryData(["issue", key], saved);
+      void client.invalidateQueries({ queryKey: ["issues"] });
+      void client.invalidateQueries({ queryKey: ["note"] });
+      setForm(null);
+      setConflict(null);
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "REVISION_MISMATCH") {
+        const current = (error.details as { current?: IssueView } | undefined)?.current;
+        if (current) setConflict(current);
+        else void client.invalidateQueries({ queryKey: ["issue", key] });
+      }
+    },
+  });
+
+  if (issue.error) return <section className="page"><ErrorNote error={issue.error} /><Link to="/projects">All projects</Link></section>;
+  if (!issue.data) return <section className="page" aria-busy="true"><p className="muted">Loading issue…</p></section>;
+  const i = issue.data;
+  const value = { title: i.title, description: i.description, status: i.status, priority: i.priority, due: i.due, ...form };
+  const dirty = form !== null;
+  const set = (patch: IssuePatch) => setForm({ ...form, ...patch });
+  const submit = (e: FormEvent) => { e.preventDefault(); if (form) update.mutate({ baseRevision: i.revision, patch: form }); };
+  const dueDate = value.due && "date" in value.due ? value.due.date : "";
+
+  return (
+    <section className="page issue-page" aria-labelledby="issue-h">
+      <p className="path"><Link to="/projects">Projects</Link> / <Link to={`/projects/${i.projectKey}`}>{i.projectKey}</Link> / {i.key}</p>
+      <h1 id="issue-h"><span className="issue-key">{i.key}</span> {i.title}</h1>
+      {extraIssue.aboveFields.map((Slot, n) => <Slot key={n} issue={i} />)}
+      {conflict ? (
+        <div className="conflict" role="alert">
+          <p><strong>This issue changed since you opened it.</strong> Your edits are still in the form.</p>
+          <div className="row">
+            <button type="button" onClick={() => { client.setQueryData(["issue", key], conflict); setForm(null); setConflict(null); }}>Load latest (discard mine)</button>
+            <button type="button" onClick={() => { if (form) update.mutate({ baseRevision: conflict.revision, patch: form }); }}>Apply mine on top</button>
+          </div>
+        </div>
+      ) : null}
+      <form className="fields-form" onSubmit={submit} aria-label="Issue details">
+        <label>Title<input value={value.title} onChange={(e) => set({ title: e.target.value })} required data-field="title" /></label>
+        <div className="field-row">
+          <label>Status
+            <select value={value.status} onChange={(e) => set({ status: e.target.value as IssuePatch["status"] })} data-field="status">
+              {Object.entries(statusLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </label>
+          <label>Priority
+            <select value={value.priority} onChange={(e) => set({ priority: e.target.value as IssuePatch["priority"] })} data-field="priority">
+              {Object.entries(priorityLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
+          </label>
+          <label data-field-wrapper="due">Due date
+            <input type="date" value={dueDate} onChange={(e) => set({ due: e.target.value ? { date: e.target.value } : null })} data-field="due" />
+          </label>
+        </div>
+        <label>Description<textarea rows={4} value={value.description} onChange={(e) => set({ description: e.target.value })} data-field="description" /></label>
+        <div className="row">
+          <button type="submit" className="primary" disabled={!dirty || update.isPending}>{update.isPending ? "Saving…" : "Save issue"}</button>
+          {dirty ? <button type="button" onClick={() => setForm(null)}>Discard changes</button> : null}
+          <span className="save-state" role="status">{dirty ? "Unsaved changes" : `Saved · revision ${i.revision}`}</span>
+        </div>
+        {update.error && !conflict ? <ErrorNote error={update.error} /> : null}
+      </form>
+      <NoteLinks issue={i} onChange={(noteLinks) => update.mutate({ baseRevision: i.revision, patch: { noteLinks } })} busy={update.isPending} />
+    </section>
+  );
+}
+
+function NoteLinks({ issue, onChange, busy }: { issue: IssueView; onChange: (links: NoteLink[]) => void; busy: boolean }) {
+  const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<{ notes: string[] }>("/notes") });
+  const [notePath, setNotePath] = useState("");
+  const [headingSlug, setHeadingSlug] = useState("");
+  const note = useQuery({
+    queryKey: ["note", notePath],
+    enabled: !!notePath,
+    queryFn: () => api.get<NoteView>(`/notes/content?path=${encodeURIComponent(notePath)}`),
+  });
+  useEffect(() => setHeadingSlug(""), [notePath]);
+  const plain = (l: NoteLink): NoteLink => ({ notePath: l.notePath, headingSlug: l.headingSlug, headingText: l.headingText });
+
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    if (!notePath) return;
+    const h = note.data?.headings.find((x) => x.slug === headingSlug);
+    const link: NoteLink = { notePath, headingSlug: h?.slug ?? null, headingText: h?.text ?? null };
+    if (issue.noteLinks.some((l) => l.notePath === link.notePath && l.headingSlug === link.headingSlug)) return;
+    onChange([...issue.noteLinks.map(plain), link]);
+    setNotePath("");
+  };
+
+  return (
+    <section className="links" aria-labelledby="links-h">
+      <h2 id="links-h">Linked notes</h2>
+      {issue.links.length === 0 ? <p className="muted">No notes linked yet.</p> : (
+        <ul className="linked">
+          {issue.links.map((l, n) => (
+            <li key={`${l.notePath}#${l.headingSlug}`}>
+              {l.status === "note-missing" ? (
+                <span className="broken-link">{l.notePath} (note not found)</span>
+              ) : (
+                <Link to={notePathParam(l.notePath, l.resolvedSlug)} data-testid="open-linked-note">
+                  {l.notePath.replace(/\.md$/i, "")}{l.headingText ? ` › ${l.headingText}` : ""}
+                </Link>
+              )}
+              {l.status === "heading-missing" ? <span className="muted"> (heading not found; opens the note)</span> : null}
+              <button type="button" className="link-button" disabled={busy}
+                onClick={() => onChange(issue.noteLinks.filter((_, idx) => idx !== n).map(plain))}
+                aria-label={`Remove link to ${l.notePath}${l.headingText ? ` › ${l.headingText}` : ""}`}>Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <form className="inline-form" onSubmit={add} aria-label="Link a note">
+        <label>Note
+          <select value={notePath} onChange={(e) => setNotePath(e.target.value)} data-testid="link-note">
+            <option value="">Choose a note…</option>
+            {(notes.data?.notes ?? []).map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </label>
+        <label>Heading
+          <select value={headingSlug} onChange={(e) => setHeadingSlug(e.target.value)} disabled={!note.data} data-testid="link-heading">
+            <option value="">Whole note</option>
+            {(note.data?.headings ?? []).map((h) => <option key={h.slug} value={h.slug}>{"  ".repeat(h.depth - 1)}{h.text}</option>)}
+          </select>
+        </label>
+        <button type="submit" disabled={!notePath || busy}>Add link</button>
+      </form>
+    </section>
+  );
+}

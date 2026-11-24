@@ -79,8 +79,8 @@ Local milestone commits under DEC-004:
 | Milestone | Status | Commit | Evidence |
 | --- | --- | --- | --- |
 | A | Done | see `git log` (`docs: amend PRD, add B1 spec, wireframe and dev tooling`) | The B1 spec was self-reviewed by Kiro. Impeccable detect returned `[]` after one fix, and its renders were checked. The Playwright MCP stdio smoke test passed 6 of 6. Registering the server with Kiro is blocked by the permission policy (see `docs/tooling.md`) |
-| B | In progress | | |
-| C | Not started | | |
+| B | Done | see `git log` (`feat: B1 workspace core in browser and Electron`) | `npm run typecheck` has no errors. `npm test` passes 38 tests, and `npm run test:e2e` passes 4 (Edge and Electron). A manual `npm run try` / `open` / `stop` and `npm run desktop`, closed through the window, released the lock. `FEATURES.md` holds the details |
+| C | In progress | | |
 | D | Not started | | |
 
 ## Assumptions to check
@@ -92,6 +92,10 @@ Local milestone commits under DEC-004:
 | 3 | The web UI takes a typed folder path, because browsers have no native picker | Hein |
 | 4 | The wireframe's palette and layout are placeholders, and Hein owns the final identity | Hein |
 | 5 | Impeccable telemetry was left on globally and disabled per call, so a human should decide whether to run `npx impeccable telemetry off` | Will |
+| 6 | The E2E tests use the system Microsoft Edge (`channel: msedge`) rather than downloading Playwright's Chromium | Hein |
+| 7 | TypeScript 7.0.2 (the native compiler) is used only for type checking. esbuild and Vite do the transpiling | Will |
+| 8 | The `npm run try` workspace is shared by the browser and desktop routes, so running both at once shows the lock message, which is intended | Will |
+| 9 | Editing JSON externally while Nexus runs is detected only at the next write (it is refused and reloaded). Live watching of `.nexus/*.json` is not built | Will |
 
 ## Human actions pending
 
@@ -100,8 +104,8 @@ Local milestone commits under DEC-004:
 
 ## Next action
 
-Milestone B, task 1: scaffold the project and toolchain
-(`.kiro/specs/workspace-core/tasks.md`).
+Milestone C: write the B5 spec, `.kiro/specs/change-journal/`, then
+implement the journal engine with fixed, labelled demo operations.
 
 ### Continuation instruction for a fresh Kiro session
 

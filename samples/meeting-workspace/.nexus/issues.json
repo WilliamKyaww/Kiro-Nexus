@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "issues": [
+    {
+      "id": "iss_01KAR5Y3S2M8Q4K7Y2C9X5V6B3",
+      "key": "NEX-1",
+      "projectId": "prj_01KAR5Y3S1M8Q4K7Y2C9X5V6B2",
+      "title": "Build calendar view",
+      "description": "Month view showing dated issues and events.",
+      "status": "in_progress",
+      "priority": "high",
+      "due": {
+        "date": "2026-12-05"
+      },
+      "rank": "00000001",
+      "noteLinks": [
+        {
+          "notePath": "meetings/2026-11-24 kickoff.md",
+          "headingSlug": "actions",
+          "headingText": "Actions"
+        }
+      ],
+      "createdAt": "2026-11-24T09:00:00.000Z",
+      "updatedAt": "2026-11-24T09:00:00.000Z",
+      "revision": 1
+    }
+  ]
+}

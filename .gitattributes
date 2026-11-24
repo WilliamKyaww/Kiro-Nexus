@@ -1,0 +1,9 @@
+# Keep repository text byte-stable on every machine (sample hashes and
+# deterministic JSON depend on it). Windows batch files need CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.exe binary

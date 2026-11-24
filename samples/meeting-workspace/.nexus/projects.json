@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "projects": [
+    {
+      "id": "prj_01KAR5Y3S1M8Q4K7Y2C9X5V6B2",
+      "key": "NEX",
+      "name": "Nexus hackathon",
+      "nextIssueNumber": 2,
+      "createdAt": "2026-11-24T09:00:00.000Z",
+      "updatedAt": "2026-11-24T09:00:00.000Z",
+      "revision": 1
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "nexus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first Markdown notebook and project board with reviewable agent edits (Kiroween 2026).",
+  "type": "module",
+  "engines": {
+    "node": "^24.14.0 || >=26"
+  },
+  "main": "apps/desktop/dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && node scripts/launch.mjs",
+    "try": "node scripts/build.mjs && node scripts/launch.mjs --try",
+    "try:reset": "node scripts/launch.mjs --reset-try",
+    "open": "node scripts/open.mjs",
+    "stop": "node scripts/stop.mjs",
+    "desktop": "node scripts/build.mjs && node scripts/desktop.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:review": "vitest run server/src/review",
+    "test:e2e": "node scripts/build.mjs && playwright test",
+    "mcp:smoke": "node scripts/mcp-smoke.mjs"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.12",
+    "@tanstack/react-query": "5.108.4",
+    "chokidar": "6.0.0",
+    "fastify": "5.12.8",
+    "github-slugger": "2.0.0",
+    "mdast-util-find-and-replace": "3.0.5",
+    "minisearch": "7.2.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "react-router": "8.5.2",
+    "remark-gfm": "4.0.1",
+    "ulid": "3.0.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/mdast": "4.0.4",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.4.1",
+    "esbuild": "0.28.2",
+    "fast-check": "4.11.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.1"
+  }
+}
