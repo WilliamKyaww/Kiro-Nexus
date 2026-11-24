@@ -71,8 +71,8 @@ not features.
 
 ### B5 change journal with fixed demo operations (verified by Kiro, 2026-11-24; no human review yet)
 
-These changes come from **fixed, labelled demo operations, not AI**. Agent
-proposals arrive in slice D and will use the same engine.
+These changes come from **fixed, labelled demo operations, not AI**. Edit
+runs (run 4, below) propose through the same engine.
 
 - **Apply.** "Apply demo changes (fixed, not AI)" on Home writes two real
   changes:
@@ -334,6 +334,102 @@ still untested.
   - Evidence: `ask-http.test.ts` (both modes), `context.test.ts` and
     `c4-ask-proof.spec.ts`.
 
+### Run 4: Ask repairs, a first board and calendar, and the first Edit journey (verified by Kiro, 2026-11-24, against the test double only; no human review yet)
+
+Will authorised five milestones. Every Ask and Edit answer below came from
+the test double, so none of this shows how a live model behaves (Q1 is
+open).
+
+- **Ask matches meeting actions to issues by evidence** (`ab7d19b`,
+  DEC-018).
+  - A text lookup that finds nothing ("Hein calendar view") returns the
+    project's records instead, so a model that searches with the owner's
+    name still reaches NEX-1.
+  - Tracking claims are structured entries. Nexus records one as a fact
+    only when the run read the action's section and a related issue
+    record, or, for "no issue", every issue record. A link to the same
+    heading does not count as evidence.
+  - Before it accepts an answer about issues, Nexus reads the remaining
+    records itself (up to 200).
+  - The phrase list for absence claims is gone. "The judge instructions do
+    not appear on the board", made after reading no issues, is shown under
+    "Not confirmed by the evidence".
+  - Evidence: `matching.test.ts` (7 tests, using double variants that
+    imitate the live failures), and the existing Ask tests and browser
+    journeys.
+- **The live check proves the two-turn journey** (`1f48735`).
+  - **Turn 1:** the judge instructions are untracked, and NEX-1 tracks the
+    calendar work, with the right heading and issue cited.
+  - **Between the turns:** the check creates "Write the judge
+    instructions" through the issue API.
+  - **Turn 2:** asked again in the same conversation, NEX-2 must track the
+    action.
+  - Notes and issues must be byte-for-byte unchanged by both Ask turns.
+  - Both evaluator bugs that Codex reported are fixed, with regression
+    tests: a sentence denying the NEX-1 match no longer passes, and
+    citation order no longer matters.
+  - The browser journey `c4-ask-proof.spec.ts` uses the same evaluator.
+  - Evidence: `live-check-cli.test.ts` (14 tests). Against the double, the
+    real CLI passes its 17 checks and still exits 6, because a fixture is
+    never a live pass.
+- **A pending heading rename keeps search, reads and citations in step**
+  (`cb92534`).
+  - While "Approved heading" awaits a rename to "Pending preview", Ask
+    finds the accepted heading, labels the proposed one as pending, and
+    reads the section by either slug.
+  - Citations open the heading that is on disk, before review, after
+    acceptance and after rejection.
+  - Evidence: `rename.test.ts` (5 tests), and `headings.test.ts` (3 tests)
+    for the note page's link resolver. Both were shown to fail on the old
+    code.
+- **A first board and month calendar** (`58bcc94`, B3 partial, DEC-019).
+  - `/projects/NEX` shows To do, In progress and Done, with the backlog
+    kept as a second view.
+  - On the board, the user can create issues and open them, and change a
+    card's status by dragging it, with Alt+Left Arrow or Alt+Right Arrow
+    (announced), or with its status control.
+  - Due dates can be changed from a card.
+  - `/calendar` shows dated issues on a Monday-first month, in the
+    workspace time zone. A due-date edit from either view changes the
+    same issue, and both views show it after a restart.
+  - A date awaiting review shows as "Proposed" beside the accepted date.
+  - At 390 px, the columns stack and the month reads as a list.
+  - Everything works with AI off and by keyboard.
+  - Not built (Hein's handoff): calendar events, the agenda view,
+    ordering within a column and the final design.
+  - Evidence: `b3-board-calendar.spec.ts` (3 tests, checking
+    `issues.json`), `month.test.ts` (3 tests, including a clock change and
+    a Tokyo workspace), and screenshots at both widths.
+- **The first Ask → Edit → Review journey** (`1bde4e7`, DEC-020, spec
+  `.kiro/specs/edit-first-journey/`).
+  - After the kickoff answer, the user selects **Edit** and asks Nexus to
+    create the missing issue, link it to its heading and update the note
+    line. Nexus writes three changes for review:
+    - new issue NEX-2 "Write the judge instructions";
+    - its link to *Kickoff › Actions*;
+    - the note line "Will writes the judge instructions (NEX-2)".
+  - The note line opens focused and highlighted. The link and the new
+    issue are highlighted on NEX-2's page, and each change opens from the
+    answer's **Proposed changes** list.
+  - Each change has its own Accept and Reject.
+    - Accepting the note line first asks **Accept both**, because it
+      needs the new issue.
+    - Rejecting the new issue lists the link and the note line, offers
+      **Cancel** or **Reject all 3**, and undoes all three.
+  - An unrelated manual edit to the same note is kept, and the pending
+    changes survive a restart.
+  - Ask stays read-only. It is never offered the write tool, and it does
+    not count a pending issue as a record until it is accepted.
+  - Edit is chosen for one message at a time, and needs a model that has
+    shown tool calling.
+  - Evidence:
+    - `create.test.ts` (6 tests: the journal, the files, a restart and a
+      crash);
+    - `edit.test.ts` (6 tests, on the coordinator);
+    - `c5-edit-journey.spec.ts` (2 browser tests, checking the files and
+      the journal);
+    - screenshots at 1360 × 900 and 390 × 844.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
@@ -343,12 +439,19 @@ still untested.
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - `npm test` passes 139 tests (corrective pass, at `1c4cd75`).
-  - `npm run test:e2e` passes 29 tests in Edge and Electron, and 58 of 58
-    with `--repeat-each=2`. Two flaky observations remain unexplained (see
-    `STATE.md`).
-  - `npm run scan:secrets` passes.
-- **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on agent edits and on file saves, and record PASS or FAIL. See `docs/tooling.md`.
+  - At `1bde4e7` (run 4), the unit and integration suite passes 173 of
+    173. Because `vitest.config.ts` is deleted in the working tree, this
+    used a temporary copy (`npx vitest run --config .tmp/vitest.config.ts`).
+    Plain `npm test` currently finds only 13 tests (see `STATE.md`).
+  - `npm run test:e2e` passes 34 tests in Edge and Electron, and 68 of 68
+    with `--repeat-each=2`. Two earlier flaky observations remain
+    unexplained (see `STATE.md`).
+  - `npm run scan:secrets` passes (278 files).
+- **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on
+  agent edits and on file saves, and record PASS or FAIL. See
+  `docs/tooling.md`. In run 4 they fired but logged FAIL ("no summary"),
+  because their Vitest run finds no tests without `vitest.config.ts`. The
+  same tests pass with the temporary config.
 - **Dev tooling** (Kiro, 2026-11-24): see `docs/tooling.md`.
   - The Impeccable detector and renders ran.
   - The Playwright MCP stdio smoke test passes 6 of 6 checks.

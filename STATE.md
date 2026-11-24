@@ -1,12 +1,15 @@
 # State
 
-- **Date updated:** 2026-11-24 (Ask repairs, B3 and first Edit journey in
-  progress)
-- **Active phase:** the current run below: Ask repairs (milestones 1 to 3),
-  then the B3 board and calendar slice, then the first Edit journey. Slice
-  C's live check (task 5) is waiting for Will's free key.
-- **Last spec:** `.kiro/specs/ask-readonly/`. Tasks 1 to 4 and 6 are done;
-  task 5 (the live check) is partly done.
+- **Date updated:** 2026-11-24 (run 4 delivered: Ask repairs, a first B3
+  slice and the first Edit journey)
+- **Active phase:** none authorised. Run 4 is used up. Slice C's live check
+  (task 5) is waiting for Will's free key.
+- **Last spec:** `.kiro/specs/edit-first-journey/`. Tasks 1 to 4 are done,
+  and task 5 (the correction loop and a live Edit check) is not
+  authorised. Also touched in run 4: `.kiro/specs/ask-readonly/` (tasks 7
+  to 9 done; task 5 partly done), `.kiro/specs/board-calendar/` (tasks 1
+  to 3 done; task 4 is Hein's) and `.kiro/specs/change-journal/` (task 9
+  partly done).
 - **Baselines:**
   - `2310608` for Phase 1: Will ran the app and reported the defects,
     Codex independently reproduced them, and Kiro implemented and tested
@@ -22,8 +25,10 @@
 - **Standing:** local milestone commits under DEC-004. Stage only the
   relevant files by name, review the staged diff, add no AI trailers, report
   the short hash, and never push.
-- **Current run: Ask repairs, B3 board and calendar, first Edit journey
-  (granted by Will on 2026-11-24; it survives context compaction).**
+- **Run 4: Ask repairs, B3 board and calendar, first Edit journey
+  (granted by Will on 2026-11-24): used up.** All five milestones are
+  delivered (the run-4 milestone log below). Its scope, kept for the
+  record:
   - **Scope:**
     1. Ask reliably matches meeting actions to issues. It recovers from an
        empty narrow search by checking the project's records and comparing
@@ -97,8 +102,11 @@
     - Agent writes, reminder delivery and remote publication are outside
       this run.
 - **Previous overnight authorisation:** used up.
-- **Not authorised now:** any new slice, including D (agent edits) and B4
-  (reminders), until Will or Hein names one.
+- **Not authorised now:** any new slice or increment, until Will or Hein
+  names one. This includes:
+  - the rest of D (the correction loop, new notes, "Restore original");
+  - B4 (reminders);
+  - Hein's B3 handoff, which is his to start.
 - **Never authorised without an explicit request:**
   - remote Git actions, publication, deployments, account changes and paid
     services;
@@ -179,6 +187,33 @@ code):**
 
 **No human has reviewed the corrective pass yet.**
 
+## Milestone log (run 4)
+
+For the repairs (milestones 1 to 3), each defect was reproduced, or each
+new test was shown to fail, before the fix. Milestones 4 and 5 are new
+features. Every Ask and Edit answer came from the test double. Details are
+in the journal (`docs/journal/2026-11-24.md`, "Run 4").
+
+| Milestone | Commit | Evidence |
+| --- | --- | --- |
+| 1. Ask matches actions to issues by evidence (DEC-018) | `ab7d19b` | `matching.test.ts` (7 tests), with double variants that imitate the live failures |
+| 2. The live check proves the two-turn journey | `1f48735` | `live-check-cli.test.ts` (14 tests): 17 checks pass against the double, and the check still exits 6. `c4-ask-proof.spec.ts` uses the same evaluator |
+| 3. Search, reads and citations agree through a pending heading rename | `cb92534` | `rename.test.ts` (5 tests) and `headings.test.ts` (3 tests), both shown failing on the old code |
+| 4. First B3 slice: board, backlog, status moves, due dates, month view (DEC-019) | `58bcc94` | `b3-board-calendar.spec.ts` (3 tests), `month.test.ts` (3 tests), screenshots at 1360 and 390 px |
+| 5. First Ask → Edit → Review journey (DEC-020) | `1bde4e7` | `create.test.ts` (6 tests), `edit.test.ts` (6 tests), `c5-edit-journey.spec.ts` (2 tests), screenshots at 1360 and 390 px |
+
+**Checks (Kiro, at `1bde4e7`; the documentation commit after it changes
+no code):**
+
+- `npm run typecheck` reported no errors.
+- The unit and integration suite passed 173 of 173, run with
+  `npx vitest run --config .tmp/vitest.config.ts`, because
+  `vitest.config.ts` is deleted in the working tree.
+- `npm run test:e2e` passed 34 of 34, and 68 of 68 with `--repeat-each=2`.
+- `npm run scan:secrets` passed (278 files).
+
+**No human has reviewed run 4 yet.**
+
 ## Unverified
 
 - **Live AI (Q1).** No free provider was configured, and Kiro did not look
@@ -187,10 +222,14 @@ code):**
   template is a candidate only.
 - **Masked key prompt in a real console.** It was tested with a simulated
   terminal; Will's PowerShell window has not been tried.
-- **Absence wording.** "Not confirmed" relies on a wording heuristic for
-  claims that no issue tracks something. A real model may phrase an
-  absence claim in a way the heuristic misses, which would leave it under
-  "Recorded facts" when coverage is incomplete.
+- **Tracking claims from a real model.** The wording heuristic was
+  replaced by structured tracking entries checked against evidence
+  (DEC-018). Whether a free model fills `tracking` reliably is untested.
+  A model that answers only in free text gets nothing confirmed, which
+  is honest but unhelpful.
+- **Edit with a real model.** Edit has run only against the test double.
+  Nothing shows whether a free model proposes valid operations, quotes
+  the note's lines exactly, or recovers from a refused proposal.
 - **Team route (Q5, PRD-091).** Proposed in `docs/judge-ai-route.md`, but
   neither decided nor built.
 - **Packaged build.** There is no Windows zip yet (slice E). The Electron
@@ -202,6 +241,9 @@ code):**
   it was made with a shell command (not confirmed). They fired and passed
   when retested at 11:47 (see the journal), and the full suite covers that
   change.
+- **Review hooks in run 4.** They fired on every review-code edit but
+  logged FAIL ("no summary"), because Vitest finds no tests without
+  `vitest.config.ts`. The same tests passed with the temporary config.
 
 ## Human actions pending
 
@@ -221,6 +263,15 @@ code):**
    Then confirm that Kiro discovers the server, and run one tool call.
 5. **Final rules recheck before submission** (`docs/submission-checklist.md`).
 6. **Choose an open-source licence** (the README says "to be chosen").
+7. **Will: decide about `vitest.config.ts`.** It is deleted in the working
+   tree and was never committed as deleted. To restore it, run
+   `git restore vitest.config.ts`. Until it is restored or replaced:
+   - `npm test` runs only 13 tests;
+   - `npm run test:review` and the review hooks find no tests;
+   - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
+8. **Review run 4**, preferably independently. Two parts are
+   consequential: the Edit authority path (DEC-020) and the evidence rules
+   for tracking claims (DEC-018).
 
 ## Assumptions to check
 
@@ -239,19 +290,27 @@ code):**
 | 11 | "Overwrite with mine" after an outside edit replaces the outside text without merging. The user chooses it after comparing | Will, Hein |
 | 12 | Drafts live in the tab's session storage, so they survive navigation and a reload but not closing the tab | Will, Hein |
 | 13 | When a search for every word finds nothing, search falls back to any word, because questions rarely match every word | Will |
-| 14 | The composer's submit button is called **Send**, so it does not clash with the Ask/Edit switch. Edit is shown but disabled until slice D | Hein |
+| 14 | The composer's submit button is called **Send**, so it does not clash with the Ask/Edit switch. Edit is enabled for models that have shown tool calling (run 4) | Hein |
 | 15 | In the browser, provider keys are held in service memory for the session only, so a browser user re-enters the key after a restart | Will |
 | 16 | Follow-up context is the last 3 answered turns, capped at 4,000 characters, sent as plain text with citation labels and no handles | Will |
 | 17 | Retrieval-first mode reads at most 200 issues. Tool mode pages 50 at a time within its 8-step limit, so about 250 at most unless the model makes a targeted lookup. Beyond that, absence claims show as "Not confirmed" | Will |
 | 18 | A send to a busy conversation is refused (409) rather than queued; the composer keeps the typed question for a later send | Will, Hein |
-| 19 | "Not confirmed (Nexus did not read every record)" is a separate answer section. Its styling is a placeholder for Hein | Hein |
+| 19 | "Not confirmed by the evidence" is a separate answer section. Its styling is a placeholder for Hein | Hein |
+| 20 | Edit applies to one message. After sending, the composer returns to Ask, so a follow-up question cannot write by accident (DEC-020) | Will, Hein |
+| 21 | A review run that creates an issue does not advance `nextIssueNumber`, so a rejected agent issue's key (for example NEX-2) can be given to the next issue (DEC-020) | Will |
+| 22 | An Edit run does not ask the user to save open drafts first. The outside-change banner keeps them (DEC-020) | Will, Hein |
+| 23 | Board drag and drop is native HTML, with Alt+Arrow keys and a status control for the keyboard. Touch users use the status control (DEC-019) | Hein |
+| 24 | When the Edit answer arrives, the tab that sent it opens the first change by itself. Other tabs and later visits do not navigate | Will, Hein |
 
 ## Blockers and risks
 
 - **Blocker:** none for the existing work.
 - **Blocked:** the live check (slice C, task 5) needs Will's free key.
 - **Risk:** the free model route is unverified (Q1). A real model may call
-  the tools or cite sources less reliably than the test double does.
+  the tools, fill tracking entries, cite sources or propose edits less
+  reliably than the test double does.
+- **Risk:** the missing `vitest.config.ts` hides most unit tests from
+  `npm test` and the review hooks until Will decides (human action 7).
 - **Risk:** the team evaluation route is still open (Q5, PRD-091).
 - **Dates:** Kiro credit requests close on 1 December at 20:00 GMT. The
   feature freeze is on 2 December. Submission closes on 4 December at
@@ -259,22 +318,39 @@ code):**
 
 ## Next action
 
-- **Will:** run `npm run live:check` with a free Groq key and record the
-  exit status and report in `docs/judge-ai-route.md` and here. Close Q1
-  only on exit 0.
-- **Hein:** write and run the B3 board and calendar spec against
-  `docs/data-format.md` and the review states in
-  `packages/schema/src/review.ts`.
+- **Will:**
+  - Try the Edit journey with the test double (README, "Try Ask and
+    Edit").
+  - Decide about `vitest.config.ts`.
+  - Run `npm run live:check` with a free Groq key, and record the exit
+    status and report in `docs/judge-ai-route.md` and here. Close Q1 only
+    on exit 0.
+- **Hein:** task 4 of `.kiro/specs/board-calendar/tasks.md`:
+  - calendar events in `calendar.json` (4.1);
+  - the agenda view (4.2);
+  - ordering within a column (4.3);
+  - the final design (4.4).
+
+  The board and month view already read and write the shared issue
+  record, so these can be built on top independently.
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. The
-> corrective-pass authorisation is spent, so do not start a new slice
-> until Will or Hein names one. To check that everything still works, run
-> `npm run typecheck`, `npm test`, `npm run test:e2e` and
-> `npm run scan:secrets`. The expected totals are 139 and 29 passing. If
-> Will supplies a live-check result, record it in slice C task 5 and in
-> `docs/judge-ai-route.md`, and close Q1 only on exit 0 from a real free
+> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 4's
+> authorisation is spent, so do not start a new slice until Will or Hein
+> names one. To check that everything still works, run:
+>
+> - `npm run typecheck`;
+> - the unit suite: `npm test` if `vitest.config.ts` has been restored,
+>   otherwise `npx vitest run --config .tmp/vitest.config.ts`;
+> - `npm run test:e2e`;
+> - `npm run scan:secrets`.
+>
+> The expected totals are 173 unit and integration tests and 34 browser
+> tests, all passing.
+>
+> If Will supplies a live-check result, record it in slice C task 5 and
+> in `docs/judge-ai-route.md`. Close Q1 only on exit 0 from a real free
 > provider. When a slice is authorised:
 >
 > 1. Write its native spec under `.kiro/specs/<slice>/`.

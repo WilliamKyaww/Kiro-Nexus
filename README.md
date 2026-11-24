@@ -39,20 +39,26 @@ npm run try          # build, copy the fictional sample to .tmp/try, open the br
    - Create a note of your own with a few `##` headings, edit it and press
      Ctrl+S.
 2. **Projects.**
-   - Open *NEX*, then *NEX-1*. Under **Linked notes**, choose your note and
-     a heading, then select **Add link**.
+   - Open *NEX*: a board with To do, In progress and Done. Drag *NEX-1* to
+     another column, or focus its card and press Alt+Right Arrow.
+     **Backlog** shows the same issues as a list.
+   - Open *NEX-1*. Under **Linked notes**, choose your note and a heading,
+     then select **Add link**.
    - Open the link: the note scrolls to that heading.
    - The note's **Linked issues** panel leads back to the issue.
-3. **Restart.** Press Ctrl+C in the terminal, run `npm run try` again, and
+3. **Calendar.** Open **Calendar**, then go to December 2026. *NEX-1* is on
+   5 December. Change its date there, and the board's card shows the same
+   date.
+4. **Restart.** Press Ctrl+C in the terminal, run `npm run try` again, and
    find everything intact.
-4. **Review.**
+5. **Review.**
    - On **Home**, select **Apply demo changes (fixed, not AI)**.
    - Accept the ticked checklist item on the note page.
    - Reject the due-date change on `NEX-1`, and give a reason or skip.
    - Inspect `.tmp/try/workspace/` to see the real files.
-5. **Outside edits.** Edit the kickoff note in another editor while it is
+6. **Outside edits.** Edit the kickoff note in another editor while it is
    open in Nexus, with and without unsaved text in the Nexus editor.
-6. **Search.** Type "judge" in the Notes search box.
+7. **Search.** Type "judge" in the Notes search box.
 
 `npm run try` keeps running and prints the address. While it runs:
 
@@ -74,10 +80,12 @@ single-writer lock at work.
 
 Start again from a clean sample with `npm run try:reset`.
 
-## Try Ask (read-only AI)
+## Try Ask and Edit
 
 Ask answers questions from the open workspace and never changes your notes
 or issues. It saves only the conversation, in `.nexus/conversations/`.
+Edit, chosen for one message at a time, proposes changes. Nexus writes them
+to the files for you to review, and keeps only what you accept.
 
 ### With the local test double (no account, no key)
 
@@ -108,9 +116,27 @@ npm run demo:ask     # terminal 2: build, then open a separate copy of the sampl
    tracked?" The answer names only NEX-1. Ask uses the last few questions
    in the conversation as context, and checks the workspace again for
    each answer.
-5. In **Projects → NEX**, create the issue "Write the judge instructions".
-   Go back to the conversation from Home and ask again. This time the
-   answer says the action is tracked by NEX-2.
+5. **Edit.** In the same conversation, select **Edit** above the composer
+   and send "Create the missing issue, link it to its source heading and
+   update the note line." Nexus proposes three changes, and opens the
+   first one highlighted:
+   - new issue NEX-2 "Write the judge instructions";
+   - its link to *Kickoff › Actions*;
+   - the note line "Will writes the judge instructions (NEX-2)".
+
+   Then review them:
+   - Select **Accept** on the note line. It needs the new issue, so Nexus
+     offers **Accept both**.
+   - The review bar moves to the link on NEX-2's page. Accept it.
+   - To see dependencies the other way, reject the new issue instead.
+     Nexus lists the link and the note line, then undoes all three.
+
+   The answer's **Proposed changes** list shows each change's outcome.
+   The composer is back in Ask, so asking the kickoff question again
+   reports the action as tracked by NEX-2.
+
+Without Edit, you can create the issue yourself in **Projects → NEX** and
+ask again, with the same result.
 
 If Ask could not read every issue record, an answer that says something
 has no issue appears under **Not confirmed**, with how many records it
@@ -118,9 +144,13 @@ read. A conversation answers one question at a time. If you send a
 question from another window while an answer is running, Nexus refuses it
 with a message and keeps your typed question.
 
+Edit needs a model that has shown tool calling in **Settings → Test**. A
+model with structured output only answers in Ask.
+
 `npm run demo:ask` uses its own profile and workspace, so it does not
 affect `npm run try`. Stop it with Ctrl+C. To start again from a fresh
-sample, delete `.tmp/ask-demo`.
+sample, delete `.tmp/ask-demo`. A workspace already used for an earlier
+run may hold your own changes, so the steps above assume a fresh copy.
 
 ### With a real provider
 
