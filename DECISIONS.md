@@ -433,3 +433,28 @@ status control.
   have to reverse two files, or leave a gap in the numbering.
 - *Keeping Edit selected after a send.* A follow-up meant as a question
   could then write.
+
+## DEC-021: A reviewer relay after every major update, sent by Will to Astra 6.2 in Codex
+
+- **Status:** Accepted (standing instruction from Will, 2026-11-24)
+
+**Decision.**
+- After every major implementation or update, Kiro writes a reviewer
+  relay: a self-contained message that Will pastes into the reviewer
+  unchanged. "Major" is defined under "Reviews" in `AGENTS.md`. Minor
+  changes and tweaks need no relay.
+- The current reviewer is Astra 6.2 in the Codex extension, run by Will.
+  The reviewer may change. `AGENTS.md` names the current one in a single
+  line.
+- Relays are saved in `docs/reviews/relays/` and committed. A relay is a
+  request, not a review: the review record is written only after the
+  report comes back, with the reviewer named as the tool and the person
+  who ran it.
+- The first relay covers run 4 (`4093fa1..50a6a8f`).
+
+**Alternatives.**
+- *Giving the relay in the chat only.* Nothing would then show what the
+  reviewer was asked to check, which the review record and the submission
+  write-up both need.
+- *A review after every commit.* Too much for copy and styling changes.
+  Will excluded minor changes.

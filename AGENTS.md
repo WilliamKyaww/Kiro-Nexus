@@ -48,15 +48,50 @@ only. Never open, search, index or copy them.
    evidence, a meaningful decision, a blocker or an independent finding. If
    the update is a completed major milestone, commit it locally (see Git
    conventions).
+7. After a major implementation or update, end the handoff with a reviewer
+   relay (see Reviews).
 
 Each task has one authoritative checklist: its spec's `tasks.md`. Do not
 copy task lists into other files; link to them instead.
 
 ## Reviews
 
-Will or Hein may ask Codex or Claude Code for a second review. Record reviews
-in `docs/reviews/YYYY-MM-DD-topic.md` with the reviewer (tool and the person
-who ran it), the scope reviewed, the findings and how each was resolved.
+**Current reviewer:** Astra 6.2 in the Codex extension, chosen by Will. It
+may change; update this line when it does. Will or Hein may also ask another
+tool, such as Claude Code, for a review.
+
+**A relay after each major update (standing instruction from Will,
+DEC-021).**
+
+- **When.** After every major implementation or update, write a relay: a
+  message that Will can paste into the reviewer unchanged.
+  - *Major* means an authorised run, a slice increment or new feature, a
+    substantive fix, or a change to security, data handling or the agent's
+    authority.
+  - *Minor* changes and tweaks need no relay: copy, styling, small fixes
+    and routine document updates.
+  - If it is unclear which, say so in the handoff and let Will decide.
+- **Where.** Save it as `docs/reviews/relays/YYYY-MM-DD-topic.md`. Commit
+  it with the handoff documents, and give its full text in the handoff.
+- **What.** Make it self-contained for a reviewer with no context:
+  - the ground rules: review only (no edits, commits or pushes), the source
+    boundaries, Will's demo folders, no credentials or paid services, and
+    fictional data only;
+  - the commit range since the last review, by milestone, with the
+    decisions and specs behind it;
+  - the checks to run, with the totals Kiro saw;
+  - specific questions, including Kiro's own doubts;
+  - known limitations, so that they are not reported again;
+  - the report format: the reviewer's name, a verdict, findings with
+    severity and reproduction steps, the checks run, and answers.
+- **After.** A relay is a request, not a review. When Will pastes the
+  report back:
+  - reproduce each finding before fixing it;
+  - fix it within the authorised scope in `STATE.md`;
+  - record the review in `docs/reviews/YYYY-MM-DD-topic.md`, with the
+    reviewer (tool and the person who ran it), the scope reviewed, the
+    findings and how each was resolved, and link the relay.
+
 Record only reviews that actually happened. Never attribute a review to a
 tool or person that did not perform it.
 

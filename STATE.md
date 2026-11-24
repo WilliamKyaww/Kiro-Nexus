@@ -22,9 +22,13 @@
 
 ## Authorisation
 
-- **Standing:** local milestone commits under DEC-004. Stage only the
-  relevant files by name, review the staged diff, add no AI trailers, report
-  the short hash, and never push.
+- **Standing:**
+  - Local milestone commits under DEC-004. Stage only the relevant files
+    by name, review the staged diff, add no AI trailers, report the short
+    hash, and never push.
+  - After every major implementation or update, write a reviewer relay
+    for Will to send to Astra 6.2 in the Codex extension (DEC-021,
+    `AGENTS.md` "Reviews"). Minor changes and tweaks need none.
 - **Run 4: Ask repairs, B3 board and calendar, first Edit journey
   (granted by Will on 2026-11-24): used up.** All five milestones are
   delivered (the run-4 milestone log below). Its scope, kept for the
@@ -212,7 +216,8 @@ no code):**
 - `npm run test:e2e` passed 34 of 34, and 68 of 68 with `--repeat-each=2`.
 - `npm run scan:secrets` passed (278 files).
 
-**No human has reviewed run 4 yet.**
+**Run 4 has not been reviewed yet.** The relay for Astra 6.2 in Codex is
+ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
 
 ## Unverified
 
@@ -269,9 +274,12 @@ no code):**
    - `npm test` runs only 13 tests;
    - `npm run test:review` and the review hooks find no tests;
    - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
-8. **Review run 4**, preferably independently. Two parts are
-   consequential: the Edit authority path (DEC-020) and the evidence rules
-   for tracking claims (DEC-018).
+8. **Will: send the run-4 relay to Astra 6.2 in Codex.** The message is in
+   `docs/reviews/relays/2026-11-24-run4.md` and covers `4093fa1..50a6a8f`.
+   The two most consequential parts are the Edit authority path (DEC-020)
+   and the evidence rules for tracking claims (DEC-018). Paste Astra's
+   report back to Kiro. Kiro then reproduces each finding, fixes it within
+   the scope you authorise, and records the review in `docs/reviews/`.
 
 ## Assumptions to check
 
@@ -319,6 +327,8 @@ no code):**
 ## Next action
 
 - **Will:**
+  - Send the run-4 relay to Astra 6.2 in Codex, and paste the report
+    back to Kiro.
   - Try the Edit journey with the test double (README, "Try Ask and
     Edit").
   - Decide about `vitest.config.ts`.
@@ -351,7 +361,8 @@ no code):**
 >
 > If Will supplies a live-check result, record it in slice C task 5 and
 > in `docs/judge-ai-route.md`. Close Q1 only on exit 0 from a real free
-> provider. When a slice is authorised:
+> provider. If Will pastes a reviewer's report, follow "Reviews" in
+> `AGENTS.md`. When a slice is authorised:
 >
 > 1. Write its native spec under `.kiro/specs/<slice>/`.
 > 2. Follow the working loop in `AGENTS.md`.

@@ -23,6 +23,11 @@ starts from the current phase. If they conflict, `STATE.md` is authoritative.
   `docs/PRD/` once it exists. Labels in the intake matter: `R-*` items are
   Will's requirements and `D-*` items are proposals that can change.
 - Ask before going beyond the authorised scope in `STATE.md`.
+- After every major implementation or update, end the handoff with a
+  reviewer relay for Will to paste into the current reviewer (Astra 6.2 in
+  the Codex extension). Save it in `docs/reviews/relays/`. Minor changes
+  and tweaks do not need one. The rules are under "Reviews" in `AGENTS.md`
+  (DEC-021).
 - When a spec, steering file or hook changes a decision or catches a defect,
   record it briefly in that day's `docs/journal/` note. The submission
   write-up needs this evidence.

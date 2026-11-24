@@ -16,5 +16,7 @@
 | How can judges try the AI, and what has been tested live? | `docs/judge-ai-route.md` |
 | Are we ready to submit? | `docs/submission-checklist.md` |
 | What happened that matters later? | `docs/journal/YYYY-MM-DD.md` |
+| Who reviews the work, and when? | `AGENTS.md` ("Reviews") |
+| What was the reviewer asked to check? | `docs/reviews/relays/YYYY-MM-DD-topic.md` |
 | What did an independent reviewer find? | `docs/reviews/YYYY-MM-DD-topic.md` |
 | Which third-party work is incorporated? | `docs/licences.md` (created with the first dependency) |
