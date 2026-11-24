@@ -36,7 +36,7 @@ export function SettingsPage() {
   const client = useQueryClient();
   const providers = useProviders();
   const workspace = useQuery({ queryKey: ["workspace"], queryFn: () => api.get<WorkspaceView>("/workspace") });
-  const refresh = () => client.invalidateQueries({ queryKey: providersKey });
+  const refresh = () => Promise.all([client.invalidateQueries({ queryKey: providersKey }), client.invalidateQueries({ queryKey: ["ask", "status"] })]);
   const [message, setMessage] = useState<string | null>(null);
 
   const test = useMutation({

@@ -161,7 +161,8 @@ export function startProviderDouble(port = 0) {
       if (!auth.startsWith("Bearer ") || auth === "Bearer invalid-key" || model.endsWith("-401")) return send(401, { error: { message: "Invalid API key provided.", type: "invalid_request_error" } });
       if (model.endsWith("-429")) return send(429, { error: { message: "Rate limit reached for requests.", type: "rate_limit" } }, { "retry-after": "0" });
       const respond = () => { const r = handleChat(body); send(r.status, r.body); };
-      if (model.endsWith("-slow")) setTimeout(respond, 20_000); else respond();
+      const isProbe = (Array.isArray(body.tools) && body.tools.some((t) => t.function?.name === "ping")) || body.response_format?.json_schema?.name === "probe";
+      if (model.endsWith("-slow") && !isProbe) setTimeout(respond, 20_000); else respond();
     });
   });
   return new Promise((resolve) => {

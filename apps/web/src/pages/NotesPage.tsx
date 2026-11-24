@@ -10,6 +10,7 @@ import { useOpenChanges } from "../review/review";
 import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
 import { revealAboveBar } from "../review/reveal";
+import { BackToConversation } from "../ask/BackToConversation";
 
 /** Workspace identity that scopes drafts; "none" before a workspace is known. */
 function useWorkspaceId(): string {
@@ -162,10 +163,12 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
 
   // Reaching a change: switch to preview, scroll to and briefly highlight the exact block.
   useEffect(() => { if (changeParam) setMode("preview"); }, [changeParam]);
+  const revealedChange = useRef<string | null>(null);
   useEffect(() => {
-    if (mode !== "preview" || !changeParam) return;
+    if (mode !== "preview" || !changeParam || revealedChange.current === changeParam) return;
     const el = previewRef.current?.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
     if (!el) return;
+    revealedChange.current = changeParam;
     // Wait a frame so the review bar has its final height before measuring.
     requestAnimationFrame(() => revealAboveBar(el));
   }, [changeParam, mode, note.dataUpdatedAt, pendingBlocks.length]);
@@ -200,6 +203,7 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
   return (
     <>
       <section className="note-main" aria-labelledby="note-title">
+        <BackToConversation />
         <div className="note-toolbar">
           <p className="path" id="note-title">{n.path}</p>
           <div className="segmented" role="group" aria-label="View">

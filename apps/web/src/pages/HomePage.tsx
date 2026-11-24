@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { api, notePathParam } from "../api";
 import { extraHome } from "../homeSlots";
+import { Composer } from "../ask/Composer";
+import { useConversations } from "../ask/ask";
 
 const SAMPLE_NOTE = "meetings/2026-11-24 kickoff.md";
 
@@ -24,22 +26,31 @@ function StartActions() {
   );
 }
 
+function RecentConversations() {
+  const conversations = useConversations();
+  const list = conversations.data?.conversations ?? [];
+  return (
+    <>
+      <h2>Recent conversations</h2>
+      {list.length === 0 ? <p className="muted">None yet.</p> : (
+        <ul className="plain conversations">
+          {list.slice(0, 8).map((c) => (
+            <li key={c.id}><Link to={`/c/${c.id}`}>{c.title}</Link> <span className="muted">· {new Date(c.updatedAt).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}</span></li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export function HomePage() {
   return (
     <section className="page home" aria-labelledby="home-h">
       <h1 id="home-h">What do you need?</h1>
       <StartActions />
-      <form className="composer" onSubmit={(e) => e.preventDefault()} aria-describedby="ai-off">
-        <label htmlFor="composer">Ask about your notes and projects</label>
-        <textarea id="composer" rows={3} disabled placeholder="Asking questions needs an AI provider, which is not set up yet" />
-        <div className="composer-row">
-          <span className="chip" id="ai-off">AI is off</span>
-          <span className="muted">Notes and projects work fully without it. Nothing here needs a key.</span>
-        </div>
-      </form>
+      <Composer />
+      <RecentConversations />
       {extraHome.sections.map((Section, i) => <Section key={i} />)}
-      <h2>Recent conversations</h2>
-      <p className="muted">None yet.</p>
     </section>
   );
 }

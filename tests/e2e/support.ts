@@ -45,3 +45,16 @@ export async function launchUrl(svc: Service): Promise<string> {
   const { launchCode } = await res.json();
   return `http://127.0.0.1:${svc.port}/#launch=${launchCode}`;
 }
+
+/** A Node-side API client for test setup (synthetic data only). */
+export async function apiSession(svc: Service) {
+  const url = new URL(await launchUrl(svc));
+  const code = new URLSearchParams(url.hash.slice(1)).get("launch");
+  const res = await fetch(`http://127.0.0.1:${svc.port}/api/v1/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ launchCode: code }) });
+  const { token } = await res.json();
+  return async (method: string, path: string, body?: unknown) => {
+    const r = await fetch(`http://127.0.0.1:${svc.port}/api/v1${path}`, { method, headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const text = await r.text();
+    return { status: r.status, body: text ? JSON.parse(text) : null };
+  };
+}

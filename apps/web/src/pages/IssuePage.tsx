@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { ChangeView, IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
@@ -8,6 +8,7 @@ import { priorityLabel, statusLabel } from "../format";
 import { extraIssue } from "../issueSlots";
 import { useOpenChanges } from "../review/review";
 import { revealAboveBar } from "../review/reveal";
+import { BackToConversation } from "../ask/BackToConversation";
 
 export function IssuePage() {
   const { key = "" } = useParams();
@@ -21,11 +22,14 @@ export function IssuePage() {
   const changeParam = params.get("change");
   const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field && c.state !== "prepared").map((c) => [c.field as string, c]));
   const pendingClass = (field: string) => (pendingByField.has(field) ? ` pending-field${pendingByField.get(field)!.state === "conflicted" ? " conflicted" : ""}` : "");
+  // Reveal each change once when it is reached; later refetches must not steal focus (for example from the feedback box).
+  const revealed = useRef<string | null>(null);
   useEffect(() => {
-    if (!changeParam) return;
+    if (!changeParam || revealed.current === changeParam || !pendingByField.size) return;
     const el = document.querySelector<HTMLElement>(`label[data-change-id="${CSS.escape(changeParam)}"]`)
       ?? document.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
     if (!el) return;
+    revealed.current = changeParam;
     requestAnimationFrame(() => revealAboveBar(el));
   }, [changeParam, issue.dataUpdatedAt, pendingByField.size]);
 
@@ -80,6 +84,7 @@ export function IssuePage() {
 
   return (
     <section className="page issue-page" aria-labelledby="issue-h">
+      <BackToConversation />
       <p className="path"><Link to="/projects">Projects</Link> / <Link to={`/projects/${i.projectKey}`}>{i.projectKey}</Link> / {i.key}</p>
       <h1 id="issue-h"><span className="issue-key">{i.key}</span> {i.title}</h1>
       {extraIssue.aboveFields.map((Slot, n) => <Slot key={n} issue={i} />)}

@@ -32,7 +32,7 @@ test("note and linked issue: create, navigate both ways, protect stale saves, su
   await page.goto(await launchUrl(svc));
   await expect(page.getByRole("heading", { name: "What do you need?" })).toBeVisible();
   expect(page.url()).not.toContain("launch=");
-  await expect(page.getByText("AI is off")).toBeVisible();
+  await expect(page.getByText("AI is off", { exact: true })).toBeVisible();
 
   // Create a note with headings.
   await page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: "Notes" }).click();

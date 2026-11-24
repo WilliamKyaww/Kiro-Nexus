@@ -311,6 +311,33 @@ export class WorkspaceService {
     return readFile(this.collectionPath(name));
   }
 
+  // ---------------- Conversations (Ask history; the only thing an Ask run writes) ----------------
+
+  conversationsDir(): string {
+    return join(this.root, ".nexus", "conversations");
+  }
+
+  async writeConversation(id: string, bytes: string): Promise<void> {
+    if (!/^cnv_[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) throw new NexusError("VALIDATION", "Invalid conversation ID.");
+    await this.exclusive(async () => {
+      try {
+        await atomicWrite(join(this.conversationsDir(), `${id}.json`), bytes);
+      } catch (e) {
+        throw new NexusError("WRITE_FAILED", `Could not save the conversation: ${(e as Error).message}`);
+      }
+    });
+  }
+
+  async readConversation(id: string): Promise<string | null> {
+    if (!/^cnv_[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) return null;
+    return readFile(join(this.conversationsDir(), `${id}.json`), "utf8").catch(() => null);
+  }
+
+  async listConversationIds(): Promise<string[]> {
+    const names = await readdir(this.conversationsDir()).catch(() => [] as string[]);
+    return names.filter((n) => /^cnv_[0-9A-HJKMNP-TV-Z]{26}\.json$/.test(n)).map((n) => n.slice(0, -5));
+  }
+
   // ---------------- Review journal ----------------
 
   journalDir(): string {

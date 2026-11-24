@@ -10,6 +10,8 @@ import { IssuePage } from "./pages/IssuePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { ConversationPage } from "./pages/ConversationPage";
+import { setProgress } from "./ask/ask";
 import { extraShell } from "./slices";
 
 const queryClient = new QueryClient({
@@ -72,6 +74,12 @@ function useLiveUpdates(): boolean {
       }
       void client.invalidateQueries({ queryKey: ["review"] }); // pending markers follow the new content
     }
+    if (event.type === "ask.progress" && typeof event.runId === "string") setProgress(event.runId, String(event.activity ?? ""));
+    if (event.type === "ask.done" && typeof event.runId === "string") {
+      setProgress(event.runId, null);
+      void client.invalidateQueries({ queryKey: ["conversation", event.conversationId] });
+      void client.invalidateQueries({ queryKey: ["conversations"] });
+    }
     for (const fn of extraShell.eventHandlers) fn(event, client);
   }, setConnected), [client]);
   return connected;
@@ -108,6 +116,7 @@ function Shell() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/workspace" element={<WorkspacePage />} />
+              <Route path="/c/:id" element={<ConversationPage />} />
               <Route path="/notes" element={<NotesPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:key" element={<ProjectPage />} />

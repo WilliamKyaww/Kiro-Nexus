@@ -53,7 +53,16 @@ acceptance condition has been seen to pass.
        unchanged.
   - _Requirements: 2.2, 2.3, 4, 5_
 
-- [ ] 3. Conversations, Home and citations (increment C3)
+- [x] 3. Conversations, Home and citations (increment C3)
+  - **Verified by Kiro, 2026-11-24:**
+    - `server/src/ask/ask-http.test.ts` (2 tests, against the real
+      service): availability states; only the conversation changes; the
+      model is pinned; cancel; a rejected key; one run at a time; a crash
+      mid-run is marked interrupted.
+    - `tests/e2e/c3-conversations.spec.ts`: cancel; Retry with the
+      structured-only fallback; a rejected key pointing to Settings.
+    - The C4 journey also covers citations, "Back to conversation" and
+      persistence across a restart.
   - **Acceptance:** E2E tests show that:
     1. Home shows the workspace and model.
     2. An answer renders facts, discrepancies, suggestions and the
