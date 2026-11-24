@@ -80,8 +80,8 @@ Local milestone commits under DEC-004:
 | --- | --- | --- | --- |
 | A | Done | see `git log` (`docs: amend PRD, add B1 spec, wireframe and dev tooling`) | The B1 spec was self-reviewed by Kiro. Impeccable detect returned `[]` after one fix, and its renders were checked. The Playwright MCP stdio smoke test passed 6 of 6. Registering the server with Kiro is blocked by the permission policy (see `docs/tooling.md`) |
 | B | Done | see `git log` (`feat: B1 workspace core in browser and Electron`) | `npm run typecheck` has no errors. `npm test` passes 38 tests, and `npm run test:e2e` passes 4 (Edge and Electron). A manual `npm run try` / `open` / `stop` and `npm run desktop`, closed through the window, released the lock. `FEATURES.md` holds the details |
-| C | In progress | | |
-| D | Not started | | |
+| C | Done | see `git log` (`feat: B5 change journal with per-change review`) | `npm test` passes 64 tests, including real crash recovery, property tests and a mutation check. `npm run test:e2e` passes 6 (adding two B5 journeys). The Kiro hooks fire and record PASS or FAIL, including a deliberate regression (`docs/tooling.md`) |
+| D | In progress | | |
 
 ## Assumptions to check
 
@@ -104,8 +104,9 @@ Local milestone commits under DEC-004:
 
 ## Next action
 
-Milestone C: write the B5 spec, `.kiro/specs/change-journal/`, then
-implement the journal engine with fixed, labelled demo operations.
+Milestone D: a B2 notes slice covering heading-level search, and external file
+changes that never discard an unsaved editor buffer. Write the spec
+`.kiro/specs/notes-search-watch/` first.
 
 ### Continuation instruction for a fresh Kiro session
 

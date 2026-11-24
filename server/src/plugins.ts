@@ -1,10 +1,14 @@
-// Slice extensions registered by main.ts. B5 (review) and B2 (watcher, search) add here.
+// Slice extensions registered by main.ts.
 import type { FastifyInstance } from "fastify";
 import type { RouteContext } from "./app";
+import { installReview, reviewRoutes } from "./review";
 import type { AppState } from "./state";
 
-export function extraPlugins(_state: AppState): Array<(app: FastifyInstance, ctx: RouteContext) => void> {
-  return [];
+export function extraPlugins(state: AppState): Array<(app: FastifyInstance, ctx: RouteContext) => void> {
+  return [reviewRoutes(state)];
 }
 
-export async function extraStartup(_state: AppState): Promise<void> {}
+/** Runs before the service listens or opens a workspace. */
+export async function extraStartup(state: AppState): Promise<void> {
+  installReview(state);
+}

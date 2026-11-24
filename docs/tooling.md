@@ -105,7 +105,37 @@ Port 47101 is the wireframe (`node scripts/serve-static.mjs wireframe
 47101`), and 47100 is the fixed port `npm run try` uses for the app. The
 configuration holds no credentials.
 
-### Kiro hook: review and reversal tests
+### Kiro hooks: review and reversal tests (configured and verified)
 
-This is added in milestone C, once the tests exist. Its verification result
-is recorded there.
+- **Files:**
+  - `.kiro/hooks/review-tests-on-agent-edit.json` uses the `PostToolUse`
+    trigger and matches `fs_write`, `str_replace`, `fs_append`,
+    `smart_relocate` and `semantic_rename`.
+  - `.kiro/hooks/review-tests-on-save.json` uses the `PostFileSave`
+    trigger, matching on the path regex.
+  - Both run `node scripts/hook-review-tests.mjs`.
+- **Behaviour:**
+  1. The script reads the hook event from stdin.
+  2. It ignores edits outside `server/src/review/`, `server/src/workspace/`
+     and `packages/schema/src/review.ts`.
+  3. It runs `vitest run server/src/review server/src/workspace`, which is
+     47 tests.
+  4. It appends one line to `.tmp/hooks/review-tests.log`:
+     `<time> PASS|FAIL trigger=… file=… tests="…" duration=…`.
+- **Verification (Kiro, 2026-11-24, in the session that created the
+  hooks):**
+  - Kiro's message said the hooks would be active "on the next session
+    start", but both fired in the same session.
+  - The first firings logged `FAIL … tests="no tests"`. Kiro starts hooks
+    with a lower-case drive letter (`c:\…`), and Vitest on Windows then
+    loads two copies of itself ("failed to find the runner"). The script
+    now normalises the path.
+  - After the fix, both triggers logged
+    `PASS … tests="47 passed (47)"`.
+  - A deliberate regression in `server/src/review/spans.ts` was logged as
+    `FAIL … tests="3 failed | 44 passed (47)"` by both triggers. After the
+    revert, the log showed `PASS`.
+- **Known cost:** an agent edit fires both hooks, because the IDE also saves
+  the file, so the tests run twice (about 3 s each). Both are kept: the save
+  hook covers human edits, and the tool hook covers agent edits in contexts
+  without an IDE save.

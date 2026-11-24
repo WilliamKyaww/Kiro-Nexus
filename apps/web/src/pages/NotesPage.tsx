@@ -6,6 +6,7 @@ import { ApiError, api, notePathParam } from "../api";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { ErrorNote } from "../components/ErrorNote";
 import { extraNotes } from "../noteSlots";
+import { useOpenChanges } from "../review/review";
 
 export function NotesPage() {
   const [params] = useSearchParams();
@@ -81,7 +82,10 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
   const note = useQuery({ queryKey: ["note", path], queryFn: () => api.get<NoteView>(`/notes/content?path=${encodeURIComponent(path)}`) });
   const issues = useQuery({ queryKey: ["issues", "all"], queryFn: () => api.get<{ issues: Issue[] }>("/issues") });
   const issueKeys = useMemo(() => new Set((issues.data?.issues ?? []).map((i) => i.key)), [issues.data]);
-  const [mode, setMode] = useState<"preview" | "edit">(params.get("edit") === "1" && !heading ? "edit" : "preview");
+  const changeParam = params.get("change");
+  const [mode, setMode] = useState<"preview" | "edit">(params.get("edit") === "1" && !heading && !changeParam ? "edit" : "preview");
+  const openChanges = useOpenChanges().filter((c) => c.kind === "note.replaceSpan" && c.file === path);
+  const pendingBlocks = openChanges.flatMap((c) => (c.lines ? [{ start: c.lines.start, end: c.lines.end, changeId: c.changeId, state: c.state }] : []));
   const [draft, setDraft] = useState<string | null>(null);
   const [base, setBase] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ content: string; revision: string } | null>(null);
@@ -128,6 +132,19 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
     void el.offsetWidth;
     el.classList.add("flash");
   }, [targetSlug, mode, note.dataUpdatedAt]);
+
+  // Reaching a change: switch to preview, scroll to and briefly highlight the exact block.
+  useEffect(() => { if (changeParam) setMode("preview"); }, [changeParam]);
+  useEffect(() => {
+    if (mode !== "preview" || !changeParam) return;
+    const el = previewRef.current?.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }, [changeParam, mode, note.dataUpdatedAt, pendingBlocks.length]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -177,6 +194,12 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
             </div>
           </div>
         ) : null}
+        {openChanges.length > 0 ? (
+          <p className="notice" role="note">
+            {openChanges.length === 1 ? "1 change in this note is" : `${openChanges.length} changes in this note are`} awaiting review
+            {mode === "edit" ? ". Switch to Preview to see where." : ". Use the review bar to accept or reject."}
+          </p>
+        ) : null}
         {extraNotes.aboveContent.map((Slot, i) => <Slot key={i} path={n.path} />)}
         {mode === "edit" ? (
           <label className="editor">
@@ -186,7 +209,7 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
           </label>
         ) : (
           <div ref={previewRef}>
-            <MarkdownPreview content={text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} />
+            <MarkdownPreview content={text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} pending={draft === null ? pendingBlocks : []} />
           </div>
         )}
         {save.error && !(save.error instanceof ApiError && save.error.code === "REVISION_MISMATCH") ? <ErrorNote error={save.error} /> : null}

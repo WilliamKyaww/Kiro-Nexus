@@ -69,6 +69,66 @@ not features.
 - **Usable with AI off.** Home shows "AI is off". No key is asked for
   anywhere.
 
+### B5 change journal with fixed demo operations (verified by Kiro, 2026-11-24; no human review yet)
+
+These changes come from **fixed, labelled demo operations, not AI**. Agent
+proposals arrive in slice D and will use the same engine.
+
+- **Apply.** "Apply demo changes (fixed, not AI)" on Home writes two real
+  changes:
+  - It ticks "Hein builds the calendar view" in the kickoff note.
+  - It moves `NEX-1`'s due date from 5 December to 3 December.
+
+  The journal `.nexus/reviews/<runId>.json` is written before either file
+  is touched, with per-file before and after hashes and stable `opId` and
+  `changeId` values. Evidence: `engine.test.ts` and `review-http.test.ts`.
+- **Review.**
+  - The note opens on the exact list item, which is highlighted, focused
+    and marked "Pending review".
+  - The review bar moves between the note and the issue.
+  - The issue page marks the due-date field and shows "5 Dec 2026 → 3 Dec
+    2026" with its own Accept and Reject.
+
+  Evidence: `b5-review.spec.ts`.
+- **Mixed decisions across two files.** A user can accept the note change
+  and reject the date. The rejection is undone straight away, Nexus asks why,
+  and the reason is saved. The files hold exactly the accepted result after a
+  restart. Evidence: the E2E test and engine tests, which read the files.
+- **Reversals never guess.**
+  - An unrelated manual edit to the note survives a rejection.
+  - An edited target becomes `conflicted` (`missing`), and a duplicated
+    paragraph with identical neighbours becomes `conflicted` (`ambiguous`).
+    In both cases nothing is written, and "Keep current version" closes the
+    change.
+  - Editing another field of the issue does not block rejecting the date.
+
+  Evidence: `engine.test.ts` and the fast-check property tests in
+  `spans.test.ts`. A mutation check showed that the ambiguity test fails if
+  reversal guesses.
+- **Recovery.** Real service processes were killed mid-run and mid-rejection
+  (`NEXUS_FAULT`, exit code 86), and recovered on restart:
+  - A crash after the journal write, or between the two file writes, is
+    rolled forward to `pending`, with the file hashes matching the journal.
+  - A crash after the reversal was journaled is completed as `rejected`.
+  - A file edited while the service was down becomes `conflicted`, and the
+    newer text is kept.
+
+  Evidence: `review-http.test.ts` and `engine.test.ts`.
+- **Idempotent.** A repeated demo or a repeated `opId` applies nothing new.
+  Repeating accept or reject is a no-op.
+- **Pending dates do not schedule reminders.** At 09:30 London time on the
+  proposed date, no reminder is due while the change is pending. One is due
+  after it is accepted. Evidence: `GET /api/v1/reminders/due` in
+  `review-http.test.ts`, plus `engine.test.ts`.
+- **Accessibility.**
+  - Every decision works from the keyboard.
+  - The feedback box takes focus after a rejection.
+  - With `prefers-reduced-motion`, the highlight is a static outline with no
+    animation.
+  - An unsaved note draft is kept when a change lands.
+
+  Evidence: the second test in `b5-review.spec.ts`.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
@@ -78,8 +138,9 @@ not features.
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - `npm test` passes 38 tests.
-  - `npm run test:e2e` passes 4 tests in Edge and Electron.
+  - `npm test` passes 64 tests.
+  - `npm run test:e2e` passes 6 tests in Edge and Electron.
+- **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on agent edits and on file saves, and record PASS or FAIL. See `docs/tooling.md`.
 - **Dev tooling** (Kiro, 2026-11-24): see `docs/tooling.md`.
   - The Impeccable detector and renders ran.
   - The Playwright MCP stdio smoke test passes 6 of 6 checks.

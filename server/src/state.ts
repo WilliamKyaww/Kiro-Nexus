@@ -45,7 +45,14 @@ export class AppState {
         onLockTakeover: (prev) => this.log(`lock: took over stale lock from pid ${prev.pid}`),
       });
       service.events.on("change", (e: ChangeEvent) => this.publish({ ...e }));
-      for (const hook of this.onOpen) await hook(service);
+      try {
+        for (const hook of this.onOpen) await hook(service);
+      } catch (e) {
+        // A failed start-up step (for example review recovery) must not leave the lock held.
+        for (const hook of this.onClose) await hook(service).catch(() => undefined);
+        await service.close();
+        throw e;
+      }
       this.service = service;
       this.openError = null;
       await addRecent(this.profileDir, root);

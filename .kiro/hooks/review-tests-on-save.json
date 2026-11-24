@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Review/reversal tests when a human saves mutation code",
+      "trigger": "PostFileSave",
+      "description": "When Will or Hein saves workspace-mutation code in the IDE, run the focused review/reversal tests and record the result in .tmp/hooks/review-tests.log.",
+      "matcher": "(server[\\\\/]src[\\\\/](review|workspace)[\\\\/].*\\.ts|packages[\\\\/]schema[\\\\/]src[\\\\/]review\\.ts)$",
+      "action": {
+        "type": "command",
+        "command": "node scripts/hook-review-tests.mjs",
+        "timeout": 240
+      }
+    }
+  ]
+}

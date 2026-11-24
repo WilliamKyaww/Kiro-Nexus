@@ -18,6 +18,8 @@ export default defineConfig({
     outDir: here("./apps/web/dist"),
     emptyOutDir: true,
     sourcemap: true,
+    // One local bundle served from loopback; splitting buys nothing yet.
+    chunkSizeWarningLimit: 1200,
     // No inline scripts or modulepreload polyfill, so a strict CSP holds.
     modulePreload: { polyfill: false },
   },

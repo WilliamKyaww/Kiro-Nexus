@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { bootstrapSession } from "./api";
 import "./styles.css";
+import "./review/install";
 
 const session = await bootstrapSession();
 createRoot(document.getElementById("root")!).render(

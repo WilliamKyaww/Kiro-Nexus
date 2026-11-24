@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
-import type { IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
+import { Link, useParams, useSearchParams } from "react-router";
+import type { ChangeView, IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
 import { ApiError, api, notePathParam } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
 import { priorityLabel, statusLabel } from "../format";
 import { extraIssue } from "../issueSlots";
+import { useOpenChanges } from "../review/review";
 
 export function IssuePage() {
   const { key = "" } = useParams();
@@ -13,6 +14,20 @@ export function IssuePage() {
   const issue = useQuery({ queryKey: ["issue", key], queryFn: () => api.get<IssueView>(`/issues/${encodeURIComponent(key)}`) });
   const [form, setForm] = useState<IssuePatch | null>(null);
   const [conflict, setConflict] = useState<IssueView | null>(null);
+  const [params] = useSearchParams();
+  const changeParam = params.get("change");
+  const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field).map((c) => [c.field as string, c]));
+  const pendingClass = (field: string) => (pendingByField.has(field) ? ` pending-field${pendingByField.get(field)!.state === "conflicted" ? " conflicted" : ""}` : "");
+  useEffect(() => {
+    if (!changeParam) return;
+    const el = document.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+    el.classList.remove("flash");
+    void el.offsetWidth;
+    el.classList.add("flash");
+  }, [changeParam, issue.dataUpdatedAt, pendingByField.size]);
 
   const update = useMutation({
     mutationFn: (input: { baseRevision: number; patch: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
@@ -68,8 +83,9 @@ export function IssuePage() {
               {Object.entries(priorityLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
-          <label data-field-wrapper="due">Due date
+          <label data-field-wrapper="due" className={pendingClass("due").trim() || undefined} data-change-id={pendingByField.get("due")?.changeId} tabIndex={pendingByField.has("due") ? -1 : undefined}>Due date
             <input type="date" value={dueDate} onChange={(e) => set({ due: e.target.value ? { date: e.target.value } : null })} data-field="due" />
+            {pendingByField.has("due") ? <span className="pending-badge">{pendingByField.get("due")!.state === "conflicted" ? "Conflict" : "Pending review"}</span> : null}
           </label>
         </div>
         <label>Description<textarea rows={4} value={value.description} onChange={(e) => set({ description: e.target.value })} data-field="description" /></label>

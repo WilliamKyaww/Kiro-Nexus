@@ -266,6 +266,27 @@ export class WorkspaceService {
     return this.diskHash[name];
   }
 
+  /** Current bytes of a collection file, read from disk (not the cache). */
+  async readCollectionBytes(name: CollectionName): Promise<Buffer> {
+    return readFile(this.collectionPath(name));
+  }
+
+  // ---------------- Review journal ----------------
+
+  journalDir(): string {
+    return join(this.root, ".nexus", "reviews");
+  }
+
+  /** Persist a review journal record. Callers must hold `exclusive`. */
+  async writeJournalUnlocked(runId: string, bytes: string): Promise<void> {
+    if (!/^run_[0-9A-HJKMNP-TV-Z]{26}$/.test(runId)) throw new NexusError("VALIDATION", "Invalid run ID.");
+    try {
+      await atomicWrite(join(this.journalDir(), `${runId}.json`), bytes);
+    } catch (e) {
+      throw new NexusError("WRITE_FAILED", `Could not write the review journal: ${(e as Error).message}`);
+    }
+  }
+
   // ---------------- Projects and issues ----------------
 
   listProjects(): Project[] {

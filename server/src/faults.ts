@@ -8,12 +8,15 @@ let injector: Injector | null = null;
 
 const envFault = process.env.NEXUS_FAULT;
 if (envFault) {
-  const [target, nth] = envFault.split(":");
+  // Point names contain colons ("review:after-file-write"); an optional trailing ":<n>" is the hit count.
+  const m = envFault.match(/^(.*?)(?::(\d+))?$/);
+  const target = m?.[1] ?? envFault;
+  const nth = Number(m?.[2] ?? 1);
   let hits = 0;
   injector = (point) => {
     if (point !== target) return;
     hits += 1;
-    if (hits >= Number(nth ?? 1)) process.exit(86);
+    if (hits >= nth) process.exit(86);
   };
 }
 
