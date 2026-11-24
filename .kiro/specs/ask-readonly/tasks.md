@@ -1,0 +1,71 @@
+# Implementation plan: C, read-only Ask
+
+This is the only checklist for slice C. Tick a task only after its
+acceptance condition has been seen to pass.
+
+- [ ] 1. Provider profiles, keys, adapter and probes (increment C1)
+  - **Acceptance:**
+    1. Unit and integration tests against the test double show that:
+       - tool calling and structured output are probed separately and
+         stored;
+       - 401, 429 (with retry), timeout and cancellation each give a
+         distinct message;
+       - non-HTTPS remote base URLs are refused.
+    2. `GET /providers` never returns a key.
+    3. A scan for a fake key in the profile, workspace and logs finds
+       nothing.
+    4. In the Settings UI, a user can add, test, select and remove a
+       profile.
+    5. An Electron test shows that a key saved through the preload is
+       encrypted in `secrets.bin`, survives a relaunch, and never reaches
+       renderer storage.
+  - _Requirements: 1, 2, 3_
+
+- [ ] 2. Read-only coordinator, tools, handles and validation (increment C2)
+  - **Acceptance:** coordinator tests with the double show that:
+    1. Answers cite valid handles. Invented handles are removed and
+       counted, and unsupported facts are demoted.
+    2. `propose_changes` is rejected.
+    3. A heading that is missing or renamed is reported as "heading not
+       found".
+    4. A pending due date is reported as proposed, with the accepted value
+       given as the fact.
+    5. Retrieval-first mode works for structured-output-only profiles.
+    6. An insufficient-evidence question is flagged.
+    7. Every workspace file except the conversations is byte-for-byte
+       unchanged.
+  - _Requirements: 2.2, 2.3, 4, 5_
+
+- [ ] 3. Conversations, Home and citations (increment C3)
+  - **Acceptance:** E2E tests show that:
+    1. Home shows the workspace and model.
+    2. An answer renders facts, discrepancies, suggestions and the
+       fixture label.
+    3. A citation opens the exact heading or issue, and "Back to
+       conversation" returns to it.
+    4. Cancel and failure with Retry work.
+    5. Home with AI off still offers notes.
+    6. Conversations persist across a restart.
+  - _Requirements: 5.4, 6_
+
+- [ ] 4. End-to-end proof in two fictional workspaces (increment C4)
+  - **Acceptance:** a Playwright journey on the kickoff sample:
+    1. Ask the question, and the answer names the judge-instructions action
+       as untracked and NEX-1 as tracking the calendar work.
+    2. Open the Actions heading and NEX-1.
+    3. Create the missing issue, ask again, and the answer says it is
+       tracked.
+
+    A second synthetic workspace, with different people, actions and keys,
+    gives matching answers. Workspace hashes before and after show that
+    only `.nexus/conversations/` changed.
+  - _Requirements: 4.2, 7.1–7.3_
+
+- [ ] 5. Live check, Q1 and Q5 documentation
+  - **Acceptance:**
+    - A live check against a real free route runs only if a configured
+      free profile exists. Otherwise the exact steps for Will are recorded,
+      and Q1 stays open.
+    - `docs/judge-ai-route.md` describes the proposed team route and marks
+      it as not tested.
+  - _Requirements: 7.4; PRD-091_
