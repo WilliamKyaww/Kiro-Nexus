@@ -1,14 +1,7 @@
 // Pure record-field changes on issues.json. They are deterministic, so recovery can recompute them.
 import { Issue, type IssuesFile, type RecordField } from "@nexus/schema";
 
-/** Stable JSON for value comparison (sorted keys). */
-export function canonical(value: unknown): string {
-  return JSON.stringify(value, (_k, v) => (v && typeof v === "object" && !Array.isArray(v)
-    ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
-    : v));
-}
-
-export const sameValue = (a: unknown, b: unknown) => canonical(a) === canonical(b);
+export { canonical, sameValue } from "../util/json";
 
 export function setField(file: IssuesFile, recordId: string, field: RecordField, value: unknown, at: string): IssuesFile {
   return {

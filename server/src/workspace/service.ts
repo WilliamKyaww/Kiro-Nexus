@@ -11,6 +11,7 @@ import {
 } from "@nexus/schema";
 import { parseHeadings, resolveHeading } from "@nexus/markdown";
 import { NexusError, isNodeError } from "../errors";
+import { sameValue } from "../util/json";
 import { atomicWrite, createExclusive, sha256 } from "./atomic";
 import { acquireLock, releaseLock, type LockInfo } from "./lock";
 import { assertInsideRealRoot, resolveNotePath } from "./paths";
@@ -397,12 +398,24 @@ export class WorkspaceService {
     });
   }
 
-  async updateIssue(key: string, baseRevision: number, patch: IssuePatch): Promise<IssueView> {
+  /**
+   * Update an issue. A stale `baseRevision` is refused unless `baseValues` show
+   * that every patched field still has the value the editor started from (or
+   * already has the new value): then the patch is applied on top of the newer
+   * record, preserving other people's edits to other fields.
+   */
+  async updateIssue(key: string, baseRevision: number, patch: IssuePatch, baseValues?: IssuePatch): Promise<IssueView> {
     return this.exclusive(async () => {
       const current = this.issues.issues.find((i) => i.key === key || i.id === key);
       if (!current) throw new NexusError("NOT_FOUND", `Issue not found: ${key}`);
       if (current.revision !== baseRevision) {
-        throw new NexusError("REVISION_MISMATCH", "This issue changed since you opened it.", { current: await this.viewIssue(current) });
+        const fields = (Object.keys(patch) as Array<keyof IssuePatch>).filter((f) => patch[f] !== undefined);
+        const conflictingFields = baseValues
+          ? fields.filter((f) => !(f in baseValues) || !(sameValue(current[f], baseValues[f]) || sameValue(current[f], patch[f])))
+          : fields;
+        if (conflictingFields.length > 0) {
+          throw new NexusError("REVISION_MISMATCH", "This issue changed since you started editing.", { current: await this.viewIssue(current), conflictingFields });
+        }
       }
       for (const link of patch.noteLinks ?? []) this.notePath(link.notePath);
       const defined = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));

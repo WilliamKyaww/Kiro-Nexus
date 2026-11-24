@@ -118,7 +118,12 @@ export const IssuePatch = z.strictObject({
   due: Due.optional(),
   noteLinks: z.array(NoteLink).max(50).optional(),
 });
-export const UpdateIssueRequest = z.strictObject({ baseRevision: z.number().int().positive(), patch: IssuePatch });
+/**
+ * `baseValues` are the patched fields' values when the edit began. With them, a
+ * stale `baseRevision` is merged field by field: fields nobody else changed are
+ * applied on top of newer edits; a field changed by someone else is a conflict.
+ */
+export const UpdateIssueRequest = z.strictObject({ baseRevision: z.number().int().positive(), patch: IssuePatch, baseValues: IssuePatch.optional() });
 
 export type IssuePatch = z.infer<typeof IssuePatch>;
 

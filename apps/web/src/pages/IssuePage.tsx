@@ -13,7 +13,9 @@ export function IssuePage() {
   const client = useQueryClient();
   const issue = useQuery({ queryKey: ["issue", key], queryFn: () => api.get<IssueView>(`/issues/${encodeURIComponent(key)}`) });
   const [form, setForm] = useState<IssuePatch | null>(null);
-  const [conflict, setConflict] = useState<IssueView | null>(null);
+  // The editing base: the issue as it was when the first field was changed.
+  const [editBase, setEditBase] = useState<IssueView | null>(null);
+  const [conflict, setConflict] = useState<{ current: IssueView; fields: string[] } | null>(null);
   const [params] = useSearchParams();
   const changeParam = params.get("change");
   const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field && c.state !== "prepared").map((c) => [c.field as string, c]));
@@ -29,31 +31,53 @@ export function IssuePage() {
     el.classList.add("flash");
   }, [changeParam, issue.dataUpdatedAt, pendingByField.size]);
 
+  const refreshAfterSave = (saved: IssueView) => {
+    client.setQueryData(["issue", key], saved);
+    void client.invalidateQueries({ queryKey: ["issues"] });
+    void client.invalidateQueries({ queryKey: ["note"] });
+  };
+  const onConflict = (error: unknown) => {
+    if (error instanceof ApiError && error.code === "REVISION_MISMATCH") {
+      const details = error.details as { current?: IssueView; conflictingFields?: string[] } | undefined;
+      if (details?.current) setConflict({ current: details.current, fields: details.conflictingFields ?? [] });
+      else void client.invalidateQueries({ queryKey: ["issue", key] });
+    }
+  };
   const update = useMutation({
-    mutationFn: (input: { baseRevision: number; patch: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
-    onSuccess: (saved) => {
-      client.setQueryData(["issue", key], saved);
-      void client.invalidateQueries({ queryKey: ["issues"] });
-      void client.invalidateQueries({ queryKey: ["note"] });
-      setForm(null);
-      setConflict(null);
-    },
-    onError: (error) => {
-      if (error instanceof ApiError && error.code === "REVISION_MISMATCH") {
-        const current = (error.details as { current?: IssueView } | undefined)?.current;
-        if (current) setConflict(current);
-        else void client.invalidateQueries({ queryKey: ["issue", key] });
-      }
-    },
+    mutationFn: (input: { baseRevision: number; patch: IssuePatch; baseValues: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
+    onSuccess: (saved) => { refreshAfterSave(saved); setForm(null); setEditBase(null); setConflict(null); },
+    onError: onConflict,
+  });
+  // Link changes have their own request, so an unsaved title or description is never cleared.
+  const updateLinks = useMutation({
+    mutationFn: (input: { baseRevision: number; patch: IssuePatch; baseValues: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
+    onSuccess: refreshAfterSave,
+    onError: onConflict,
   });
 
   if (issue.error) return <section className="page"><ErrorNote error={issue.error} /><Link to="/projects">All projects</Link></section>;
   if (!issue.data) return <section className="page" aria-busy="true"><p className="muted">Loading issue…</p></section>;
   const i = issue.data;
+  // Fields being edited show the draft; every other field shows the newest value, so others' edits stay visible.
   const value = { title: i.title, description: i.description, status: i.status, priority: i.priority, due: i.due, ...form };
   const dirty = form !== null;
-  const set = (patch: IssuePatch) => setForm({ ...form, ...patch });
-  const submit = (e: FormEvent) => { e.preventDefault(); if (form) update.mutate({ baseRevision: i.revision, patch: form }); };
+  const set = (patch: IssuePatch) => {
+    if (!editBase) setEditBase(i);
+    setForm({ ...form, ...patch });
+  };
+  const baseValuesFor = (patch: IssuePatch, from: IssueView): IssuePatch =>
+    Object.fromEntries(Object.keys(patch).map((f) => [f, from[f as keyof IssuePatch]])) as IssuePatch;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!form) return;
+    const b = editBase ?? i;
+    update.mutate({ baseRevision: b.revision, patch: form, baseValues: baseValuesFor(form, b) });
+  };
+  const changedElsewhere = editBase && form
+    ? (Object.keys(form) as Array<keyof IssuePatch>).filter((f) => JSON.stringify(i[f]) !== JSON.stringify(editBase[f]))
+    : [];
+  const fieldName: Record<string, string> = { title: "Title", description: "Description", status: "Status", priority: "Priority", due: "Due date", noteLinks: "Linked notes" };
+  const shown = (v: unknown) => (v === null || v === undefined ? "none" : typeof v === "string" ? v : JSON.stringify(v));
   const dueDate = value.due && "date" in value.due ? value.due.date : "";
 
   return (
@@ -62,13 +86,31 @@ export function IssuePage() {
       <h1 id="issue-h"><span className="issue-key">{i.key}</span> {i.title}</h1>
       {extraIssue.aboveFields.map((Slot, n) => <Slot key={n} issue={i} />)}
       {conflict ? (
-        <div className="conflict" role="alert">
-          <p><strong>This issue changed since you opened it.</strong> Your edits are still in the form.</p>
+        <div className="conflict" role="alert" data-testid="issue-conflict">
+          <p><strong>Someone else changed {conflict.fields.length ? conflict.fields.map((f) => fieldName[f] ?? f).join(", ") : "this issue"} since you started editing.</strong> Your edits are still in the form. Nothing was saved.</p>
+          <ul className="plain">
+            {conflict.fields.map((f) => (
+              <li key={f}>{fieldName[f] ?? f}: theirs “{shown(conflict.current[f as keyof IssueView])}”, yours “{shown(form?.[f as keyof IssuePatch])}”</li>
+            ))}
+          </ul>
           <div className="row">
-            <button type="button" onClick={() => { client.setQueryData(["issue", key], conflict); setForm(null); setConflict(null); }}>Load latest (discard mine)</button>
-            <button type="button" onClick={() => { if (form) update.mutate({ baseRevision: conflict.revision, patch: form }); }}>Apply mine on top</button>
+            <button type="button" onClick={() => {
+              const rest = Object.fromEntries(Object.entries(form ?? {}).filter(([f]) => !conflict.fields.includes(f))) as IssuePatch;
+              client.setQueryData(["issue", key], conflict.current);
+              setForm(Object.keys(rest).length ? rest : null);
+              setEditBase(Object.keys(rest).length ? conflict.current : null);
+              setConflict(null);
+            }}>Use theirs for {conflict.fields.length > 1 ? "these fields" : "this field"}</button>
+            <button type="button" onClick={() => {
+              if (!form) return;
+              update.mutate({ baseRevision: conflict.current.revision, patch: form, baseValues: baseValuesFor(form, conflict.current) });
+            }}>Keep mine</button>
           </div>
         </div>
+      ) : changedElsewhere.length ? (
+        <p className="notice" role="status" data-testid="changed-elsewhere">
+          {changedElsewhere.map((f) => fieldName[f] ?? f).join(", ")} changed elsewhere while you were editing. Saving will ask which version to keep.
+        </p>
       ) : null}
       <form className="fields-form" onSubmit={submit} aria-label="Issue details">
         <label>Title<input value={value.title} onChange={(e) => set({ title: e.target.value })} required data-field="title" /></label>
@@ -91,16 +133,17 @@ export function IssuePage() {
         <label>Description<textarea rows={4} value={value.description} onChange={(e) => set({ description: e.target.value })} data-field="description" /></label>
         <div className="row">
           <button type="submit" className="primary" disabled={!dirty || update.isPending}>{update.isPending ? "Saving…" : "Save issue"}</button>
-          {dirty ? <button type="button" onClick={() => setForm(null)}>Discard changes</button> : null}
+          {dirty ? <button type="button" onClick={() => { setForm(null); setEditBase(null); setConflict(null); }}>Discard changes</button> : null}
           <span className="save-state" role="status">{dirty ? "Unsaved changes" : `Saved · revision ${i.revision}`}</span>
         </div>
         {update.error && !conflict ? <ErrorNote error={update.error} /> : null}
       </form>
-      <NoteLinks issue={i} onChange={(noteLinks) => update.mutate({ baseRevision: i.revision, patch: { noteLinks } })} busy={update.isPending} />
+      <NoteLinks issue={i} busy={updateLinks.isPending}
+        onChange={(noteLinks) => updateLinks.mutate({ baseRevision: i.revision, patch: { noteLinks }, baseValues: { noteLinks: i.noteLinks.map((l) => ({ notePath: l.notePath, headingSlug: l.headingSlug, headingText: l.headingText })) } })} />
+      {updateLinks.error && !conflict ? <ErrorNote error={updateLinks.error} /> : null}
     </section>
   );
 }
-
 function NoteLinks({ issue, onChange, busy }: { issue: IssueView; onChange: (links: NoteLink[]) => void; busy: boolean }) {
   const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<{ notes: string[] }>("/notes") });
   const [notePath, setNotePath] = useState("");

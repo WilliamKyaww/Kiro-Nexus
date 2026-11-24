@@ -98,3 +98,20 @@ No human review has happened yet.
   - **Acceptance:** every command in the README has been run during this
     task and behaved as described.
   - _Requirements: 2.5, 11.1_
+
+- [x] 11. Issue edits never overwrite each other silently (Phase 1 repair 3; added 2026-11-24)
+  - **Defect, reproduced on `2310608`:** after a live refresh, tab A's
+    title save silently replaced tab B's title. Adding a link cleared an
+    unsaved title.
+  - **Fix:**
+    - The form captures its editing base when the first field changes.
+    - `PATCH /issues/:key` accepts `baseValues` and merges field by field:
+      fields nobody else changed are applied on top of newer edits, and a
+      field someone else changed is a conflict listing theirs and yours.
+    - Link add and remove use a separate request that leaves unsaved fields
+      alone.
+  - **Acceptance:**
+    - `workspace.test.ts` "merges a stale edit field by field";
+    - `tests/e2e/b1-issue-edits.spec.ts` (3 tests: the same field in two
+      tabs, different fields in two tabs, and link add and remove with
+      unsaved fields). All three check the form and `issues.json`.

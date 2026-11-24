@@ -177,7 +177,7 @@ export function createApp(options: AppOptions): FastifyInstance {
   app.get("/api/v1/issues/:key", async (request) => state.requireService().getIssue((request.params as { key: string }).key));
   app.patch("/api/v1/issues/:key", async (request) => {
     const body = parseBody(UpdateIssueRequest, request.body);
-    return state.requireService().updateIssue((request.params as { key: string }).key, body.baseRevision, body.patch);
+    return state.requireService().updateIssue((request.params as { key: string }).key, body.baseRevision, body.patch, body.baseValues);
   });
 
   // ---------- Live events (authenticated fetch stream) ----------

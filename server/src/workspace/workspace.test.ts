@@ -106,6 +106,28 @@ describe("WorkspaceService", () => {
     await s.close();
   });
 
+  it("merges a stale edit field by field: different fields both survive, the same field conflicts", async () => {
+    const s = await WorkspaceService.open(dir, { lock: lock() });
+    const p = await s.createProject("NEX", "Nexus");
+    await s.createIssue({ projectId: p.id, title: "Original", description: "Original text" });
+    // Tab B saves a new title first (revision 1 -> 2).
+    await s.updateIssue("NEX-1", 1, { title: "Title from B" }, { title: "Original" });
+    // Tab A started from revision 1 and edited only the description: merged on top.
+    const merged = await s.updateIssue("NEX-1", 1, { description: "Description from A" }, { description: "Original text" });
+    expect(merged).toMatchObject({ title: "Title from B", description: "Description from A", revision: 3 });
+    // Tab C also started from revision 1 and edited the title: a conflict, nothing written.
+    await expect(s.updateIssue("NEX-1", 1, { title: "Title from C" }, { title: "Original" }))
+      .rejects.toMatchObject({ code: "REVISION_MISMATCH", details: { conflictingFields: ["title"] } });
+    // Without base values a stale write is still refused outright.
+    await expect(s.updateIssue("NEX-1", 1, { priority: "high" })).rejects.toMatchObject({ code: "REVISION_MISMATCH" });
+    // Choosing "keep mine" re-bases on the current revision.
+    const kept = await s.updateIssue("NEX-1", 3, { title: "Title from C" }, { title: "Title from B" });
+    expect(kept).toMatchObject({ title: "Title from C", description: "Description from A", revision: 4 });
+    const onDisk = JSON.parse(await readFile(join(dir, ".nexus", "issues.json"), "utf8")).issues[0];
+    expect(onDisk).toMatchObject({ title: "Title from C", description: "Description from A", revision: 4 });
+    await s.close();
+  });
+
   it("refuses to overwrite issues.json changed outside Nexus and reloads it", async () => {
     const s = await WorkspaceService.open(dir, { lock: lock() });
     const p = await s.createProject("NEX", "Nexus");
