@@ -42,3 +42,19 @@ human review has happened yet.
     - an external delete with a draft offers "Recreate with my text", and
       that recreates the file.
   - _Requirements: 2.2â€“2.4, 2.6_
+
+- [x] 6. Drafts survive navigation and in-flight saves (Phase 1 repair 2; added 2026-11-24)
+  - **Defect, reproduced on `2310608`:** an unsaved draft was lost after
+    visiting Projects. Text typed during a slow save vanished when it
+    completed, and the status said "Saved".
+  - **Fix:** drafts are kept in a tab store keyed by workspace and note,
+    with the editing base captured when the draft began. A save
+    acknowledgement clears only the submitted text. Compare shows the disk
+    text and the draft together.
+  - **Acceptance:**
+    - `apps/web/src/notes/drafts.test.ts` (3 tests);
+    - `tests/e2e/b2-drafts.spec.ts` (4 tests: Projects and issue
+      navigation plus Back; a review jump; a delayed save; Compare showing
+      both texts);
+    - the B1 stale-save test, updated to assert both texts.
+  - _Requirements: 2.2–2.4_

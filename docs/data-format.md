@@ -111,6 +111,27 @@ When a heading text repeats, the copies get de-duplicated slugs such as
   case-insensitively, preferring the shallowest path. A known issue key such
   as `NEX-1` in text renders as a link to that issue.
 
+## Drafts and saving (actual behaviour)
+
+- **Drafts are not workspace data.** Unsaved text lives in the browser tab,
+  in its session storage, keyed by workspace ID and note path. It survives
+  page navigation, Back, automatic review jumps and a reload of that tab. It
+  is lost when the tab or desktop window is closed, and Nexus warns before
+  that happens.
+- **The editing base.** A draft records the note revision at the moment
+  the first character was typed. A save sends that base. If the file has
+  changed since, the save writes nothing. Nexus then shows the actual disk
+  text next to the draft, and the user chooses "Load latest" or
+  "Overwrite with mine".
+- **In-flight saves.** When a save succeeds, only the exact text that was
+  submitted is cleared. Text typed while the save was in flight stays as a
+  draft, now based on the saved revision, and the status reads "Unsaved
+  changes" rather than "Saved".
+- **Outside edits while a draft is open** keep the draft and say so.
+  "Compare and choose" shows both texts before anything is written.
+- **Outside deletion while a draft is open** keeps the draft and offers
+  "Recreate with my text".
+
 ## `lock`
 
 `lock` holds `{ pid, instanceId, port, startedAt }`.

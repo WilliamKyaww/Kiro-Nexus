@@ -1,19 +1,29 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import type { Issue, NoteView } from "@nexus/schema";
+import type { Issue, NoteView, WorkspaceView } from "@nexus/schema";
 import { ApiError, api, notePathParam } from "../api";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { ErrorNote } from "../components/ErrorNote";
 import { extraNotes } from "../noteSlots";
 import { useOpenChanges } from "../review/review";
 import { NoteSearch } from "../components/NoteSearch";
+import { drafts } from "../notes/drafts";
+
+/** Workspace identity that scopes drafts; "none" before a workspace is known. */
+function useWorkspaceId(): string {
+  const workspace = useQuery({ queryKey: ["workspace"], queryFn: () => api.get<WorkspaceView>("/workspace") });
+  return workspace.data?.workspace?.workspaceId ?? "none";
+}
 
 export function NotesPage() {
   const [params] = useSearchParams();
   const path = params.get("path");
   const heading = params.get("heading");
   const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<{ notes: string[] }>("/notes") });
+  const wsId = useWorkspaceId();
+  useSyncExternalStore(drafts.subscribe, drafts.version);
+  const withDrafts = new Set(drafts.paths(wsId));
 
   return (
     <div className="notes-layout">
@@ -31,6 +41,7 @@ export function NotesPage() {
               <li key={p}>
                 <Link to={notePathParam(p)} aria-current={p === path ? "page" : undefined}>
                   {parts.length ? <span className="folder">{parts.join(" / ")} / </span> : null}{name}
+                  {withDrafts.has(p) ? <span className="draft-dot"> · unsaved draft</span> : null}
                 </Link>
               </li>
             );
@@ -38,7 +49,7 @@ export function NotesPage() {
         </ul>
         {notes.isSuccess && notes.data.notes.length === 0 ? <p className="muted">No notes yet. Create one above.</p> : null}
       </aside>
-      {path ? <NoteEditor key={path} path={path} heading={heading} allNotes={notes.data?.notes ?? []} /> : (
+      {path ? <NoteEditor key={`${wsId}:${path}`} wsId={wsId} path={path} heading={heading} allNotes={notes.data?.notes ?? []} /> : (
         <section className="note-empty"><p>Choose a note, or create one.</p></section>
       )}
     </div>
@@ -78,34 +89,42 @@ function NewNoteForm({ existing }: { existing: string[] }) {
   );
 }
 
-function NoteEditor({ path, heading, allNotes }: { path: string; heading: string | null; allNotes: string[] }) {
+/**
+ * Save behaviour (documented in docs/data-format.md "Drafts and saving"):
+ * - Typing creates a draft in the tab's draft store, keyed by workspace and note,
+ *   with the note revision at the moment the draft began as its editing base.
+ * - Save submits the current text with that base. On success only the submitted
+ *   text is cleared; text typed while the save was in flight stays as a draft.
+ * - A stale base (the file changed) never overwrites: both texts are shown and the
+ *   user chooses.
+ */
+function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: string; heading: string | null; allNotes: string[] }) {
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
   const note = useQuery({ queryKey: ["note", path], queryFn: () => api.get<NoteView>(`/notes/content?path=${encodeURIComponent(path)}`) });
   const issues = useQuery({ queryKey: ["issues", "all"], queryFn: () => api.get<{ issues: Issue[] }>("/issues") });
   const issueKeys = useMemo(() => new Set((issues.data?.issues ?? []).map((i) => i.key)), [issues.data]);
+  const stored = useSyncExternalStore(drafts.subscribe, () => drafts.get(wsId, path));
+  const draft = stored?.text ?? null;
   const changeParam = params.get("change");
-  const [mode, setMode] = useState<"preview" | "edit">(params.get("edit") === "1" && !heading && !changeParam ? "edit" : "preview");
+  const [mode, setMode] = useState<"preview" | "edit">(
+    (params.get("edit") === "1" || stored !== null) && !heading && !changeParam ? "edit" : "preview",
+  );
+  const [restored] = useState(stored !== null);
   const openChanges = useOpenChanges().filter((c) => c.kind === "note.replaceSpan" && c.file === path);
   const pendingBlocks = openChanges.flatMap((c) => (c.lines ? [{ start: c.lines.start, end: c.lines.end, changeId: c.changeId, state: c.state }] : []));
-  const [draft, setDraft] = useState<string | null>(null);
-  const [base, setBase] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{ content: string; revision: string } | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // Adopt the server copy when there is no unsaved draft.
-  useEffect(() => {
-    if (note.data && draft === null) setBase(note.data.revision);
-  }, [note.data, draft]);
-  // A newer server copy while a draft is open: keep the draft, flag the difference.
-  const diskChanged = !!(note.data && draft !== null && base !== null && note.data.revision !== base && !conflict);
+  const base = stored?.base ?? note.data?.revision ?? null;
+  // A newer file on disk while a draft is open: keep the draft, flag the difference.
+  const diskChanged = !!(note.data && stored && note.data.revision !== stored.base && !conflict);
 
   const save = useMutation({
     mutationFn: (body: { content: string; baseRevision: string }) => api.put<NoteView>("/notes/content", { path, ...body }),
-    onSuccess: (saved) => {
+    onSuccess: (saved, submitted) => {
       client.setQueryData(["note", path], saved);
-      setBase(saved.revision);
-      setDraft(null);
+      drafts.acknowledgeSave(wsId, path, submitted.content, saved.revision);
       setConflict(null);
     },
     onError: (error) => {
@@ -115,9 +134,14 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
     },
   });
 
-  const dirty = draft !== null && draft !== note.data?.content;
   const text = draft ?? note.data?.content ?? "";
-  const doSave = () => { if (draft !== null && base) save.mutate({ content: draft, baseRevision: base }); };
+  const dirty = draft !== null && draft !== note.data?.content;
+  const setText = (value: string) => {
+    if (!note.data) return;
+    drafts.set(wsId, path, value, stored?.base ?? note.data.revision);
+  };
+  const discardDraft = () => { drafts.clear(wsId, path); setConflict(null); };
+  const doSave = () => { if (draft !== null && base && !save.isPending) save.mutate({ content: draft, baseRevision: base }); };
 
   // Scroll to and indicate the linked heading.
   const targetSlug = useMemo(() => {
@@ -156,6 +180,7 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
     return () => window.removeEventListener("keydown", onKey);
   });
   useEffect(() => {
+    // Drafts survive navigation and reloads in this tab, but not closing it.
     const warn = (e: BeforeUnloadEvent) => { if (dirty) e.preventDefault(); };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
@@ -165,13 +190,14 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
   const recreate = async () => {
     if (draft === null) return;
     await api.post<NoteView>("/notes", { path, content: draft });
-    setDraft(null);
+    drafts.clear(wsId, path);
     await client.invalidateQueries({ queryKey: ["note", path] });
     await client.invalidateQueries({ queryKey: ["notes"] });
   };
   if (note.error && !deletedOutside) return <section className="note-main"><ErrorNote error={note.error} /></section>;
   if (!note.data) return <section className="note-main" aria-busy="true"><p className="muted">Loading note…</p></section>;
   const n = note.data;
+  const status = save.isPending ? "Saving…" : dirty ? "Unsaved changes" : "Saved";
 
   return (
     <>
@@ -183,15 +209,32 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
             <button type="button" aria-pressed={mode === "edit"} onClick={() => { setMode("edit"); if (heading) setParams({ path }); }}>Edit</button>
           </div>
           <button type="button" className="primary" onClick={doSave} disabled={!dirty || save.isPending}>{save.isPending ? "Saving…" : "Save"}</button>
-          <span className="save-state" role="status">{dirty ? "Unsaved changes" : "Saved"}</span>
+          <span className="save-state" role="status">{status}</span>
         </div>
+        {restored && draft !== null && !conflict && !diskChanged ? (
+          <div className="notice" role="note" data-testid="draft-restored">
+            <p>Your unsaved draft of this note is restored. Save it, or discard it to see the file.</p>
+            <button type="button" className="link-button" onClick={discardDraft}>Discard draft</button>
+          </div>
+        ) : null}
         {heading && !targetSlug ? <p className="notice">The linked heading was not found in this note. It may have been renamed.</p> : null}
         {conflict ? (
-          <div className="conflict" role="alert">
-            <p><strong>This note changed since you opened it.</strong> Your unsaved text is still in the editor.</p>
+          <div className="conflict" role="alert" data-testid="compare">
+            <p><strong>The file and your draft differ.</strong> Compare them, then choose which to keep. Nothing is overwritten until you choose.</p>
+            <div className="compare">
+              <section aria-label="On disk now">
+                <h3>On disk now</h3>
+                <pre data-testid="compare-disk">{conflict.content}</pre>
+              </section>
+              <section aria-label="Your draft">
+                <h3>Your draft</h3>
+                <pre data-testid="compare-draft">{draft ?? ""}</pre>
+              </section>
+            </div>
             <div className="row">
-              <button type="button" onClick={() => { setDraft(null); setConflict(null); setBase(conflict.revision); void client.invalidateQueries({ queryKey: ["note", path] }); }}>Load latest (discard mine)</button>
+              <button type="button" onClick={() => { discardDraft(); void client.invalidateQueries({ queryKey: ["note", path] }); }}>Load latest (discard mine)</button>
               <button type="button" onClick={() => { if (draft !== null) save.mutate({ content: draft, baseRevision: conflict.revision }); }}>Overwrite with mine</button>
+              <button type="button" className="link-button" onClick={() => setConflict(null)}>Keep editing</button>
             </div>
           </div>
         ) : null}
@@ -203,9 +246,9 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
         ) : null}
         {diskChanged && !deletedOutside ? (
           <div className="conflict" role="alert" data-testid="disk-changed">
-            <p><strong>This note was changed outside the editor.</strong> Your unsaved text is kept. Saving will ask how to resolve it.</p>
+            <p><strong>This note was changed outside the editor.</strong> Your unsaved text is kept. Compare to see both versions.</p>
             <div className="row">
-              <button type="button" onClick={() => { setDraft(null); setBase(n.revision); }}>Load the new version (discard mine)</button>
+              <button type="button" onClick={discardDraft}>Load the new version (discard mine)</button>
               <button type="button" onClick={() => setConflict({ content: n.content, revision: n.revision })}>Compare and choose</button>
             </div>
           </div>
@@ -220,8 +263,8 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
         {mode === "edit" ? (
           <label className="editor">
             <span className="visually-hidden">Markdown for {n.path}</span>
-            <textarea value={text} spellCheck onChange={(e) => setDraft(e.target.value)} aria-describedby="save-help" />
-            <span id="save-help" className="muted">Ctrl+S saves. Nexus writes exactly this text to the .md file.</span>
+            <textarea value={text} spellCheck onChange={(e) => setText(e.target.value)} aria-describedby="save-help" />
+            <span id="save-help" className="muted">Ctrl+S saves. Nexus writes exactly this text to the .md file. Unsaved drafts stay in this tab when you switch pages.</span>
           </label>
         ) : (
           <div ref={previewRef}>

@@ -79,7 +79,9 @@ test("note and linked issue: create, navigate both ways, protect stale saves, su
   await page.getByRole("textbox", { name: /Markdown for/ }).fill("# Kickoff\n\nMy unsaved draft\n");
   await writeFile(join(ws, "meetings", "Kickoff.md"), "# Kickoff\n\nNewer text from another editor\n");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "This note changed since you opened it" }).first()).toBeVisible();
+  // The stale save shows both versions before anything is overwritten.
+  await expect(page.getByTestId("compare-disk")).toHaveText("# Kickoff\n\nNewer text from another editor\n");
+  await expect(page.getByTestId("compare-draft")).toHaveText("# Kickoff\n\nMy unsaved draft\n");
   await expect(page.getByRole("textbox", { name: /Markdown for/ })).toHaveValue("# Kickoff\n\nMy unsaved draft\n");
   expect(await readFile(join(ws, "meetings", "Kickoff.md"), "utf8")).toBe("# Kickoff\n\nNewer text from another editor\n");
   await page.getByRole("button", { name: "Load latest (discard mine)" }).click();
