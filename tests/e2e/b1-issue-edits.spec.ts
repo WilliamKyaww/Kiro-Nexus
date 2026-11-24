@@ -63,6 +63,33 @@ test("two tabs editing different fields: both edits survive in the form and the 
   await expect(description(b)).toHaveValue("Description from tab A");
 });
 
+// Reproduced on e61a3d4: a title typed while an earlier save was in flight was replaced by
+// the older saved value, and the form said "Saved".
+test("a save acknowledges only the submitted values; typing during the save stays visible and unsaved", async ({ page }) => {
+  await page.route("**/api/v1/issues/NEX-1", async (route) => {
+    if (route.request().method() === "PATCH") await new Promise((r) => setTimeout(r, 1200));
+    await route.continue();
+  });
+  await page.goto(await launchUrl(svc!));
+  await page.goto(`http://127.0.0.1:${svc!.port}/issues/NEX-1`);
+  await title(page).fill("First title");
+  await page.getByRole("button", { name: "Save issue" }).click();
+  await expect(page.getByRole("button", { name: "Saving…" })).toBeVisible();
+  await title(page).fill("Newer title typed during the save");
+  await description(page).fill("Description typed during the save");
+  await expect.poll(async () => (await nex1()).title).toBe("First title");
+  await expect(page.locator(".save-state")).toHaveText("Unsaved changes");
+  await expect(title(page)).toHaveValue("Newer title typed during the save");
+  await expect(description(page)).toHaveValue("Description typed during the save");
+  await expect(page.getByRole("heading", { name: "NEX-1 First title" })).toBeVisible();
+  await expect(page.getByTestId("changed-elsewhere")).toHaveCount(0); // our own save is not someone else's edit
+
+  await page.getByRole("button", { name: "Save issue" }).click();
+  await expect(page.locator(".save-state")).toHaveText("Saved · revision 3", { timeout: 5000 });
+  expect(await nex1()).toMatchObject({ title: "Newer title typed during the save", description: "Description typed during the save", revision: 3 });
+  await expect(title(page)).toHaveValue("Newer title typed during the save");
+});
+
 test("adding and removing a note link keeps an unsaved title and description", async ({ page }) => {
   await page.goto(await launchUrl(svc!));
   await page.goto(`http://127.0.0.1:${svc!.port}/issues/NEX-1`);

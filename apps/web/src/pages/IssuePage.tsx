@@ -9,14 +9,18 @@ import { extraIssue } from "../issueSlots";
 import { useOpenChanges } from "../review/review";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
+import { acknowledge } from "../issues/acknowledge";
 
 export function IssuePage() {
   const { key = "" } = useParams();
   const client = useQueryClient();
   const issue = useQuery({ queryKey: ["issue", key], queryFn: () => api.get<IssueView>(`/issues/${encodeURIComponent(key)}`) });
-  const [form, setForm] = useState<IssuePatch | null>(null);
-  // The editing base: the issue as it was when the first field was changed.
-  const [editBase, setEditBase] = useState<IssueView | null>(null);
+  // The unsaved field values, and the editing base: the issue as it was when the first field
+  // was changed. They live in one state object so that a save acknowledgement can update
+  // both together.
+  const [draft, setDraft] = useState<{ values: IssuePatch; base: IssueView } | null>(null);
+  const form = draft?.values ?? null;
+  const editBase = draft?.base ?? null;
   const [conflict, setConflict] = useState<{ current: IssueView; fields: string[] } | null>(null);
   const [params] = useSearchParams();
   const changeParam = params.get("change");
@@ -47,7 +51,9 @@ export function IssuePage() {
   };
   const update = useMutation({
     mutationFn: (input: { baseRevision: number; patch: IssuePatch; baseValues: IssuePatch }) => api.patch<IssueView>(`/issues/${encodeURIComponent(key)}`, input),
-    onSuccess: (saved) => { refreshAfterSave(saved); setForm(null); setEditBase(null); setConflict(null); },
+    // Like the note editor: the reply acknowledges only what was submitted. Anything typed
+    // while the save was in flight stays in the form, visible and unsaved.
+    onSuccess: (saved, input) => { refreshAfterSave(saved); setDraft((d) => acknowledge(d, input.patch, saved)); setConflict(null); },
     onError: onConflict,
   });
   // Link changes have their own request, so an unsaved title or description is never cleared.
@@ -63,10 +69,7 @@ export function IssuePage() {
   // Fields being edited show the draft; every other field shows the newest value, so others' edits stay visible.
   const value = { title: i.title, description: i.description, status: i.status, priority: i.priority, due: i.due, ...form };
   const dirty = form !== null;
-  const set = (patch: IssuePatch) => {
-    if (!editBase) setEditBase(i);
-    setForm({ ...form, ...patch });
-  };
+  const set = (patch: IssuePatch) => setDraft((d) => ({ values: { ...d?.values, ...patch }, base: d?.base ?? i }));
   const baseValuesFor = (patch: IssuePatch, from: IssueView): IssuePatch =>
     Object.fromEntries(Object.keys(patch).map((f) => [f, from[f as keyof IssuePatch]])) as IssuePatch;
   const submit = (e: FormEvent) => {
@@ -100,8 +103,7 @@ export function IssuePage() {
             <button type="button" onClick={() => {
               const rest = Object.fromEntries(Object.entries(form ?? {}).filter(([f]) => !conflict.fields.includes(f))) as IssuePatch;
               client.setQueryData(["issue", key], conflict.current);
-              setForm(Object.keys(rest).length ? rest : null);
-              setEditBase(Object.keys(rest).length ? conflict.current : null);
+              setDraft(Object.keys(rest).length ? { values: rest, base: conflict.current } : null);
               setConflict(null);
             }}>Use theirs for {conflict.fields.length > 1 ? "these fields" : "this field"}</button>
             <button type="button" onClick={() => {
@@ -136,7 +138,7 @@ export function IssuePage() {
         <label>Description<textarea rows={4} value={value.description} onChange={(e) => set({ description: e.target.value })} data-field="description" /></label>
         <div className="row">
           <button type="submit" className="primary" disabled={!dirty || update.isPending}>{update.isPending ? "Saving…" : "Save issue"}</button>
-          {dirty ? <button type="button" onClick={() => { setForm(null); setEditBase(null); setConflict(null); }}>Discard changes</button> : null}
+          {dirty ? <button type="button" onClick={() => { setDraft(null); setConflict(null); }}>Discard changes</button> : null}
           <span className="save-state" role="status">{dirty ? "Unsaved changes" : `Saved · revision ${i.revision}`}</span>
         </div>
         {update.error && !conflict ? <ErrorNote error={update.error} /> : null}

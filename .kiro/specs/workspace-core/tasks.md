@@ -115,3 +115,22 @@ No human review has happened yet.
     - `tests/e2e/b1-issue-edits.spec.ts` (3 tests: the same field in two
       tabs, different fields in two tabs, and link add and remove with
       unsaved fields). All three check the form and `issues.json`.
+
+- [x] 12. A save acknowledges only the submitted issue values (corrective pass on `e61a3d4`; added 2026-11-24)
+  - **Defect, reproduced by Kiro on `e61a3d4`** (Will saw it first): with
+    the save delayed by 1.2 s, a title typed while the save was in flight
+    was replaced by the older saved title, and the form said "Saved ·
+    revision 2".
+  - **Fix:** the note editor's rule now applies to issue fields
+    (`apps/web/src/issues/acknowledge.ts`). A field whose draft value still
+    equals what was submitted leaves the draft. A field changed again
+    during the save stays, based on the saved value. A field first changed
+    during the save stays on its original base and revision, so the server
+    still checks it against other people's edits.
+  - **Acceptance:**
+    - `acknowledge.test.ts` (4 tests);
+    - `b1-issue-edits.spec.ts` "a save acknowledges only the submitted
+      values…": the newer title and a description typed during the save
+      stay visible, with "Unsaved changes". `issues.json` holds the first
+      title. A second save writes both at revision 3.
+    - The three task 11 tests and the B1 and B5 browser tests still pass.
