@@ -3,7 +3,13 @@
 This is the only checklist for slice C. Tick a task only after its
 acceptance condition has been seen to pass.
 
-- [ ] 1. Provider profiles, keys, adapter and probes (increment C1)
+- [x] 1. Provider profiles, keys, adapter and probes (increment C1)
+  - **Verified by Kiro, 2026-11-24:**
+    - `providers.test.ts` (4 tests, including the real service and a disk
+      scan for the fake key);
+    - `tests/e2e/c1-providers.spec.ts` (browser and Electron, with
+      safeStorage, relaunch and remove);
+    - `npm run scan:secrets` passed.
   - **Acceptance:**
     1. Unit and integration tests against the test double show that:
        - tool calling and structured output are probed separately and

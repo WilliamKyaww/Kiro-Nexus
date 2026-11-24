@@ -1,8 +1,8 @@
 // Electron main: starts the local service in a utilityProcess, mints a launch
 // code and loads the same web UI in a sandboxed window (architecture 4.2).
-import { app, BrowserWindow, dialog, ipcMain, shell, utilityProcess, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
@@ -25,14 +25,14 @@ function startService(): Promise<number> {
     const child = utilityProcess.fork(serviceEntry, args, {
       stdio: "pipe",
       serviceName: "Nexus local service",
-      env: { ...process.env, NEXUS_CONTROL_SECRET: controlSecret },
+      env: { ...process.env, NEXUS_CONTROL_SECRET: controlSecret, NEXUS_DESKTOP: "1" },
     });
     service = child;
     child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[service] ${d}`));
     createInterface({ input: child.stdout! }).on("line", (line) => {
       try {
         const msg = JSON.parse(line) as { event?: string; port?: number; code?: string };
-        if (msg.event === "ready" && msg.port) resolveStart(msg.port);
+        if (msg.event === "ready" && msg.port) { sendStoredKeys(child); resolveStart(msg.port); }
         if (msg.event === "error") reject(new Error(`The Nexus service could not start (${msg.code}).`));
       } catch { /* not a control line */ }
     });
@@ -45,6 +45,55 @@ function startService(): Promise<number> {
     });
   });
 }
+
+// ---------- Provider keys (PRD-076): encrypted with safeStorage (DPAPI on Windows) ----------
+const secretsFile = join(profileDir, "secrets.bin");
+type Secrets = { version: 1; keys: Record<string, string> };
+function readSecrets(): Secrets {
+  try {
+    const data = JSON.parse(readFileSync(secretsFile, "utf8")) as Secrets;
+    return data?.version === 1 && data.keys && typeof data.keys === "object" ? data : { version: 1, keys: {} };
+  } catch {
+    return { version: 1, keys: {} };
+  }
+}
+function writeSecrets(s: Secrets): void {
+  const tmp = `${secretsFile}.tmp-${randomBytes(4).toString("hex")}`;
+  writeFileSync(tmp, JSON.stringify(s), { mode: 0o600 });
+  renameSync(tmp, secretsFile);
+}
+const encryptionAvailable = () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } };
+function sendStoredKeys(child: UtilityProcess): void {
+  if (!encryptionAvailable()) return;
+  for (const [profileId, b64] of Object.entries(readSecrets().keys)) {
+    try {
+      child.postMessage({ type: "provider-key", profileId, key: safeStorage.decryptString(Buffer.from(b64, "base64")), storage: "os-protected" });
+    } catch { /* unreadable on this machine or user: skip */ }
+  }
+}
+const fromAppOrigin = (event: IpcMainInvokeEvent) => servicePort !== null && (event.senderFrame?.url ?? "").startsWith(`http://127.0.0.1:${servicePort}/`);
+const validId = (v: unknown): v is string => typeof v === "string" && /^prf_[0-9A-HJKMNP-TV-Z]{26}$/.test(v);
+
+ipcMain.handle("nexus:key-storage", () => (encryptionAvailable() ? "os-protected" : "session"));
+ipcMain.handle("nexus:set-provider-key", (event, profileId: unknown, key: unknown) => {
+  if (!fromAppOrigin(event) || !validId(profileId) || typeof key !== "string" || !key.trim() || key.length > 500) throw new Error("Invalid key request.");
+  const storage = encryptionAvailable() ? "os-protected" : "session";
+  if (storage === "os-protected") {
+    const s = readSecrets();
+    s.keys[profileId] = safeStorage.encryptString(key.trim()).toString("base64");
+    writeSecrets(s);
+  }
+  service?.postMessage({ type: "provider-key", profileId, key: key.trim(), storage });
+  return storage;
+});
+ipcMain.handle("nexus:delete-provider-key", (event, profileId: unknown) => {
+  if (!fromAppOrigin(event) || !validId(profileId)) throw new Error("Invalid key request.");
+  const s = readSecrets();
+  delete s.keys[profileId];
+  writeSecrets(s);
+  service?.postMessage({ type: "provider-key-delete", profileId });
+  return true;
+});
 
 async function launchUrl(port: number): Promise<string> {
   const res = await fetch(`http://127.0.0.1:${port}/api/v1/launch-codes`, { method: "POST", headers: { authorization: `Bearer ${controlSecret}` } });

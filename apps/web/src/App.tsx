@@ -9,6 +9,7 @@ import { ProjectsPage, ProjectPage } from "./pages/ProjectsPage";
 import { IssuePage } from "./pages/IssuePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { extraShell } from "./slices";
 
 const queryClient = new QueryClient({
@@ -113,7 +114,7 @@ function Shell() {
               <Route path="/issues/:key" element={<IssuePage />} />
               <Route path="/calendar" element={<PlaceholderPage title="Calendar" body="The calendar is not available yet. Due dates you set on issues are already saved." />} />
               <Route path="/notifications" element={<PlaceholderPage title="Notifications" body="Reminders are not available yet. A due date that is still awaiting review will never trigger a reminder." />} />
-              <Route path="/settings" element={<PlaceholderPage title="Settings" body="AI providers cannot be set up in this version yet. Notes and projects never need a key." />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<PlaceholderPage title="Not found" body="This page does not exist." />} />
             </Routes>
           )}

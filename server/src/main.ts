@@ -11,6 +11,7 @@ import { resolveProfileDir, removeServiceFile, writeServiceFile, readRecent } fr
 import { SessionManager } from "./security/session";
 import { AppState } from "./state";
 import { extraPlugins, extraStartup } from "./plugins";
+import { handleParentMessage } from "./providers";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -85,4 +86,7 @@ process.on("SIGTERM", () => void shutdown(0));
 process.on("message", (m: unknown) => { if ((m as { type?: string })?.type === "shutdown") void shutdown(0); });
 // Electron utilityProcess channel.
 const parentPort = (process as unknown as { parentPort?: { on: (e: string, cb: (m: { data: unknown }) => void) => void } }).parentPort;
-parentPort?.on("message", (m) => { if ((m.data as { type?: string })?.type === "shutdown") void shutdown(0); });
+parentPort?.on("message", (m) => {
+  if ((m.data as { type?: string })?.type === "shutdown") void shutdown(0);
+  else handleParentMessage(state, m.data);
+});

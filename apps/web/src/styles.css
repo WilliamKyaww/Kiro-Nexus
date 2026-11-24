@@ -185,3 +185,13 @@ a.button.primary { background: var(--accent); border-color: var(--accent); color
 a.button.big { padding: 0.7rem 1.2rem; font-size: 1.05rem; font-weight: 600; }
 a.button:hover { background: var(--accent-soft); }
 a.button.primary:hover { background: #0b544d; }
+
+/* Settings: providers (slice C) */
+.provider-list { list-style: none; padding: 0; display: grid; gap: 0.75rem; max-width: 52rem; }
+.provider { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 1rem; }
+.provider.selected { border-color: var(--accent); }
+.provider p { margin: 0.25rem 0; }
+.provider-head { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.chip.fixture { border-color: var(--pending); color: var(--pending); font-weight: 600; }
+.add-provider { display: grid; gap: 0.6rem; max-width: 36rem; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 1rem; }
+.add-provider h3 { margin: 0; }

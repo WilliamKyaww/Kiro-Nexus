@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:review": "vitest run server/src/review",
     "test:e2e": "node scripts/build.mjs && playwright test",
-    "mcp:smoke": "node scripts/mcp-smoke.mjs"
+    "mcp:smoke": "node scripts/mcp-smoke.mjs",
+    "scan:secrets": "node scripts/secret-scan.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.12",

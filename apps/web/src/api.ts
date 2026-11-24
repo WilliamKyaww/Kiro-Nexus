@@ -72,6 +72,7 @@ export const api = {
   post: <T>(path: string, body: unknown = {}) => call<T>("POST", path, body),
   put: <T>(path: string, body: unknown) => call<T>("PUT", path, body),
   patch: <T>(path: string, body: unknown) => call<T>("PATCH", path, body),
+  del: <T>(path: string) => call<T>("DELETE", path),
 };
 
 export interface ServerEvent { type: string; path?: string; [key: string]: unknown }

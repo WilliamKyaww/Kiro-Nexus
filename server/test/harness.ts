@@ -92,6 +92,7 @@ export function client(svc: RunningService, token: string) {
     post: (p: string, b?: unknown) => call("POST", p, b ?? {}),
     put: (p: string, b: unknown) => call("PUT", p, b),
     patch: (p: string, b: unknown) => call("PATCH", p, b),
+    del: (p: string) => call("DELETE", p),
   };
 }
 
