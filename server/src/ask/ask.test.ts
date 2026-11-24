@@ -179,7 +179,7 @@ describe("a second fictional workspace with different names and keys", () => {
     expect(facts).toMatch(/Priya drafts the onboarding guide.*has no matching issue/);
     expect(facts).toMatch(/Tomasz migrates the billing tests.*tracked by OPS-1/);
     expect(facts).toMatch(/Aiyana books the venue.*tracked by OPS-2/);
-    expect(texts(r.answer.discrepancies)).toMatch(/marks “Aiyana books the venue” as done, but OPS-2 is in_progress/);
+    expect(texts(r.answer.discrepancies)).toMatch(/marks “Aiyana books the venue” as done, but OPS-2 is in progress/);
     expect(facts).not.toMatch(/NEX-|judge|calendar/i);
     expect(Object.values(r.answer.citations).map((c) => c.target)).toContainEqual({ kind: "note", path: "standups/2026-11-20 planning.md", headingSlug: "action-items", headingText: "Action items" });
     expect(await hashTree(other)).toEqual(before);

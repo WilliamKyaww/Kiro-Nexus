@@ -12,6 +12,8 @@
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 
+// Same wording as the product's status labels (apps/web/src/format.ts).
+const STATUS_TEXT = { todo: "to do", in_progress: "in progress", done: "done" };
 const STOP = new Set("a an and are as at be by did do does for from has have how i in is it its of on or still that the their them there this to was we were what which who will with without no not any issue issues tracked yet".split(" "));
 const stem = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/(ing|ed|es|s)$/, "");
 const words = (s) => (s.match(/[A-Za-z0-9']+/g) ?? []).map(stem).filter((w) => w.length > 2 && !STOP.has(w));
@@ -55,9 +57,10 @@ export function buildAnswer({ section, issues, invent = false }) {
       if (shared >= 2 && score > bestScore) { best = issue; bestScore = score; }
     }
     if (best) {
-      facts.push({ text: `“${item.text}” is tracked by ${best.key} (${best.title}, status ${best.status}).`, sources: [section.handle, best.handle] });
+      const status = STATUS_TEXT[best.status] ?? best.status;
+      facts.push({ text: `“${item.text}” is tracked by ${best.key} (${best.title}, ${status}).`, sources: [section.handle, best.handle] });
       if (item.done !== (best.status === "done")) {
-        discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${best.status}.`, sources: [section.handle, best.handle] });
+        discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${status}.`, sources: [section.handle, best.handle] });
       }
     } else {
       facts.push({ text: `“${item.text}” has no matching issue.`, sources: [section.handle] });
