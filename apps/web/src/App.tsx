@@ -67,7 +67,9 @@ function useLiveUpdates(): boolean {
       } else {
         void client.invalidateQueries({ queryKey: ["notes"] });
         void client.invalidateQueries({ queryKey: ["note", event.path] });
+        void client.invalidateQueries({ queryKey: ["search"] });
       }
+      void client.invalidateQueries({ queryKey: ["review"] }); // pending markers follow the new content
     }
     for (const fn of extraShell.eventHandlers) fn(event, client);
   }, setConnected), [client]);

@@ -37,3 +37,19 @@ describe("resolveHeading", () => {
   it("falls back to unique heading text", () => expect(resolveHeading(headings, "gone", "Notes")).toEqual({ slug: "notes", status: "ok" }));
   it("reports a missing heading", () => expect(resolveHeading(headings, "gone", "Gone")).toEqual({ slug: null, status: "heading-missing" }));
 });
+
+import { sections } from "./index";
+
+describe("sections", () => {
+  it("splits into a preamble and heading sections with heading paths", () => {
+    const md = "Intro line\n\n# Kickoff\nOpening\n## Actions\n- [ ] Judge instructions\n```\n# not a heading\n```\n## Notes\nLast\n# Other\n";
+    expect(sections(md)).toEqual([
+      { headingSlug: null, headingText: null, headingPath: [], startLine: 0, text: "Intro line" },
+      { headingSlug: "kickoff", headingText: "Kickoff", headingPath: ["Kickoff"], startLine: 2, text: "Opening" },
+      { headingSlug: "actions", headingText: "Actions", headingPath: ["Kickoff", "Actions"], startLine: 4, text: "- [ ] Judge instructions\n```\n# not a heading\n```" },
+      { headingSlug: "notes", headingText: "Notes", headingPath: ["Kickoff", "Notes"], startLine: 9, text: "Last" },
+      { headingSlug: "other", headingText: "Other", headingPath: ["Other"], startLine: 11, text: "" },
+    ]);
+  });
+  it("returns nothing for an empty note", () => { expect(sections("")).toEqual([]); });
+});

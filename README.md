@@ -5,9 +5,15 @@ workspace. It runs in a normal browser and in an Electron desktop window,
 and both are useful with AI switched off. It is Will and Hein's entry in the
 Frankenstein category of Kiroween 2026.
 
-**Status:** this is an early build. Notes, projects, issues and heading
-links work and persist. Board, calendar, reminders and AI arrive in later
-slices; see `STATE.md` and `BACKLOG.md`.
+**Status:** this is an early build. Working now:
+
+- notes, projects, issues and heading links, which persist;
+- section search;
+- detection of outside edits, without losing unsaved text;
+- per-change review of edits, demonstrated with fixed operations (not AI).
+
+The board, calendar, reminders and AI arrive in later slices; see
+`STATE.md` and `BACKLOG.md`.
 
 ## Requirements
 
@@ -21,6 +27,28 @@ slices; see `STATE.md` and `BACKLOG.md`.
 npm install
 npm run try          # build, copy the fictional sample to .tmp/try, open the browser
 ```
+
+### A five-minute walkthrough (fictional sample)
+
+1. **Notes.**
+   - Open *meetings / 2026-11-24 kickoff*.
+   - Create a note of your own with a few `##` headings, edit it and press
+     Ctrl+S.
+2. **Projects.**
+   - Open *NEX*, then *NEX-1*. Under **Linked notes**, choose your note and
+     a heading, then select **Add link**.
+   - Open the link: the note scrolls to that heading.
+   - The note's **Linked issues** panel leads back to the issue.
+3. **Restart.** Press Ctrl+C in the terminal, run `npm run try` again, and
+   find everything intact.
+4. **Review.**
+   - On **Home**, select **Apply demo changes (fixed, not AI)**.
+   - Accept the ticked checklist item on the note page.
+   - Reject the due-date change on `NEX-1`, and give a reason or skip.
+   - Inspect `.tmp/try/workspace/` to see the real files.
+5. **Outside edits.** Edit the kickoff note in another editor while it is
+   open in Nexus, with and without unsaved text in the Nexus editor.
+6. **Search.** Type "judge" in the Notes search box.
 
 `npm run try` keeps running and prints the address. While it runs:
 

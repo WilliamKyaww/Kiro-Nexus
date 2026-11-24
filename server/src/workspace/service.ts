@@ -43,6 +43,8 @@ export class WorkspaceService {
   readonly events = new EventEmitter();
   private queue: Promise<unknown> = Promise.resolve();
   private diskHash: Partial<Record<CollectionName, string>> = {};
+  /** Last note hash Nexus wrote or reported, so watcher echoes of our own writes are ignored. */
+  private readonly knownNoteHash = new Map<string, string>();
   private closed = false;
 
   private constructor(
@@ -178,6 +180,7 @@ export class WorkspaceService {
         if (isNodeError(e) && e.code === "EEXIST") throw new NexusError("EXISTS", `A note already exists at ${norm}`);
         throw e;
       }
+      this.knownNoteHash.set(norm, sha256(content));
       this.emit({ type: "file.changed", path: norm, source: "nexus", revision: sha256(content) });
       return this.readNote(norm);
     });
@@ -212,8 +215,44 @@ export class WorkspaceService {
       throw new NexusError("WRITE_FAILED", `Could not save ${norm}: ${(e as Error).message}`);
     }
     const revision = sha256(content);
+    this.knownNoteHash.set(norm, revision);
     this.emit({ type: "file.changed", path: norm, source: "nexus", revision });
     return revision;
+  }
+
+  /**
+   * Called by the watcher. Publishes the change only when the bytes differ from
+   * what Nexus last wrote or reported (PRD-023). A missing file reports revision null.
+   */
+  async externalNoteChanged(rel: string): Promise<boolean> {
+    let norm: string;
+    try { norm = this.notePath(rel).rel; } catch { return false; }
+    const raw = await this.readNoteRaw(norm).catch(() => null);
+    if (!raw) {
+      this.knownNoteHash.delete(norm);
+      this.emit({ type: "file.changed", path: norm, source: "external", revision: null });
+      return true;
+    }
+    if (this.knownNoteHash.get(norm) === raw.revision) return false;
+    this.knownNoteHash.set(norm, raw.revision);
+    this.emit({ type: "file.changed", path: norm, source: "external", revision: raw.revision });
+    return true;
+  }
+
+  /** Reload a JSON collection edited outside Nexus, if it is valid. Invalid files are left alone and never overwritten. */
+  async externalCollectionChanged(name: CollectionName): Promise<boolean> {
+    return this.exclusive(async () => {
+      const bytes = await readFile(this.collectionPath(name)).catch(() => null);
+      if (!bytes || sha256(bytes) === this.diskHash[name]) return false;
+      try {
+        this.reloadCollection(name, bytes);
+      } catch {
+        this.events.emit("warning", `${collectionFiles[name]} changed on disk but is not valid; Nexus kept its last good copy and will not overwrite the file.`);
+        return false;
+      }
+      this.emit({ type: "file.changed", path: `.nexus/${collectionFiles[name]}`, source: "external", revision: this.diskHash[name] ?? null });
+      return true;
+    });
   }
 
   // ---------------- Collections ----------------

@@ -129,6 +129,30 @@ proposals arrive in slice D and will use the same engine.
 
   Evidence: the second test in `b5-review.spec.ts`.
 
+### B2 slice: section search and outside edits (verified by Kiro, 2026-11-24; no human review yet)
+
+- **Section search.**
+  - The Notes sidebar searches note sections: a heading with its text, plus
+    any text before the first heading.
+  - Heading matches rank first. Prefixes and small typos still match.
+  - A result opens the note at that heading.
+  - The index is held in memory, rebuilt from the Markdown when the
+    workspace opens, and updated on every save and outside edit.
+  - Evidence: `notes.test.ts` and `b2-notes.spec.ts` "search lands on the
+    matching heading".
+- **Outside edits.**
+  - An edit in another editor is detected within 2 s, and Nexus's own
+    writes are not reported as outside edits. With no draft, the open view
+    reloads.
+  - With a draft, the draft is kept and Nexus says the note "was changed
+    outside the editor". The user can load the new version, or compare and
+    overwrite with their own text.
+  - A note deleted outside while a draft is open keeps the text and offers
+    "Recreate with my text".
+  - An outside edit to `issues.json` is reloaded. An invalid edit is never
+    overwritten: Nexus keeps its last good copy and refuses writes.
+  - Evidence: `notes.test.ts` and `b2-notes.spec.ts`.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
@@ -138,8 +162,8 @@ proposals arrive in slice D and will use the same engine.
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - `npm test` passes 64 tests.
-  - `npm run test:e2e` passes 6 tests in Edge and Electron.
+  - `npm test` passes 71 tests, stable across 3 repeat runs.
+  - `npm run test:e2e` passes 8 tests in Edge and Electron, 24 of 24 across 3 repeats.
 - **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on agent edits and on file saves, and record PASS or FAIL. See `docs/tooling.md`.
 - **Dev tooling** (Kiro, 2026-11-24): see `docs/tooling.md`.
   - The Impeccable detector and renders ran.

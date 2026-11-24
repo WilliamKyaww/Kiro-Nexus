@@ -61,6 +61,40 @@ export function parseWikilinks(markdown: string): Wikilink[] {
   return out;
 }
 
+export interface Section {
+  /** null for text before the first heading. */
+  headingSlug: string | null;
+  headingText: string | null;
+  /** Ancestor headings and this one, e.g. ["Kickoff", "Actions"]. */
+  headingPath: string[];
+  startLine: number;
+  text: string;
+}
+
+/** Split a note into sections: each heading with its text up to the next heading. */
+export function sections(markdown: string): Section[] {
+  const lines = markdown.split(/\r?\n/);
+  const headings = parseHeadings(markdown);
+  const out: Section[] = [];
+  const firstLine = headings[0]?.line ?? lines.length;
+  const preamble = lines.slice(0, firstLine).join("\n").trim();
+  if (preamble) out.push({ headingSlug: null, headingText: null, headingPath: [], startLine: 0, text: preamble });
+  const stack: Heading[] = [];
+  headings.forEach((h, i) => {
+    while (stack.length && (stack[stack.length - 1]?.depth ?? 0) >= h.depth) stack.pop();
+    stack.push(h);
+    const end = headings[i + 1]?.line ?? lines.length;
+    out.push({
+      headingSlug: h.slug,
+      headingText: h.text,
+      headingPath: stack.map((s) => s.text),
+      startLine: h.line,
+      text: lines.slice(h.line + 1, end).join("\n").trim(),
+    });
+  });
+  return out;
+}
+
 /** Slug a single heading text the same way parseHeadings does for its first occurrence. */
 export function slugOf(text: string): string {
   return new GithubSlugger().slug(plainHeadingText(text));

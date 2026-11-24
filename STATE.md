@@ -1,117 +1,91 @@
 # State
 
-- **Date updated:** 2026-11-24 (overnight run in progress)
-- **Active phase:** Overnight autonomous run. Milestones A to D are below.
-- **Active milestone:** A. PRD amendments, B1 spec, W4 tools and wireframe.
-- **Active spec:** `.kiro/specs/workspace-core/` (B1)
+- **Date updated:** 2026-11-24, at the end of the overnight run
+- **Active phase:** waiting for Will's morning review of the overnight run
+  (milestones A to D are complete)
+- **Active spec:** none in progress. The next candidates are B3 (Hein), and
+  B4 or C (Will).
 - **PRD:** approved by Will at `7b775cd`, with amendments 1 to 4 (DEC-011
-  to DEC-014). DEC-005 to DEC-010 were accepted by Will on 2026-11-24.
+  to DEC-014).
 
-## Temporary authorisation (overnight run, granted by Will on 2026-11-24)
+## Authorisation
 
-This section survives context compaction. It applies until Will returns and
-replaces it.
-
-- **Authorised without further approval:**
-  - Update the PRD and `STATE.md`.
-  - Write and self-review native Kiro specs through requirements, design and
-    tasks. This replaces the requirement to stop at each spec review point,
-    for this scope only.
-  - Configure the named workspace dev tools (Impeccable, Microsoft
-    Playwright MCP) and the focused Kiro hook.
-  - Scaffold the project and install project-local dependencies from their
-    official sources (the npm registry).
-  - Implement milestones A to D, run the app and tests, and make local
-    milestone commits under DEC-004.
-- **Milestones in order:**
-  - **A.** Apply PRD amendments 1 to 4. Write the B1 spec. Inventory, set
-    up and smoke-test the W4 tools. Make a brief navigable wireframe of the
-    note, the linked issue and the review interaction.
-  - **B.** Implement B1 end to end: note and linked issue, links both ways,
-    edit, restart, lock and stale-save protection, browser and Electron
-    smoke tests, morning commands.
-  - **C.** Implement the B5 journal engine and a small review UI driven by
-    fixed, labelled operations. Cover accept and reject, a restart during
-    apply and during rejection, a repeated operation, an ambiguous paragraph,
-    an unrelated manual edit surviving, and a pending date not triggering a
-    reminder. Add the focused Kiro hook and verify that it fires.
-  - **D.** Implement a B2 notes slice: heading-level search, and external
-    file changes that never discard an unsaved buffer.
+- **Standing:** local milestone commits under DEC-004. Stage only the
+  relevant files by name, review the staged diff, add no AI trailers, report
+  the short hash, and never push.
+- **Overnight authorisation of 2026-11-24:** this covered milestones A to D
+  and is now **spent**. Will's next instruction sets the next scope. Until
+  then, a fresh session may only:
+  - fix a failing check in existing work;
+  - update documentation;
+  - make the human-action steps below easier.
 - **Not authorised:**
-  - Remote Git actions (push, branches on the remote, pull requests),
-    publication, deployments, account changes and paid services.
-  - System-wide installs or upgrades. Node stays at 24.14.0 unless a human
-    decides otherwise.
-  - Provider credentials. Tonight uses only fictional data and needs no
-    keys.
-- **Working agreement:**
-  - One active slice at a time.
-  - Synthetic data, temporary test workspaces and isolated app profiles.
-  - Verdanta Internal Tools stays out of every read, search and index.
-  - Distinguish Kiro's self-review from human review.
-  - If a check is blocked, record the exact failure, mark it unverified and
-    continue.
-  - Record assumptions for Will or Hein in the "Assumptions to check"
-    section below.
-  - Hein owns the final visual design and the board and calendar
-    presentation.
-
-## Git
-
-Local milestone commits under DEC-004:
-
-- Stage files by name and review the staged diff.
-- Use the configured identity, with no AI trailers.
-- Report the short hash.
-- Stay on `main`.
-
-## Blockers and risks
-
-- **Blocker:** none.
-- **Risk:** the free model route is still unverified. It stays open for
-  slice C (DEC-014).
-- **Dates:** Kiro credit requests close on 1 December at 20:00 GMT. The
-  feature freeze is on 2 December. Submission closes on 4 December at
-  22:00 GMT.
+  - remote Git actions, publication, deployments, account changes and paid
+    services;
+  - system-wide installs;
+  - provider credentials.
 
 ## Milestone log (overnight)
 
 | Milestone | Status | Commit | Evidence |
 | --- | --- | --- | --- |
-| A | Done | see `git log` (`docs: amend PRD, add B1 spec, wireframe and dev tooling`) | The B1 spec was self-reviewed by Kiro. Impeccable detect returned `[]` after one fix, and its renders were checked. The Playwright MCP stdio smoke test passed 6 of 6. Registering the server with Kiro is blocked by the permission policy (see `docs/tooling.md`) |
-| B | Done | see `git log` (`feat: B1 workspace core in browser and Electron`) | `npm run typecheck` has no errors. `npm test` passes 38 tests, and `npm run test:e2e` passes 4 (Edge and Electron). A manual `npm run try` / `open` / `stop` and `npm run desktop`, closed through the window, released the lock. `FEATURES.md` holds the details |
-| C | Done | see `git log` (`feat: B5 change journal with per-change review`) | `npm test` passes 64 tests, including real crash recovery, property tests and a mutation check. `npm run test:e2e` passes 6 (adding two B5 journeys). The Kiro hooks fire and record PASS or FAIL, including a deliberate regression (`docs/tooling.md`) |
-| D | In progress | | |
+| A. PRD amendments, B1 spec, W4 tools, wireframe | Done | `9b5b23a` | Kiro self-reviewed the B1 spec. Impeccable detect returned `[]` after one fix, and its renders were checked. The Playwright MCP stdio smoke test passed 6 of 6 |
+| B. B1 workspace core | Done | `beb2b68` | Tests passed (38 unit and integration, 4 E2E). Manual runs of `try`, `open`, `stop` and `desktop` behaved as documented |
+| C. B5 change journal and review UI | Done | `556b1ca` | Tests passed (64 unit and integration, 6 E2E). Real crash recovery, property tests and a mutation check passed. The Kiro hooks fire and record PASS or FAIL |
+| D. B2 search and outside edits | Done | see `git log` (`feat: B2 section search and safe outside edits`) | 71 unit and integration tests, stable across 3 runs. 8 E2E tests, 24 of 24 across 3 repeats |
+
+Every check above was run by Kiro. **No human review has happened yet.**
+
+## Human actions pending
+
+1. **Register Playwright MCP in Kiro.** Kiro's policy blocks agent writes to
+   `.kiro/settings/`. The exact steps and JSON are in `docs/tooling.md`.
+   Then confirm that Kiro discovers the server, and run one tool call.
+2. **Final rules recheck before submission** (`docs/submission-checklist.md`).
+3. **Choose an open-source licence** (the README says "to be chosen").
 
 ## Assumptions to check
 
 | # | Assumption (Kiro's) | For |
 | --- | --- | --- |
 | 1 | A single root package with path aliases replaces npm workspaces (techstack section 1) | Will |
-| 2 | B1 uses a `<textarea>` editor, with CodeMirror deferred to B2 | Will, Hein |
-| 3 | The web UI takes a typed folder path, because browsers have no native picker | Hein |
-| 4 | The wireframe's palette and layout are placeholders, and Hein owns the final identity | Hein |
-| 5 | Impeccable telemetry was left on globally and disabled per call, so a human should decide whether to run `npx impeccable telemetry off` | Will |
-| 6 | The E2E tests use the system Microsoft Edge (`channel: msedge`) rather than downloading Playwright's Chromium | Hein |
-| 7 | TypeScript 7.0.2 (the native compiler) is used only for type checking. esbuild and Vite do the transpiling | Will |
-| 8 | The `npm run try` workspace is shared by the browser and desktop routes, so running both at once shows the lock message, which is intended | Will |
-| 9 | Editing JSON externally while Nexus runs is detected only at the next write (it is refused and reloaded). Live watching of `.nexus/*.json` is not built | Will |
+| 2 | B1 and B2 use a `<textarea>` editor, with CodeMirror still in the B2 backlog | Will, Hein |
+| 3 | The web UI takes a typed folder path, because browsers have no native picker. Electron has **Browse…** | Hein |
+| 4 | The palette and layout of the wireframe and app are placeholders. Hein owns the final identity | Hein |
+| 5 | Impeccable telemetry is left on globally and disabled per call. Decide whether to run `npx impeccable telemetry off` | Will |
+| 6 | The E2E tests use the system Microsoft Edge (`channel: msedge`), with no Playwright browser download | Hein |
+| 7 | TypeScript 7.0.2 is used only for type checking. esbuild and Vite transpile | Will |
+| 8 | The browser and desktop routes share the `npm run try` workspace, so running both shows the lock message, which is intended | Will |
+| 9 | For a field with an unsettled change, reminders use its `before` value only while the field still holds the proposed value. A newer manual edit stands (B5 design) | Will |
+| 10 | Agent edits fire both review hooks (tool and save), so the 3-second test run happens twice | Will |
+| 11 | "Overwrite with mine" after an outside edit replaces the outside text without merging. The user chooses it after comparing | Will, Hein |
 
-## Human actions pending
+## Blockers and risks
 
-- Register Playwright MCP in Kiro, following the exact steps in
-  `docs/tooling.md`. Kiro's policy blocks agent writes to `.kiro/settings/`.
+- **Blocker:** none for the existing work.
+- **Risk:** the free model route is unverified (Q1), and the team evaluation
+  route is still open (Q5, PRD-091). Both are for slice C.
+- **Dates:** Kiro credit requests close on 1 December at 20:00 GMT. The
+  feature freeze is on 2 December. Submission closes on 4 December at
+  22:00 GMT.
 
 ## Next action
 
-Milestone D: a B2 notes slice covering heading-level search, and external file
-changes that never discard an unsaved editor buffer. Write the spec
-`.kiro/specs/notes-search-watch/` first.
+- **Will:** review the overnight work using the README walkthrough. Then
+  either authorise slice C (provider settings and read-only AI, which first
+  needs the Q1 and Q5 decisions) or B4 (reminders).
+- **Hein:** write and run the B3 board and calendar spec against
+  `docs/data-format.md` and the review states in
+  `packages/schema/src/review.ts`.
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md` and this file, especially "Temporary authorisation". Then
-> read the active spec and `docs/PRD/`. Resume at the first milestone in the
-> log that is not done. Follow the working loop in `AGENTS.md`. Commit each
-> verified milestone locally under DEC-004 and never push. Keep this file
-> current after each milestone.
+> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. The overnight
+> authorisation is spent, so do not start a new slice until Will or Hein
+> names one. To check that everything still works, run
+> `npm run typecheck`, `npm test` and `npm run test:e2e`. The expected
+> totals are 71 and 8 passing. When a slice is authorised:
+>
+> 1. Write its native spec under `.kiro/specs/<slice>/`.
+> 2. Follow the working loop in `AGENTS.md`.
+> 3. Commit each verified milestone locally under DEC-004, and never push.

@@ -21,21 +21,32 @@ try {
   });
 } catch { /* no stdin */ }
 
-const forced = process.argv.includes("--force");
-const match = input.match(watched);
-if (!match && !forced) process.exit(0);
+// Only path-like fields count: file contents that merely mention a watched path must not trigger a run.
+const pathKeys = new Set(["path", "file", "filePath", "file_path", "targetFile", "sourcePath", "destinationPath", "uri"]);
+function collectPaths(value, out = []) {
+  if (Array.isArray(value)) value.forEach((v) => collectPaths(v, out));
+  else if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      if (pathKeys.has(k) && typeof v === "string") out.push(v);
+      else collectPaths(v, out);
+    }
+  }
+  return out;
+}
 
-let trigger = "manual";
-let file = "(forced)";
+const forced = process.argv.includes("--force");
+let trigger = forced ? "manual" : "hook";
+let file = forced ? "(forced)" : null;
 try {
   const event = JSON.parse(input);
-  trigger = event.hook_event_name ?? event.trigger ?? event.event ?? "hook";
-  const text = JSON.stringify(event);
-  const pathMatch = text.match(/[A-Za-z0-9_.:\\/ -]*(?:server[\\/]+src[\\/]+(?:review|workspace)[\\/]+[A-Za-z0-9_.-]+|packages[\\/]+schema[\\/]+src[\\/]+review\.ts)/i);
-  file = pathMatch ? pathMatch[0].replace(/^.*?(server|packages)/, "$1").replace(/\\+/g, "/") : "(unknown)";
+  trigger = event.hook_event_name ?? event.trigger ?? event.event ?? trigger;
+  const hit = collectPaths(event).find((p) => watched.test(p));
+  if (hit) file = hit.replace(/^.*?((?:server|packages)[\\/])/i, "$1").replace(/\\+/g, "/");
 } catch {
-  if (match) file = match[0];
+  // Not JSON: treat the raw input as a path only if it is short and single-line.
+  if (input.length < 600 && !input.includes("\n") && watched.test(input)) file = input.trim();
 }
+if (!file) process.exit(0);
 
 const started = Date.now();
 const vitest = join(root, "node_modules", "vitest", "vitest.mjs");

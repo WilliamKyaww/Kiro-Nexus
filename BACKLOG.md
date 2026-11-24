@@ -5,38 +5,53 @@ tasks live in its spec's `tasks.md`; do not copy them here. Move behaviour
 to `FEATURES.md` once it has been verified. Requirement IDs refer to
 `docs/PRD/structure.md` (`PRD-xxx`) and to the intake (`R-*`).
 
+Done overnight on 24 November 2026 (see `FEATURES.md`):
+
+- the PRD and its amendments;
+- the B1 workspace core;
+- B5 with fixed operations;
+- the B2 search and outside-edits slice;
+- the review hooks;
+- the Impeccable and Playwright MCP checks.
+
 ## P0: needed for submission (in order)
 
-- [~] **W2 PRD and first spec.** Done: `docs/PRD/` is drafted and committed.
-  Remaining: Will's review of the PRD and DEC-005 to DEC-010, then the B1
-  spec through requirements, design and tasks. Owner: Will.
-- [ ] **W4 Kiro development tooling.** Inventory, configure and smoke-test
-  the Impeccable skill and Playwright MCP, and record the results (R-K1 to
-  R-K4). Owner: Will.
-- [ ] **A Wireframe** (R-D-A, PRD-010, PRD-080). Owner: Hein. Spec:
-  `.kiro/specs/wireframe/` (not yet created).
-- [ ] **B1 Workspace core** (PRD-002, PRD-003, PRD-067, PRD-070 to PRD-072).
-  Owner: Will. Spec: `.kiro/specs/workspace-core/` (next).
-- [ ] **B2 Notes** (PRD-020 to PRD-024). Owner: Will. Spec: not yet created.
-- [ ] **B3 Board and calendar** (PRD-030 to PRD-033). Owner: Hein. Spec:
-  not yet created.
-- [ ] **B4 Reminders** (PRD-040 to PRD-044). Owner: Will. Spec: not yet
-  created.
-- [ ] **B5 Change journal and review UI with fixed operations** (PRD-060 to
-  PRD-067). Owner: Will. Spec: not yet created.
-- [ ] **Hook** to run the review and reversal tests when mutation code
-  changes (R-K5). Add it once the B5 tests exist.
+- [~] **W4 Kiro development tooling.** Done: Impeccable is configured and
+  verified, and the Playwright MCP server is verified over stdio.
+  Remaining: a human must register Playwright MCP in Kiro
+  (`docs/tooling.md`), then confirm that Kiro discovers it and run one tool
+  call. Owner: Will.
+- [ ] **A Wireframe, final design.** A brief prototype is in `wireframe/`.
+  Hein owns the final visual identity (PRD-010, PRD-080). Owner: Hein.
+- [~] **B2 Notes.** Done: section search, outside edits and draft
+  protection (`.kiro/specs/notes-search-watch/`). Remaining: rename, move
+  and delete in the UI, the CodeMirror editor, the backlinks panel and the
+  `[[wikilink]]` autocomplete (PRD-020, PRD-021). Owner: Will. Spec: not
+  yet written.
+- [ ] **B3 Board and calendar** (PRD-030 to PRD-033). Owner: Hein. Build it
+  against the issue shape in `docs/data-format.md` and the review states in
+  `packages/schema/src/review.ts`. Spec: not yet written.
+- [ ] **B4 Reminders** (PRD-040 to PRD-044). Owner: Will. The
+  accepted-values seam (`server/src/scheduler/reminders.ts`) and the dedup
+  key already exist. Spec: not yet written.
+- [~] **B5 Change journal.** Done: tasks 1 to 8 of
+  `.kiro/specs/change-journal/`. Remaining (task 9, with slice D):
+  `record.create`, `note.create`, the `dependsOn` cascade, correction runs
+  and "Restore original" for an ambiguous conflict.
 - [ ] **C Provider settings and read-only AI** (PRD-050 to PRD-055, PRD-074
-  to PRD-076). Owner: Will. Spec: not yet created.
+  to PRD-076). Owner: Will. Spec: not yet written. Open questions: Q1, the
+  free route, and Q5, the team route.
 - [ ] **D Agent edits, correction and personalised reminders** (PRD-042,
-  PRD-051, PRD-060 to PRD-066). Owner: Will. Spec: not yet created.
-- [ ] **E Package, rehearse and submit** (PRD-073, PRD-090, R-V1 to R-V6).
-  Owners: Will and Hein. Gate: `docs/submission-checklist.md`.
+  PRD-051, PRD-060 to PRD-066). Owner: Will. Spec: not yet written.
+- [ ] **E Package, rehearse and submit** (PRD-073, PRD-090 to PRD-092, R-V1
+  to R-V6). Owners: Will and Hein. Gate: `docs/submission-checklist.md`.
+  This includes choosing an open-source licence.
 
 ## P1: if time allows before 2 December
 
 - [ ] Runtime MCP tool backed by the workspace service (R-S9).
 - [ ] Bonus-prize entries (a decision for Will and Hein).
+- [ ] A dev server with hot reload. There is currently only build-and-serve.
 
 ## P2: after the first release (R-J6, R-T4)
 

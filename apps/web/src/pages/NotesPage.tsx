@@ -7,6 +7,7 @@ import { MarkdownPreview } from "../components/MarkdownPreview";
 import { ErrorNote } from "../components/ErrorNote";
 import { extraNotes } from "../noteSlots";
 import { useOpenChanges } from "../review/review";
+import { NoteSearch } from "../components/NoteSearch";
 
 export function NotesPage() {
   const [params] = useSearchParams();
@@ -18,6 +19,7 @@ export function NotesPage() {
     <div className="notes-layout">
       <aside className="note-list" aria-label="Notes">
         <h1 className="section-title">Notes</h1>
+        <NoteSearch />
         {extraNotes.sidebarTop.map((Slot, i) => <Slot key={i} />)}
         <NewNoteForm existing={notes.data?.notes ?? []} />
         {notes.error ? <ErrorNote error={notes.error} /> : null}
@@ -159,7 +161,15 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  if (note.error) return <section className="note-main"><ErrorNote error={note.error} /></section>;
+  const deletedOutside = note.error instanceof ApiError && note.error.code === "NOT_FOUND" && draft !== null;
+  const recreate = async () => {
+    if (draft === null) return;
+    await api.post<NoteView>("/notes", { path, content: draft });
+    setDraft(null);
+    await client.invalidateQueries({ queryKey: ["note", path] });
+    await client.invalidateQueries({ queryKey: ["notes"] });
+  };
+  if (note.error && !deletedOutside) return <section className="note-main"><ErrorNote error={note.error} /></section>;
   if (!note.data) return <section className="note-main" aria-busy="true"><p className="muted">Loading note…</p></section>;
   const n = note.data;
 
@@ -185,7 +195,13 @@ function NoteEditor({ path, heading, allNotes }: { path: string; heading: string
             </div>
           </div>
         ) : null}
-        {diskChanged ? (
+        {deletedOutside ? (
+          <div className="conflict" role="alert" data-testid="deleted-outside">
+            <p><strong>This note was deleted outside the editor.</strong> Your unsaved text is kept here.</p>
+            <div className="row"><button type="button" onClick={() => void recreate()}>Recreate with my text</button></div>
+          </div>
+        ) : null}
+        {diskChanged && !deletedOutside ? (
           <div className="conflict" role="alert" data-testid="disk-changed">
             <p><strong>This note was changed outside the editor.</strong> Your unsaved text is kept. Saving will ask how to resolve it.</p>
             <div className="row">

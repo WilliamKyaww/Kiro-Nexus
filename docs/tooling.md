@@ -135,6 +135,12 @@ configuration holds no credentials.
   - A deliberate regression in `server/src/review/spans.ts` was logged as
     `FAIL … tests="3 failed | 44 passed (47)"` by both triggers. After the
     revert, the log showed `PASS`.
+- **Second fix:** the script first matched watched paths anywhere in the
+  event. A `STATE.md` write whose *text* named `review.ts` therefore started
+  a run, and logged `file=(unknown)`. The script now reads only path fields
+  (`path`, `file_path` and similar). It was checked with three simulated
+  events: a Windows-path tool edit (runs), a save event (runs) and a
+  content-only mention (ignored).
 - **Known cost:** an agent edit fires both hooks, because the IDE also saves
   the file, so the tests run twice (about 3 s each). Both are kept: the save
   hook covers human edits, and the tool hook covers agent edits in contexts
