@@ -68,6 +68,20 @@ npm run try          # build, copy the fictional sample to .tmp/try, open the br
 | `npm run stop -- --try` | Stop the service cleanly, which releases the workspace lock |
 | Ctrl+C in its terminal | The same as `npm run stop -- --try` |
 
+### Reminders
+
+Nexus reminds you of dated issues while it is running, with AI off:
+
+- **When.** An all-day due date reminds at 09:00. A timed due date reminds
+  60 minutes before. Change both in **Settings → Reminders**.
+- **Test it.** On **Notifications**, select **Send test reminder**. A
+  labelled reminder appears at once; select **Open** to reach the issue.
+- **Accepted dates only.** A date still awaiting review never reminds.
+- **While you were away.** Reminders that came due while Nexus was closed
+  are listed once, under "While you were away", the next time it opens.
+- **In the desktop app**, the same reminder also appears as a Windows
+  notification, and clicking it opens the item.
+
 Desktop app on the same try workspace:
 
 ```powershell

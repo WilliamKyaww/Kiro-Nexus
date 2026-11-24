@@ -334,6 +334,79 @@ still untested.
   - Evidence: `ask-http.test.ts` (both modes), `context.test.ts` and
     `c4-ask-proof.spec.ts`.
 
+### Run 5: repairs from the run-4 review, and B4 ordinary reminders (verified by Kiro, 2026-11-24; no human review yet)
+
+The Codex extension, designated Astra 6.2, reviewed run 4 for Will. All eleven
+findings are repaired (`1a9c27e`). The record is
+`docs/reviews/2026-11-24-run4-review.md`, and each new test fails on an export
+of `251188e`. B4 (`0c641a1`) works with AI off; its evidence uses a test clock.
+
+- **Edit and review are safer** (DEC-022).
+  - An Edit changes only lines in the section the run read, and only while
+    that section still has the text that was read.
+  - A proposal that overlaps a change still awaiting review, or builds on a
+    proposed issue, is refused, and nothing is written.
+  - A change is accepted only when what it needs is really in the files.
+    **Discard** asks before undoing the changes that need what it drops.
+  - A confirmed "Accept both" or "Reject all" completes after a crash.
+  - A proposed issue's key is never reused, and an old link to a rejected
+    one says so.
+  - An Edit stays bound to the workspace it started in.
+  - A failed Edit turn offers **Retry Edit**. When it already proposed
+    changes, Nexus asks before running it again.
+  - Evidence: `repairs.test.ts` (12 tests), `edit-http.test.ts` and
+    `r5-repairs.spec.ts`.
+- **Ask's evidence and headings** (DEC-024).
+  - A tracked entry needs a strong match. An "untracked" entry is not
+    confirmed when a record the run read matches it. A free-text fact about
+    a tracked action is shown as not confirmed.
+  - The live check fails any other recorded statement about the journey's
+    actions. It is tested in two fictional vocabularies.
+  - Headings are aligned across the whole document. Search, section reads
+    and citations agree through pending, accepted and rejected renames,
+    including a rename to another heading's name, and a rename with an
+    inserted heading.
+  - The retrieval-first issue cap is exact.
+  - Evidence: `matching.test.ts`, `live-check-cli.test.ts`,
+    `rename.test.ts` and `cap.test.ts`.
+- **Dates** (DEC-023).
+  - A date drafted in one board reports a conflict instead of overwriting
+    another tab's newer date.
+  - The date editor names its zone and the day the calendar uses. Calendar
+    items show the time in the workspace zone.
+  - A time in a clock gap is moved forward with a notice.
+  - Evidence: `time.test.ts` and `r5-repairs.spec.ts`.
+- **Ordinary reminders (B4)** (DEC-025, DEC-009, spec
+  `.kiro/specs/reminders/`).
+  - **When.** An all-day due date reminds at 09:00 in the workspace zone, and
+    a timed due date or event 60 minutes before. Both can be changed in
+    Settings, per workspace.
+  - **Accepted data only.** Reminders come from accepted dates only: a date
+    awaiting review passed 09:00 with no delivery.
+  - **Once.** Each reminder is delivered once:
+    - repeated ticks, two tabs and restarts did not repeat it;
+    - a crash between recording the intent and confirming it left the
+      reminder as missed, not shown again.
+  - **While you were away.** Reminders that came due while Nexus was closed
+    are listed once, under "While you were away", and are not repeated on
+    the next start.
+  - **Surfaces.** An in-app notification appears in every tab, with a badge
+    on the rail. **Open** goes to the exact issue. An old or foreign
+    reminder link explains itself.
+  - **Test reminder.** **Send test reminder** delivers a labelled reminder
+    at once.
+  - **Desktop.** The desktop app adds a native notification from the same
+    delivery, and its click opens the issue. With notifications denied, the
+    in-app route still works and Nexus says why.
+  - **Simulated in the desktop tests:** the Windows toast and its click.
+    The test records the native call and emits the click; no OS toast was
+    observed.
+  - **Events.** Event reminders work from `.nexus/calendar.json`, tested
+    with a synthetic event. Hein's event editing is not built yet.
+  - Evidence: `reminders.test.ts`, `scheduler.test.ts`,
+    `scheduler-http.test.ts` and `b4-reminders.spec.ts` (9 of 9 over three
+    repeats).
+
 ### Run 4: Ask repairs, a first board and calendar, and the first Edit journey (verified by Kiro, 2026-11-24, against the test double only; no human review yet)
 
 Will authorised five milestones. Every Ask and Edit answer below came from
@@ -439,14 +512,13 @@ open).
 - **Toolchain** (Kiro, 2026-11-24): see `docs/toolchain.md`.
   - System Node 24.14.0 and Electron 45.4.1, whose bundled Node is 24.22.3.
   - `npm run typecheck` reports no errors.
-  - At `1bde4e7` (run 4), the unit and integration suite passes 173 of
-    173. Because `vitest.config.ts` is deleted in the working tree, this
+  - At `0c641a1` (run 5), the unit and integration suite passes 213 of
+    213. Because `vitest.config.ts` is deleted in the working tree, this
     used a temporary copy (`npx vitest run --config .tmp/vitest.config.ts`).
     Plain `npm test` currently finds only 13 tests (see `STATE.md`).
-  - `npm run test:e2e` passes 34 tests in Edge and Electron, and 68 of 68
-    with `--repeat-each=2`. Two earlier flaky observations remain
-    unexplained (see `STATE.md`).
-  - `npm run scan:secrets` passes (278 files).
+  - `npm run test:e2e` passes 41 tests in Edge and Electron. Two earlier
+    flaky observations remain unexplained (see `STATE.md`).
+  - `npm run scan:secrets` passes (300 files).
 - **Kiro hooks** (Kiro, 2026-11-24). The review and reversal hooks fire on
   agent edits and on file saves, and record PASS or FAIL. See
   `docs/tooling.md`. In run 4 they fired but logged FAIL ("no summary"),

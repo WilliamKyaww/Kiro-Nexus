@@ -17,7 +17,9 @@ pass on `e61a3d4` and run 4:
 - the four Phase 1 repairs;
 - slice C read-only Ask, tested against the test double only;
 - run 4: the Ask repairs, a first B3 slice and the first Edit journey,
-  all tested against the test double only.
+  all tested against the test double only;
+- run 5: the eleven repairs from the run-4 review, and B4 ordinary
+  reminders.
 
 ## P0: needed for submission (in order)
 
@@ -38,9 +40,12 @@ pass on `e61a3d4` and run 4:
   the board, the backlog view, status moves and the month view of dated
   issues. Remaining: task 4, Hein's handoff (calendar events, the agenda
   view, ordering within a column and the final design).
-- [ ] **B4 Reminders** (PRD-040 to PRD-044). Owner: Will. The
-  accepted-values seam (`server/src/scheduler/reminders.ts`) and the dedup
-  key already exist. Spec: not yet written.
+- [~] **B4 Reminders** (PRD-040 to PRD-044). Owner: Will. Spec:
+  `.kiro/specs/reminders/`. Done (by Kiro in run 5): tasks 1 to 5, ordinary
+  reminders in the browser and Electron. Remaining:
+  - task 6, Hein's event writing and `?event=<id>`;
+  - a look at a real Windows notification (STATE human action 9);
+  - personalised wording (PRD-042, slice D).
 - [~] **B5 Change journal.** Done: tasks 1 to 8 and 10 of
   `.kiro/specs/change-journal/`, and part of task 9 (`record.create`,
   `record.addLink` and the `dependsOn` cascade, in run 4). Remaining (the

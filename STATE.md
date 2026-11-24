@@ -1,16 +1,16 @@
 # State
 
-- **Date updated:** 2026-11-24 (run 5 in progress: run-4 repairs, then B4
+- **Date updated:** 2026-11-24 (run 5 delivered: the run-4 repairs and B4
   ordinary reminders)
-- **Active phase:** run 5 (below). Stage 1 repairs the run-4 review
-  findings R4-1 to R4-11. Stage 2 builds B4 ordinary reminders. Slice C's
-  live check (task 5) is still waiting for Will's free key.
-- **Last spec:** `.kiro/specs/edit-first-journey/`. Tasks 1 to 4 are done,
-  and task 5 (the correction loop and a live Edit check) is not
-  authorised. Also touched in run 4: `.kiro/specs/ask-readonly/` (tasks 7
-  to 9 done; task 5 partly done), `.kiro/specs/board-calendar/` (tasks 1
-  to 3 done; task 4 is Hein's) and `.kiro/specs/change-journal/` (task 9
-  partly done).
+- **Active phase:** none authorised. Run 5 is used up, and its review relay
+  is ready for Will to send. Slice C's live check (task 5) is still waiting
+  for Will's free key.
+- **Last spec:** `.kiro/specs/reminders/`. Tasks 1 to 5 are done. Task 6
+  (event writing and click-through on a real event) is Hein's.
+- **Also touched in run 5:**
+  - `.kiro/specs/ask-readonly/` (task 10);
+  - `.kiro/specs/board-calendar/` (task 5);
+  - `.kiro/specs/edit-first-journey/` (task 6).
 - **Baselines:**
   - `2310608` for Phase 1: Will ran the app and reported the defects,
     Codex independently reproduced them, and Kiro implemented and tested
@@ -30,10 +30,11 @@
   - After every major implementation or update, write a reviewer relay
     for Will to send to Astra 6.2 in the Codex extension (DEC-021,
     `AGENTS.md` "Reviews"). Minor changes and tweaks need none.
-- **Current run 5: run-4 repairs, then B4 ordinary reminders (granted by
-  Will on 2026-11-24, by sending
-  `.tmp/review-run4/2026-11-24-consolidated-relay.md`; it survives context
-  compaction).**
+- **Run 5: run-4 repairs, then B4 ordinary reminders (granted by Will on
+  2026-11-24, by sending
+  `.tmp/review-run4/2026-11-24-consolidated-relay.md`): used up.** Both
+  stages are delivered (the run-5 milestone log below). Its scope, kept for
+  the record:
   - **Stage 1.** Reproduce and repair the review findings R4-1 to R4-11
     (reviewer: the Codex extension, designated Astra 6.2, run by Will).
     - For each one: state its acceptance condition, verify it, and record
@@ -152,10 +153,12 @@
     - Agent writes, reminder delivery and remote publication are outside
       this run.
 - **Previous overnight authorisation:** used up.
-- **Not authorised now:** anything beyond run 5. This includes:
+- **Not authorised now:** any new slice or increment, until Will or Hein
+  names one. This includes:
   - the rest of D (the correction loop, new notes, "Restore original",
     personalised reminders);
-  - Hein's B3 handoff, which is his to start.
+  - fixes for findings from the run-5 review, until Will sends its report;
+  - Hein's B3 and B4 handoffs, which are his to start.
 - **Never authorised without an explicit request:**
   - remote Git actions, publication, deployments, account changes and paid
     services;
@@ -240,7 +243,24 @@ code):**
 
 | Milestone | Commit | Evidence |
 | --- | --- | --- |
-| Stage 1. Repairs R4-1 to R4-11 from the run-4 review (DEC-022 to DEC-024) | see below | `docs/reviews/2026-11-24-run4-review.md`. Each new test fails on an export of `251188e`. 200 unit and integration tests, and 38 browser tests, pass |
+| Stage 1. Repairs R4-1 to R4-11 from the run-4 review (DEC-022 to DEC-024) | `1a9c27e` | `docs/reviews/2026-11-24-run4-review.md`. Each new test fails on an export of `251188e`. At that commit, 200 unit and integration tests and 38 browser tests passed |
+| Stage 2. B4 ordinary reminders (DEC-025) | `0c641a1` | `.kiro/specs/reminders/tasks.md`: `reminders.test.ts` (4 tests), `scheduler.test.ts` (6), `scheduler-http.test.ts` (3, real process with a crash) and `b4-reminders.spec.ts` (3, browser and Electron; 9 of 9 with `--repeat-each=3`). Screenshots at 1360 and 390 px |
+
+**Checks (Kiro, at `0c641a1`; the documentation commit after it changes no
+code):**
+
+- `npm run typecheck` reported no errors.
+- The unit and integration suite passed 213 of 213 (31 files), run with
+  `npx vitest run --config .tmp/vitest.config.ts`.
+- `npm run test:e2e` passed 41 of 41 in Edge and Electron.
+- `npm run scan:secrets` passed (300 files).
+- **Found by the full suite:** three Ask browser tests compared the hashes
+  of every workspace file. They then counted the scheduler's own
+  `.nexus/state/` files as a change made by Ask. The tests now exclude
+  `state/`, as the live check already did. Ask writes nothing there.
+
+**Run 5 has not been reviewed yet.** The relay is
+`docs/reviews/relays/2026-11-24-run5.md`.
 
 ## Milestone log (run 4)
 
@@ -267,8 +287,9 @@ no code):**
 - `npm run test:e2e` passed 34 of 34, and 68 of 68 with `--repeat-each=2`.
 - `npm run scan:secrets` passed (278 files).
 
-**Run 4 has not been reviewed yet.** The relay for Astra 6.2 in Codex is
-ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
+**Run 4 was reviewed** by the Codex extension, designated Astra 6.2, which
+Will ran. Its eleven findings were repaired in run 5
+(`docs/reviews/2026-11-24-run4-review.md`).
 
 ## Unverified
 
@@ -297,9 +318,19 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
   it was made with a shell command (not confirmed). They fired and passed
   when retested at 11:47 (see the journal), and the full suite covers that
   change.
-- **Review hooks in run 4.** They fired on every review-code edit but
-  logged FAIL ("no summary"), because Vitest finds no tests without
+- **Review hooks in runs 4 and 5.** They fired on every review-code edit
+  but logged FAIL ("no summary"), because Vitest finds no tests without
   `vitest.config.ts`. The same tests passed with the temporary config.
+- **Native notifications.** In the Electron tests, main records the native
+  notification and the test emits its click. The Windows toast and a real
+  click have not been observed. Will can check them with
+  `npm run desktop` and **Send test reminder**.
+- **Event reminders.** These are tested only against a synthetic event in
+  `.nexus/calendar.json`. Clicking through to a real event waits for Hein's
+  event service. An event reminder opens its month.
+- **Coverage while records change.** Whether Ask's issue coverage stays
+  consistent when records change during a run is not established. The
+  reviewer raised this; it is not addressed.
 
 ## Human actions pending
 
@@ -325,12 +356,15 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
    - `npm test` runs only 13 tests;
    - `npm run test:review` and the review hooks find no tests;
    - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
-8. **Will: send the run-4 relay to Astra 6.2 in Codex.** The message is in
-   `docs/reviews/relays/2026-11-24-run4.md` and covers `4093fa1..50a6a8f`.
-   The two most consequential parts are the Edit authority path (DEC-020)
-   and the evidence rules for tracking claims (DEC-018). Paste Astra's
-   report back to Kiro. Kiro then reproduces each finding, fixes it within
-   the scope you authorise, and records the review in `docs/reviews/`.
+8. **Will: send the run-5 relay to Astra 6.2 in Codex.**
+   - The message is in `docs/reviews/relays/2026-11-24-run5.md` and covers
+     `251188e..0c641a1`: the repairs and B4.
+   - Paste the report back to Kiro. Kiro then reproduces each finding,
+     fixes it within the scope you authorise, and records the review in
+     `docs/reviews/`.
+9. **Will: look at a real desktop reminder.** Run `npm run desktop`, open
+   Notifications and select **Send test reminder**. Check that a Windows
+   notification appears, and that clicking it opens NEX-1.
 
 ## Assumptions to check
 
@@ -356,10 +390,14 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
 | 18 | A send to a busy conversation is refused (409) rather than queued; the composer keeps the typed question for a later send | Will, Hein |
 | 19 | "Not confirmed by the evidence" is a separate answer section. Its styling is a placeholder for Hein | Hein |
 | 20 | Edit applies to one message. After sending, the composer returns to Ask, so a follow-up question cannot write by accident (DEC-020) | Will, Hein |
-| 21 | A review run that creates an issue does not advance `nextIssueNumber`, so a rejected agent issue's key (for example NEX-2) can be given to the next issue (DEC-020) | Will |
+| 21 | A proposal reserves its new issues' key numbers, so a rejected agent issue leaves a gap (NEX-2 rejected, then the next issue is NEX-3). This replaces the run-4 behaviour after R4-7 (DEC-022) | Will |
 | 22 | An Edit run does not ask the user to save open drafts first. The outside-change banner keeps them (DEC-020) | Will, Hein |
 | 23 | Board drag and drop is native HTML, with Alt+Arrow keys and a status control for the keyboard. Touch users use the status control (DEC-019) | Hein |
 | 24 | When the Edit answer arrives, the tab that sent it opens the first change by itself. Other tabs and later visits do not navigate | Will, Hein |
+| 25 | Reminders default to 09:00 on an all-day date (workspace zone) and 60 minutes before a timed one. Both are set per workspace in Settings (DEC-025) | Will |
+| 26 | Reminders that came due while Nexus was closed are listed once as "While you were away" and never delivered late (DEC-025) | Will |
+| 27 | On a narrow screen only the newest in-app reminder shows, at the bottom. The Notifications list has them all | Hein |
+| 28 | A timed due date is edited as a day in its own zone. The calendar shows it on its day in the workspace zone, and a time in a clock gap moves forward with a notice (DEC-023) | Will, Hein |
 
 ## Blockers and risks
 
@@ -378,10 +416,10 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
 ## Next action
 
 - **Will:**
-  - Send the run-4 relay to Astra 6.2 in Codex, and paste the report
+  - Send the run-5 relay to Astra 6.2 in Codex, and paste the report
     back to Kiro.
-  - Try the Edit journey with the test double (README, "Try Ask and
-    Edit").
+  - Try reminders (README, "Reminders"), including one in the desktop
+    app.
   - Decide about `vitest.config.ts`.
   - Run `npm run live:check` with a free Groq key, and record the exit
     status and report in `docs/judge-ai-route.md` and here. Close Q1 only
@@ -392,12 +430,13 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
   - ordering within a column (4.3);
   - the final design (4.4).
 
-  The board and month view already read and write the shared issue
-  record, so these can be built on top independently.
+  Reminders already read `calendar.json` in the shape in
+  `docs/data-format.md`. Event reminders need nothing more from him except
+  `?event=<id>` on the calendar (reminders spec, task 6).
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 4's
+> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 5's
 > authorisation is spent, so do not start a new slice until Will or Hein
 > names one. To check that everything still works, run:
 >
@@ -407,7 +446,7 @@ ready (`docs/reviews/relays/2026-11-24-run4.md`) but has not been sent.
 > - `npm run test:e2e`;
 > - `npm run scan:secrets`.
 >
-> The expected totals are 173 unit and integration tests and 34 browser
+> The expected totals are 213 unit and integration tests and 41 browser
 > tests, all passing.
 >
 > If Will supplies a live-check result, record it in slice C task 5 and
