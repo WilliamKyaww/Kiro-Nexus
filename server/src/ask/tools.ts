@@ -7,6 +7,7 @@ import { effectiveAcceptedIssues } from "../scheduler/reminders";
 import { sameValue } from "../util/json";
 import { locate, splice } from "../review/spans";
 import { SearchIndex, snippet, type SearchResult } from "../notes/search";
+import { alignHeadings } from "../notes/align";
 import { taskItems, type HandleRegistry } from "./handles";
 
 const ACTIONS_NOTE = "These are the section's actions. For each one, say in tracking whether an issue tracks it, comparing the action with issue titles and descriptions by meaning.";
@@ -33,9 +34,15 @@ export interface Consulted {
   issueTotal: number;
   /** Issue records Nexus read itself before accepting the answer (requirement 8.4). */
   completedByNexus?: number;
+  /**
+   * The full accepted text of each section the run read, by path and accepted slug ("" for a
+   * whole note). An Edit run may change only lines it read, and only while they are unchanged (R4-1).
+   */
+  reads: Map<string, { path: string; headingSlug: string | null; text: string }>;
 }
 
-export const newConsulted = (): Consulted => ({ searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0 });
+export const newConsulted = (): Consulted => ({ searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0, reads: new Map() });
+export const readKey = (path: string, headingSlug: string | null) => `${path}#${headingSlug ?? ""}`;
 
 /** Whether this run saw every issue record, which an absence claim needs. */
 export function issueCoverage(c: Consulted): { read: number; total: number; complete: boolean } {
@@ -70,16 +77,21 @@ type NoteSection = ReturnType<typeof splitSections>[number];
 
 /**
  * The accepted section that corresponds to a section found in one form of a note. `slug` is
- * from the accepted text when `fromAccepted`, otherwise from the disk text: a disk section maps
- * by position when the number of sections is unchanged (a heading rename), otherwise by slug.
+ * from the accepted text when `fromAccepted`, otherwise from the disk text. A disk heading maps
+ * through the document-wide alignment of the two versions (R4-8), so a heading renamed to the
+ * name of another one, or added in the same edit, is never confused with a different section.
+ * A heading that exists only on disk (proposed by an edit) has no accepted section.
  */
 function mapSection(disk: string, accepted: string, slug: string | null, fromAccepted: boolean): NoteSection | null {
   const acc = splitSections(accepted);
-  if (fromAccepted) return acc.find((s) => s.headingSlug === slug) ?? null;
-  const onDisk = splitSections(disk);
-  const i = onDisk.findIndex((s) => s.headingSlug === slug);
-  if (i >= 0 && onDisk.length === acc.length) return acc[i] ?? null;
-  return acc.find((s) => s.headingSlug === slug) ?? null;
+  if (fromAccepted || slug === null) return acc.find((s) => s.headingSlug === slug) ?? null;
+  const accSlug = alignHeadings(disk, accepted).forward.get(slug);
+  return accSlug ? acc.find((s) => s.headingSlug === accSlug) ?? null : null;
+}
+
+/** The accepted text of a note (pending edits undone), for the Edit mapper (R4-1, R4-8). */
+export function acceptedNoteText(content: string, path: string, unsettled: ChangeRecord[]): string {
+  return acceptedContent(content, path, unsettled).content;
 }
 
 /** Pending edits inside a section of the accepted text, including one that rewrites its heading line. */
@@ -99,11 +111,11 @@ function proposedHeading(edits: PendingEdit[]): string | null {
   return null;
 }
 
-/** Accepted text of a note: pending agent edits are undone in memory for reading only. */
+/** Accepted text of a note: pending agent edits are undone in memory, newest first, for reading only. */
 function acceptedContent(content: string, path: string, unsettled: ChangeRecord[]): { content: string; pending: Array<{ proposed: string; replaces: string }> } {
   let accepted = content;
   const pending: Array<{ proposed: string; replaces: string }> = [];
-  for (const c of unsettled) {
+  for (const c of [...unsettled].reverse()) {
     if (c.kind !== "note.replaceSpan" || c.file !== path || (c.state !== "pending" && c.state !== "conflicted")) continue;
     const loc = locate(accepted, String(c.after), c.context);
     if (loc.status !== "ok") continue;
@@ -180,7 +192,12 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
       // Accepted slug first; a proposed (pending) slug resolves to the accepted section.
       const section = all.find((s) => s.headingSlug === slug) ?? (pending.length ? mapSection(raw.content, content, slug, false) : null);
       if (!section) {
-        return { error: "heading not found", path: raw.path, requestedHeading: slug, availableHeadings: parseHeadings(content).map((h) => ({ slug: h.slug, text: h.text })) };
+        const proposedOnly = pending.length > 0 && parseHeadings(raw.content).some((h) => h.slug === slug);
+        return {
+          error: "heading not found", path: raw.path, requestedHeading: slug,
+          ...(proposedOnly ? { note: `“${slug}” is a heading that an edit awaiting review would add. It is not part of the accepted note yet.` } : {}),
+          availableHeadings: parseHeadings(content).map((h) => ({ slug: h.slug, text: h.text })),
+        };
       }
       consulted.sectionsRead.push(section.headingPath.join(" › "));
       const sectionPending = pendingFor(section, content, pending);
@@ -189,6 +206,7 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
         ? { requestedHeading: slug, resolvedNote: `“${slug}” is a heading proposed by an edit awaiting review. This is the accepted section, “${section.headingText}”.` }
         : {};
       const text = section.text.slice(0, 6000);
+      consulted.reads.set(readKey(raw.path, section.headingSlug), { path: raw.path, headingSlug: section.headingSlug, text: section.text });
       const handle = handles.note(raw.path, section.headingSlug, section.headingPath);
       const actions = taskItems(text);
       handles.saw(handle, { sectionText: text, tasks: actions });
@@ -203,6 +221,7 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     }
     const title = parseHeadings(content)[0]?.text;
     consulted.sectionsRead.push(`${title ?? raw.path} (whole note)`);
+    consulted.reads.set(readKey(raw.path, null), { path: raw.path, headingSlug: null, text: content.replace(/\r\n/g, "\n").trim() });
     const text = content.slice(0, 6000);
     const handle = handles.note(raw.path, null, title ? [title] : []);
     const actions = taskItems(text);
@@ -215,7 +234,8 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     };
   }
 
-  async function query_issues(args: z.infer<typeof QueryIssuesArgs>) {
+  /** `limit` is for Nexus's own reading (the retrieval-first cap); the model's tool has no limit. */
+  async function query_issues(args: z.infer<typeof QueryIssuesArgs>, opts: { limit?: number } = {}) {
     const projects = ws.projects();
     const keyOf = new Map(projects.map((p) => [p.id, p.key]));
     const changes = unsettled();
@@ -235,7 +255,7 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     const textMatched = !text || matching.length > 0;
     if (!textMatched) matching = inScope;
     const offset = Math.min(args.offset ?? 0, matching.length);
-    const page = matching.slice(offset, offset + ISSUE_PAGE);
+    const page = matching.slice(offset, offset + Math.max(0, Math.min(ISSUE_PAGE, opts.limit ?? ISSUE_PAGE)));
     const nextOffset = offset + page.length < matching.length ? offset + page.length : null;
     for (const i of page) consulted.issueIdsSeen.add(i.id);
     const issues = page.map((i) => {

@@ -20,7 +20,8 @@ export const RUN_BUDGET_MS = 3 * 60 * 1000;
  */
 export const ISSUE_CAP = 200;
 const issueCapFromEnv = () => {
-  const n = Number(process.env.NEXUS_ASK_ISSUE_CAP);
+  const raw = process.env.NEXUS_ASK_ISSUE_CAP;
+  const n = raw === undefined || raw.trim() === "" ? NaN : Number(raw);
   return Number.isInteger(n) && n >= 0 && n < ISSUE_CAP ? n : ISSUE_CAP;
 };
 
@@ -172,7 +173,7 @@ export async function runAsk(opts: {
     attempts++;
     const parsed = ProposeArgs.safeParse(args);
     if (!parsed.success) return { error: `Invalid arguments for propose_changes: ${parsed.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`, written: false };
-    const mapped = await toProposedOperations(parsed.data.operations, workspace, `${opPrefix}-${attempts}`);
+    const mapped = await toProposedOperations(parsed.data.operations, workspace, `${opPrefix}-${attempts}`, consulted.reads);
     if ("error" in mapped) return { error: mapped.error, written: false };
     try {
       edit = editOutcome(await opts.propose!(mapped.operations));
@@ -240,14 +241,16 @@ export async function runAsk(opts: {
         const s = await tools.read_note_section({ path: r.path, headingSlug: r.headingSlug });
         if (!("error" in s)) sections.push(s);
       }
-      // Read the issue records page by page, so that an absence claim can rest on all of them.
+      // Read the issue records page by page, so that an absence claim can rest on all of them,
+      // but never more than the cap: coverage then counts exactly the records included (R4-11).
       const all: Awaited<ReturnType<typeof tools.query_issues>>["issues"] = [];
-      let page = await tools.query_issues({});
-      all.push(...page.issues);
-      while (page.nextOffset !== null && all.length < cap) {
-        page = await tools.query_issues({ offset: page.nextOffset });
+      let page: Awaited<ReturnType<typeof tools.query_issues>> | null = null;
+      while (all.length < cap && (page === null || page.nextOffset !== null)) {
+        page = await tools.query_issues(page === null ? {} : { offset: page.nextOffset }, { limit: cap - all.length });
         all.push(...page.issues);
+        if (page.issues.length === 0) break;
       }
+      if (cap === 0) consulted.issueQueries.push({ filters: {}, returned: 0, total: consulted.issueTotal, truncated: consulted.issueTotal > 0, projects: workspace.projects().map((p) => p.key) });
       const coverage = issueCoverage(consulted);
       // Compact records keep the request small for free-tier token limits.
       const issues = all.map(({ linkedNotes: _linked, description, ...rest }) => ({ ...rest, description: description.slice(0, 120) }));
@@ -256,7 +259,7 @@ export async function runAsk(opts: {
         : `Only ${coverage.read} of ${coverage.total} issue records are included. Do not state that no issue matches something: say that it could not be confirmed.`;
       const data = {
         question, ...(context ? { conversationContext: context.text } : {}),
-        sections, issues, issueCoverage: { read: coverage.read, total: coverage.total }, issueNote, projectsInWorkspace: page.projectsInWorkspace,
+        sections, issues, issueCoverage: { read: coverage.read, total: coverage.total }, issueNote, projectsInWorkspace: workspace.projects().map((p) => p.key),
       };
       opts.onProgress?.({ step: 2, activity: `Asking ${profile.model}` });
       const r = await chat({

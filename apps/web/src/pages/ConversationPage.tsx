@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { ErrorNote } from "../components/ErrorNote";
@@ -16,6 +16,25 @@ function Running({ message }: { message: Message }) {
       <button type="button" onClick={() => message.runId && void cancelRun(message.runId)}>Cancel</button>
     </div>
   );
+}
+
+/**
+ * Retry a failed turn with the authority it had. An Edit that already proposed changes says so
+ * and asks before sending it again, because a second run could propose them again.
+ */
+function RetryButton({ message, edit, disabled, onRetry }: { message: Message; edit: boolean; disabled: boolean; onRetry: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const proposed = message.edit?.changes.length ?? 0;
+  if (asking) {
+    return (
+      <div className="row" role="group" aria-label="Retry this Edit">
+        <span>This Edit already proposed {proposed === 1 ? "a change" : `${proposed} changes`}, listed below, which you can still review. Send the request again anyway?</span>
+        <button type="button" className="primary" disabled={disabled} onClick={() => { setAsking(false); onRetry(); }}>Retry Edit anyway</button>
+        <button type="button" onClick={() => setAsking(false)}>Cancel</button>
+      </div>
+    );
+  }
+  return <button type="button" disabled={disabled} onClick={() => (edit && proposed ? setAsking(true) : onRetry())}>{edit ? "Retry Edit" : "Retry"}</button>;
 }
 
 export function ConversationPage() {
@@ -63,13 +82,11 @@ export function ConversationPage() {
             {m.role === "assistant" && (m.status === "failed" || m.status === "cancelled") ? (
               <div className={m.status === "failed" ? "error" : "notice"} role={m.status === "failed" ? "alert" : "note"}>
                 <p>{m.status === "cancelled" ? "Cancelled." : "This question could not be answered."} {m.error?.message}</p>
-                <button type="button" disabled={busy || retry.isPending}
-                  onClick={() => {
+                <RetryButton message={m} edit={userTurn(i)?.authority === "edit"} disabled={busy || retry.isPending}
+                  onRetry={() => {
                     const turn = userTurn(i);
                     retry.mutate({ question: turn?.text ?? "", conversationId: c.id, mode: turn?.authority ?? "ask" }, { onSuccess: () => void client.invalidateQueries({ queryKey: ["conversation", c.id] }) });
-                  }}>
-                  Retry
-                </button>
+                  }} />
                 {m.error?.code === "PROVIDER_AUTH" ? <> <Link to="/settings">Check the key in Settings</Link></> : null}
               </div>
             ) : null}

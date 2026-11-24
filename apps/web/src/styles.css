@@ -233,6 +233,8 @@ a.button.primary:hover { background: #0b544d; }
 .confirm-related { background: var(--pending-bg); border: 1px solid var(--pending); border-radius: 8px; padding: 0.5rem 0.75rem; }
 .confirm-related p { margin: 0 0 0.3rem; }
 .confirm-related ul { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
+.cal-time { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--ink-soft); }
+.due-zone { font-size: 0.82rem; margin: 0.2rem 0; max-width: 22rem; }
 .links .linked li.pending-field { background: var(--pending-bg); outline: 1px solid var(--pending); border-radius: 4px; padding: 0.1rem 0.3rem; }
 
 /* Board and calendar (B3 first slice). Placeholder styling: Hein owns the final design. */

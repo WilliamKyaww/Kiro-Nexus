@@ -75,7 +75,7 @@ describe("a shared heading is not evidence of which action an issue tracks", () 
     expect(texts(r.answer.facts)).not.toMatch(/judge/);
     expect(r.answer.unconfirmed).toEqual([expect.objectContaining({
       text: expect.stringMatching(/“Will writes the judge instructions” is tracked by NEX-1/),
-      qualifier: "Not confirmed: NEX-1 shares no words with this action, and a link to the same heading does not show which action an issue tracks.",
+      qualifier: "Not confirmed: NEX-1 (Build calendar view) shares no words with this action, and a link to the same heading does not show which action an issue tracks.",
     })]);
   });
 });
@@ -144,5 +144,51 @@ describe("the evidence rules, independent of wording", () => {
     expect(fact(claim, [actions], complete).facts.map((f) => f.text)).toEqual([claim]); // every record was read
     // A statement about the decisions, which list no actions, does not depend on the issues.
     expect(fact("Every agent edit is reviewed one change at a time.", [decisions], incomplete).facts).toHaveLength(1);
+  });
+
+  // R4-4 (Codex review of run 4, reproduced with the production tools, validator and evaluator).
+  describe("positive and negative evidence (R4-4)", () => {
+    const entry = (action: string, source: string, status: "tracked" | "untracked", issues: string[] = []) => ({ action, source, status, issues, reason: "" });
+
+    it("does not confirm “untracked” when a record the run read matches the action", async () => {
+      const { handles, tools, actions } = await readKickoff();
+      await tools.query_issues({});
+      const r = validateAnswer({ tracking: [entry("Hein builds the calendar view", actions, "untracked")] }, handles, complete);
+      expect(r.facts).toEqual([]);
+      expect(r.unconfirmed[0]).toMatchObject({ text: "“Hein builds the calendar view” has no matching issue.", qualifier: "Not confirmed: NEX-1 (Build calendar view) appears to match this action." });
+    });
+
+    it("does not confirm “tracked” on one shared word, and qualifies a possible match", async () => {
+      const project = service.listProjects()[0]!;
+      await service.createIssue({ projectId: project.id, title: "Book judge travel" }); // NEX-2
+      const { handles, tools, actions } = await readKickoff();
+      const travel = (await tools.query_issues({ keys: ["NEX-2"] })).issues[0]!.handle;
+      const tracked = validateAnswer({ tracking: [entry("Will writes the judge instructions", actions, "tracked", [travel])] }, handles, complete);
+      expect(tracked.facts).toEqual([]);
+      expect(tracked.unconfirmed[0]!.qualifier).toBe("Not confirmed: NEX-2 (Book judge travel) shares only “judge” with this action, which does not show that it tracks it.");
+      await tools.query_issues({});
+      const untracked = validateAnswer({ tracking: [entry("Will writes the judge instructions", actions, "untracked")] }, handles, { read: 2, total: 2, complete: true });
+      expect(untracked.unconfirmed[0]!.qualifier).toBe("Not confirmed: NEX-2 (Book judge travel) may match this action (it shares “judge”).");
+      // The real match is strong, so it is confirmed.
+      await service.createIssue({ projectId: project.id, title: "Write the judge instructions" }); // NEX-3
+      const fresh = await readKickoff();
+      const nex3 = (await fresh.tools.query_issues({ keys: ["NEX-3"] })).issues[0]!.handle;
+      expect(validateAnswer({ tracking: [entry("Will writes the judge instructions", fresh.actions, "tracked", [nex3])] }, fresh.handles, complete).facts[0]!.text)
+        .toBe("“Will writes the judge instructions” is tracked by NEX-3 (Write the judge instructions, to do).");
+    });
+
+    it("does not record a free-text fact that contradicts the checked tracking result", async () => {
+      const { handles, tools, actions } = await readKickoff();
+      const nex1 = (await tools.query_issues({})).issues[0]!.handle;
+      const right = [entry("Will writes the judge instructions", actions, "untracked"), entry("Hein builds the calendar view", actions, "tracked", [nex1])];
+      for (const text of ["NEX-1 does not track the calendar work.", "No issue covers the calendar view yet."]) {
+        const r = validateAnswer({ facts: [{ text, sources: [actions, nex1] }], tracking: right }, handles, complete);
+        expect(r.facts.map((f) => f.text)).toEqual(["“Will writes the judge instructions” has no matching issue.", "“Hein builds the calendar view” is tracked by NEX-1 (Build calendar view, in progress)."]);
+        expect(r.unconfirmed).toEqual([expect.objectContaining({ text, qualifier: expect.stringMatching(/only through its own sentences/) })]);
+      }
+      // A status discrepancy that cites the confirmed issue stays a discrepancy.
+      const disc = validateAnswer({ discrepancies: [{ text: "The note marks “Hein builds the calendar view” as not done, but NEX-1 is in progress.", sources: [actions, nex1] }], tracking: right }, handles, complete);
+      expect(disc.discrepancies).toHaveLength(1);
+    });
   });
 });

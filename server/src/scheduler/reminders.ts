@@ -16,9 +16,12 @@ export function effectiveAcceptedIssues(issues: Issue[], unsettled: ChangeRecord
   // A new issue still awaiting review is not accepted data (architecture 7.7), nor is a link
   // that a pending change added.
   const proposedIssues = new Set(unsettled.filter((c) => c.kind === "record.create").map((c) => c.target.recordId));
+  // Newest first: if older journals hold two open changes to one field (new proposals can no
+  // longer overlap, R4-2), undoing them in reverse order walks back to the accepted value.
+  const newestFirst = [...unsettled].reverse();
   return issues.filter((issue) => !proposedIssues.has(issue.id)).map((issue) => {
     let out = issue;
-    for (const c of unsettled) {
+    for (const c of newestFirst) {
       if (c.target.recordId !== issue.id) continue;
       if (c.kind === "record.addLink") {
         const link = c.after as { notePath: string; headingSlug: string | null };

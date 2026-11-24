@@ -70,38 +70,90 @@ export async function workspaceHashes(dir) {
 export const NEW_ISSUE_TITLE = "Write the judge instructions";
 
 /**
+ * The journey the check expects, in one fictional workspace. The kickoff sample is the one the
+ * CLI runs; the tests also use a second vocabulary, so nothing in the evaluator depends on the
+ * kickoff's words (R4-4).
+ */
+export const KICKOFF = {
+  notePath: NOTE_PATH, headingSlug: "actions", heading: "Actions",
+  missing: { action: "Will writes the judge instructions", label: "Will's judge instructions", issueAfter: "NEX-2" },
+  tracked: { action: "Hein builds the calendar view", label: "Hein's calendar work", issue: "NEX-1" },
+};
+
+// The same content words Nexus uses (server/src/ask/answer.ts contentWords).
+const contentWords = (text) => new Set((String(text).toLowerCase().match(/[a-z0-9]{4,}/g) ?? []).map((w) => w.replace(/(ings?|ed|es|s)$/, "").replace(/e$/, "")).filter((w) => w.length >= 3));
+/** Whether a tracking entry is for an action: at least half of the action's content words appear in it. */
+const refersTo = (text, action) => {
+  const want = contentWords(action);
+  const have = contentWords(text);
+  return want.size > 0 && [...want].filter((w) => have.has(w)).length / want.size >= 0.5;
+};
+/** The words that identify an action, without its leading owner ("Hein builds …"); as in answer.ts actionWords. */
+const actionWords = (action) => {
+  const tokens = String(action).trim().split(/\s+/);
+  const owner = tokens.length >= 3 && /^[A-Z][a-z]+$/.test(tokens[0]) && /^[a-z]+s$/.test(tokens[1]) ? [...contentWords(tokens[0])][0] : null;
+  const words = contentWords(action);
+  if (owner) words.delete(owner);
+  return words;
+};
+/** Whether a recorded statement is about an action: it shares a word that identifies the action. */
+const isAbout = (text, action) => { const have = contentWords(text); return [...actionWords(action)].some((w) => have.has(w)); };
+
+/**
  * Pure evaluation of one stored answer in the two-turn journey (also used by the browser
  * test). It reads the structured tracking entries, which Nexus has already checked against
- * the run's evidence, so the wording of a sentence cannot pass or fail it.
- *   turn 1: the judge-instructions action is untracked, and NEX-1 tracks the calendar action;
- *   turn 2 (after NEX-2 is created): NEX-2 tracks the judge instructions, NEX-1 still the calendar.
+ * the run's evidence, and then checks everything the answer shows as recorded:
+ *   turn 1: the missing action is untracked, and the tracked action's issue tracks it;
+ *   turn 2 (after the new issue is created): the new issue tracks the missing action too.
+ * A recorded fact or discrepancy about either action that is not Nexus's own sentence for a
+ * correct, confirmed entry fails the turn, whatever its wording (R4-4).
  */
-export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssues }) {
+export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssues, scenario = KICKOFF }) {
   const checks = [];
   const add = (name, ok, detail) => checks.push({ name: `Turn ${turn}: ${name}`, ok, detail });
   const a = message?.answer;
   add("answer completed", message?.status === "complete" && !!a, message?.status ?? "no answer");
   if (!a) return checks;
   add("evidence sufficient", !a.insufficientEvidence, a.insufficientEvidence ? (a.insufficientReason ?? "insufficient evidence") : "ok");
+  const { missing, tracked, heading } = scenario;
   const cites = a.citations ?? {};
-  const isActions = (h) => cites[h]?.target?.kind === "note" && cites[h].target.path === NOTE_PATH && cites[h].target.headingSlug === "actions";
+  const isSection = (h) => cites[h]?.target?.kind === "note" && cites[h].target.path === scenario.notePath && cites[h].target.headingSlug === scenario.headingSlug;
   const isIssue = (key) => (h) => cites[h]?.target?.kind === "issue" && cites[h].target.key === key;
+  const keyOf = (h) => cites[h]?.target?.key ?? h;
   const entries = (a.tracking ?? []);
-  const describe = (list) => list.length ? list.map((t) => `${t.status}${t.issues.length ? ` by ${t.issues.map((h) => cites[h]?.target?.key ?? h).join(", ")}` : ""}${t.confirmed ? "" : ` (not confirmed: ${t.problem})`}`).join("; ") : "no tracking entry for this action";
-  const judge = entries.filter((t) => /judge/i.test(t.action) && /instruction/i.test(t.action));
-  const calendar = entries.filter((t) => /calendar/i.test(t.action));
-  const judgeIssue = turn === 1 ? null : "NEX-2";
-  const judgeOk = (t) => t.confirmed && isActions(t.source) && (judgeIssue === null ? t.status === "untracked" : t.status === "tracked" && t.issues.some(isIssue(judgeIssue)));
-  const calendarOk = (t) => t.confirmed && isActions(t.source) && t.status === "tracked" && t.issues.some(isIssue("NEX-1"));
-  add(judgeIssue === null
-    ? "Will's judge instructions are untracked, from the kickoff's Actions heading, confirmed by the evidence"
-    : "Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence", judge.some(judgeOk), describe(judge));
-  add("Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence", calendar.some(calendarOk), describe(calendar));
+  const describe = (list) => list.length ? list.map((t) => `${t.status}${t.issues.length ? ` by ${t.issues.map(keyOf).join(", ")}` : ""}${t.confirmed ? "" : ` (not confirmed: ${t.problem})`}`).join("; ") : "no tracking entry for this action";
+  const forMissing = entries.filter((t) => refersTo(t.action, missing.action));
+  const forTracked = entries.filter((t) => refersTo(t.action, tracked.action));
+  const missingIssue = turn === 1 ? null : missing.issueAfter;
+  const missingOk = (t) => t.confirmed && isSection(t.source) && (missingIssue === null ? t.status === "untracked" : t.status === "tracked" && t.issues.some(isIssue(missingIssue)));
+  const trackedOk = (t) => t.confirmed && isSection(t.source) && t.status === "tracked" && t.issues.some(isIssue(tracked.issue));
+  add(missingIssue === null
+    ? `${missing.label} are untracked, from the ${heading} heading, confirmed by the evidence`
+    : `${missing.label} are tracked by ${missingIssue}, from the ${heading} heading, confirmed by the evidence`, forMissing.some(missingOk), describe(forMissing));
+  add(`${tracked.label} is tracked by ${tracked.issue}, from the ${heading} heading, confirmed by the evidence`, forTracked.some(trackedOk), describe(forTracked));
   // A correct entry must not sit beside a confirmed entry that says the opposite.
-  const contradictions = [...judge.filter((t) => t.confirmed && !judgeOk(t)), ...calendar.filter((t) => t.confirmed && !calendarOk(t))];
+  const contradictions = [...forMissing.filter((t) => t.confirmed && !missingOk(t)), ...forTracked.filter((t) => t.confirmed && !trackedOk(t))];
   add("no confirmed entry contradicts these", contradictions.length === 0, contradictions.length ? describe(contradictions) : "none");
-  add("the Actions heading citation opens", Object.keys(cites).some(isActions) && actionsHeadingExists, actionsHeadingExists ? "heading exists" : "heading not found");
-  for (const key of judgeIssue === null ? ["NEX-1"] : ["NEX-1", judgeIssue]) {
+  // Everything shown as recorded about these actions must be Nexus's sentence for a correct
+  // entry, or a discrepancy that cites the issue that tracks the action.
+  const correctSentence = (text, action, issueKey) => issueKey === null
+    ? text === `“${action}” has no matching issue.`
+    : text.startsWith(`“${action}” is tracked by ${issueKey} (`);
+  const stray = [];
+  for (const [kind, list] of [["fact", a.facts ?? []], ["discrepancy", a.discrepancies ?? []]]) {
+    for (const item of list) {
+      for (const [action, issueKey] of [[missing.action, missingIssue], [tracked.action, tracked.issue]]) {
+        if (!isAbout(item.text, action)) continue;
+        const ok = kind === "fact"
+          ? correctSentence(item.text, action, issueKey)
+          : issueKey !== null && (item.sources ?? []).some(isIssue(issueKey));
+        if (!ok) stray.push(`${kind}: ${item.text}`);
+      }
+    }
+  }
+  add("the recorded facts and discrepancies say nothing else about these actions", stray.length === 0, stray.length ? stray.join(" | ") : "none");
+  add(`the ${heading} heading citation opens`, Object.keys(cites).some(isSection) && actionsHeadingExists, actionsHeadingExists ? "heading exists" : "heading not found");
+  for (const key of missingIssue === null ? [tracked.issue] : [tracked.issue, missingIssue]) {
     add(`the ${key} citation opens`, Object.keys(cites).some(isIssue(key)) && existingIssues.has(key), existingIssues.has(key) ? (Object.keys(cites).some(isIssue(key)) ? "cited and exists" : "not cited") : "issue not found");
   }
   return checks;

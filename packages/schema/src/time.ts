@@ -19,6 +19,25 @@ export function zonedTimeToUtc(date: string, time: string, timeZone: string): Da
   return new Date(instant);
 }
 
+/**
+ * Like zonedTimeToUtc, and says when the wall-clock time does not exist on that day because
+ * the clocks go forward (R4-10). Such a time moves forward by the size of the gap (01:30 becomes
+ * 02:30 in Europe/London on 28 March 2027), and `adjustedTo` gives the time actually used. A time
+ * that occurs twice when the clocks go back resolves to its first occurrence.
+ */
+export function zonedTimeToUtcChecked(date: string, time: string, timeZone: string): { instant: Date; adjustedTo: string | null } {
+  const [y, m, d] = date.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  const guess = Date.UTC(y!, m! - 1, d!, hh!, mm!);
+  // Both offsets around the guess: the earlier occurrence wins for a repeated time.
+  const candidates = [guess - tzOffsetMs(guess - 12 * 3_600_000, timeZone), guess - tzOffsetMs(guess + 12 * 3_600_000, timeZone)];
+  const exact = candidates.filter((c) => { const p = localParts(new Date(c), timeZone); return p.date === date && p.time === time; }).sort((a, b) => a - b)[0];
+  if (exact !== undefined) return { instant: new Date(exact), adjustedTo: null };
+  // In a gap: keep the offset from before the change, which moves the time forward by the gap.
+  const instant = new Date(candidates[0]!);
+  return { instant, adjustedTo: localParts(instant, timeZone).time };
+}
+
 function localParts(instant: Date | string, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",

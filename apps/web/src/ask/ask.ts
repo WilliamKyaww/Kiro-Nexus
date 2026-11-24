@@ -85,8 +85,16 @@ export function cancelRun(runId: string) {
   return api.post(`/ask-runs/${encodeURIComponent(runId)}/cancel`);
 }
 
-export function citationHref(c: Citation, conversationId: string): string {
+/**
+ * Where a citation leads. A note citation names a heading of the accepted text as it was when
+ * the answer was given (`answeredAt`), so the link says so: the note page then follows any
+ * heading moves since (R4-8).
+ */
+export function citationHref(c: Citation, conversationId: string, answeredAt?: string): string {
   const from = `&from=${encodeURIComponent(`/c/${conversationId}`)}`;
   if (c.target.kind === "issue") return `/issues/${encodeURIComponent(c.target.key)}?from=${encodeURIComponent(`/c/${conversationId}`)}`;
-  return `/notes?path=${encodeURIComponent(c.target.path)}${c.target.headingSlug ? `&heading=${encodeURIComponent(c.target.headingSlug)}` : ""}${from}`;
+  const heading = c.target.headingSlug
+    ? `&heading=${encodeURIComponent(c.target.headingSlug)}&ref=accepted${answeredAt ? `&at=${encodeURIComponent(answeredAt)}` : ""}`
+    : "";
+  return `/notes?path=${encodeURIComponent(c.target.path)}${heading}${from}`;
 }

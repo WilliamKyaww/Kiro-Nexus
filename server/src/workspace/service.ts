@@ -370,6 +370,23 @@ export class WorkspaceService {
     });
   }
 
+  /**
+   * Advance each project's counter past the given issues' numbers (a proposal's new issues),
+   * so that no later issue can be given one of their keys. Callers must hold `exclusive`.
+   */
+  async reserveIssueNumbersUnlocked(issues: Issue[]): Promise<void> {
+    const t = now();
+    let changed = false;
+    const projects = this.projects.projects.map((p) => {
+      const numbers = issues.filter((i) => i.projectId === p.id).map((i) => Number(i.key.split("-")[1]));
+      const next = Math.max(p.nextIssueNumber, ...numbers.map((n) => n + 1));
+      if (next === p.nextIssueNumber) return p;
+      changed = true;
+      return { ...p, nextIssueNumber: next, updatedAt: t, revision: p.revision + 1 };
+    });
+    if (changed) await this.writeCollectionUnlocked("projects", ProjectsFile, { ...this.projects, projects });
+  }
+
   listIssues(projectId?: string): Issue[] {
     return structuredClone(this.issues.issues.filter((i) => !projectId || i.projectId === projectId));
   }

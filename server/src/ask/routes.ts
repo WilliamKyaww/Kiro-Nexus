@@ -112,17 +112,24 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
   });
   const controller = new AbortController();
   runs.set(runId, { controller, conversationId, activity: "Starting" });
-  const workspace = readOnlyWorkspace(service, searchIndexFor(state), requireEngine(state));
+  const engine = requireEngine(state);
+  const workspace = readOnlyWorkspace(service, searchIndexFor(state), engine);
   state.publish({ type: "ask.progress", runId, conversationId, activity: "Starting" });
 
   // Edit runs write through the review engine only; the coordinator gets this callback and no
   // engine, so it cannot accept, reject or write anything else. A proposal made before a run
   // fails is still recorded on the answer, because its changes await review.
+  // The engine is the one of the workspace this run started in. If that workspace has been
+  // closed or replaced meanwhile, the proposal is refused rather than written elsewhere (R4-6).
   let proposed: EditOutcome | null = null;
   const propose = authority === "edit"
     ? async (operations: ProposedOperation[]) => {
+      await faultDelay("ask:before-propose");
+      if (state.service !== service) {
+        throw new NexusError("CONFLICT", "The workspace this question was asked in was closed or switched, so Nexus wrote nothing. Open it again and ask again.", { reason: "workspace-changed" });
+      }
       const fixtureLabel = profile.capabilities.fixture ? " (test double, not AI)" : "";
-      const outcome = await requireEngine(state).propose({ kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent");
+      const outcome = await engine.propose({ kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent");
       proposed = editOutcome(outcome);
       return outcome;
     }

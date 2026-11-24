@@ -20,6 +20,8 @@ export const RecordField = z.enum(["title", "description", "status", "priority",
 export const Actor = z.enum(["agent", "demo", "user", "system"]);
 
 export const SpanContext = z.strictObject({ lineBefore: z.string().nullable(), lineAfter: z.string().nullable() });
+/** One section of a note on disk (null: the whole note) and the SHA-256 of its text as read. */
+export const Scope = z.strictObject({ headingSlug: z.string().max(200).nullable(), sectionHash: z.string().min(1) });
 
 export const ChangeRecord = z.strictObject({
   changeId: z.string().regex(/^chg_[0-9A-HJKMNP-TV-Z]{26}$/),
@@ -38,6 +40,20 @@ export const ChangeRecord = z.strictObject({
   reversal: z.strictObject({ beforeHash: z.string(), afterHash: z.string(), at: IsoInstant }).nullable(),
   feedback: z.strictObject({ text: z.string().max(2000), at: IsoInstant }).nullable(),
   history: z.array(z.strictObject({ state: ChangeState, at: IsoInstant, by: Actor, note: z.string().nullable() })),
+  // Added in run 5. Older journals have none of these fields.
+  /** A note edit limited to one section on disk, whose text had this hash when it was read (R4-1). */
+  scope: Scope.nullable().optional(),
+  /**
+   * A decision the user confirmed for a group of related changes, saved before the first one
+   * is carried out, so that recovery can finish it after a crash (R4-9).
+   */
+  decision: z.strictObject({ action: z.enum(["accept", "reject"]), group: z.array(z.string()), at: IsoInstant }).nullable().optional(),
+  /** Heading slugs that moved when this change was decided, for saved heading links (R4-8). */
+  slugMoves: z.strictObject({
+    ref: z.enum(["accepted", "disk"]),
+    at: IsoInstant,
+    moves: z.array(z.strictObject({ from: z.string(), to: z.string(), toText: z.string() })),
+  }).nullable().optional(),
 });
 
 export const FileEntry = z.strictObject({
@@ -77,6 +93,8 @@ export const ProposedOperation = z.discriminatedUnion("kind", [
     after: z.string().max(20_000),
     /** opIds of operations in the same proposal this edit depends on (implied by {{issue:…}}). */
     dependsOn: z.array(z.string().min(1).max(120)).max(10).optional(),
+    /** Limit the edit to this section, and only while it still has the text that was read. */
+    scope: Scope.optional(),
   }),
   z.strictObject({
     opId: z.string().min(1).max(120),

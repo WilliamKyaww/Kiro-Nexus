@@ -13,7 +13,7 @@ import { demoOperations } from "../review/index";
 import { WorkspaceService, copySampleWorkspace } from "../workspace/service";
 import { runAsk } from "./coordinator";
 import { HandleRegistry } from "./handles";
-import { makeAskTools, type Consulted } from "./tools";
+import { makeAskTools, newConsulted, type Consulted } from "./tools";
 import { readOnlyWorkspace } from "./workspace";
 
 const KEY = "nexus-fake-ask-key-3b9e";
@@ -100,7 +100,7 @@ describe.each(MODES)("evidence coverage in $mode mode", (m) => {
 describe("search snippets agree with section reads", () => {
   it("shows accepted text in snippets, with the pending edit reported as proposed", async () => {
     await engine.propose({ kind: "fixed-demo", label: "Demo operations (fixed, not AI)" }, await demoOperations(service), "demo");
-    const consulted: Consulted = { searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0 };
+    const consulted: Consulted = newConsulted();
     const tools = makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), consulted);
     const found = await tools.search_notes({ query: "calendar view" });
     const hit = found.results.find((h) => h.headingSlug === "actions")!;
@@ -113,7 +113,7 @@ describe("search snippets agree with section reads", () => {
 
   it("pages through issues and reports what remains", async () => {
     await fiftyOneIssues("Write the judge instructions");
-    const consulted: Consulted = { searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0 };
+    const consulted: Consulted = newConsulted();
     const tools = makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), consulted);
     const first = await tools.query_issues({});
     expect(first).toMatchObject({ total: 51, offset: 0, truncated: true, nextOffset: 50 });

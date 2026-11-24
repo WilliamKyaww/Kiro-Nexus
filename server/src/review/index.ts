@@ -54,12 +54,20 @@ export function reviewRoutes(state: AppState) {
     app.get("/api/v1/review/heading-aliases", async (request) => {
       const path = String((request.query as { path?: string }).path ?? "");
       if (!path) throw new NexusError("VALIDATION", "path is required");
-      const rel = state.requireService().notePath(path).rel;
-      return { aliases: requireEngine(state).headingAliases(rel) };
+      const service = state.requireService();
+      const rel = service.notePath(path).rel;
+      const raw = await service.readNoteRaw(rel).catch(() => null);
+      return { aliases: requireEngine(state).headingAliases(rel, raw?.content ?? null) };
+    });
+    // An issue key that no longer resolves: was it a proposed issue that was rejected? (R4-7)
+    app.get("/api/v1/review/proposed-issue", async (request) => {
+      const key = String((request.query as { key?: string }).key ?? "").toUpperCase();
+      if (!/^[A-Z][A-Z0-9]{1,9}-\d{1,9}$/.test(key)) throw new NexusError("VALIDATION", "key must be an issue key such as NEX-2.");
+      return { proposed: requireEngine(state).proposedIssue(key) };
     });
     app.post("/api/v1/review/runs/:id/retry", async (request) => requireEngine(state).retry(id(request)));
-    app.post("/api/v1/review/runs/:id/discard", async (request) => requireEngine(state).discard(id(request)));
     const flag = (request: { query: unknown }, name: string) => (request.query as Record<string, string | undefined>)[name] === "1";
+    app.post("/api/v1/review/runs/:id/discard", async (request) => requireEngine(state).discard(id(request), { withDependents: flag(request, "withDependents") }));
     app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request), { withDependencies: flag(request, "withDependencies") }));
     app.post("/api/v1/review/changes/:id/reject", async (request) => requireEngine(state).reject(id(request), { withDependents: flag(request, "withDependents") }));
     app.post("/api/v1/review/changes/:id/keep-current", async (request) => requireEngine(state).keepCurrent(id(request)));

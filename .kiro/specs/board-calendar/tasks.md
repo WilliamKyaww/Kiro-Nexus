@@ -44,6 +44,24 @@ Hein's handoff tasks are done.
       found the date editor overflowing the Saturday cell, and it now
       floats over the grid.
   - _Requirements: 2, 3, 4_
+- [x] 5. Repairs from the review of run 4 (run 5 stage 1)
+  - **R4-5:** a date drafted in one board overwrote another tab's newer
+    save. The date editor now keeps the revision and value from when
+    editing began, and reports a conflict with **Keep mine** and **Use
+    theirs**.
+  - **R4-10:** the grid and the editor used different zones. The editor
+    now names its zone and the workspace day the calendar uses. Calendar
+    items show the time in the workspace zone. A time in a clock gap moves
+    forward with a notice (DEC-023).
+  - **Verified by Kiro, 2026-11-24:**
+    - `tests/e2e/r5-repairs.spec.ts` "R4-5" (two Edge contexts; the file
+      is checked before and after a restart) and "R4-10" (a Tokyo
+      workspace with London deadlines);
+    - `packages/schema/src/time.test.ts` (3 tests);
+    - `b3-board-calendar.spec.ts` still passes.
+
+    Each new test fails on an export of `251188e`.
+  - _Requirements: 2.2, 2.3, 3.2_
 - [ ] 4. Handoff to Hein (not started, his slice)
   - [ ] 4.1 Calendar events: `calendar.json`, create, edit and delete
     (PRD-033), and events on the month grid.

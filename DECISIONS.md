@@ -402,7 +402,8 @@ status control.
 ## DEC-020: Edit proposes typed operations through a callback, and Nexus fills every base value
 
 - **Status:** Accepted (Kiro, 2026-11-24, run 4 milestone 5 under Will's
-  authorisation; awaiting human review)
+  authorisation). Revised by DEC-022 in run 5: proposals now reserve their
+  issue keys, and an Edit note change is limited to the section the run read.
 
 **Decision.**
 - The user chooses Edit for one message at a time. After sending, the
@@ -458,3 +459,83 @@ status control.
   write-up both need.
 - *A review after every commit.* Too much for copy and styling changes.
   Will excluded minor changes.
+
+## DEC-022: Proposals may not overlap open changes, reserve their keys, and journal group decisions
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 5 stage 1 under Will's
+  authorisation; repairs R4-1, R4-2, R4-3, R4-7 and R4-9). Revises two points of
+  DEC-020.
+
+**Decision.**
+- **Overlap.** A new proposal is refused when it targets a field that already has an
+  open change, or note lines that an open change wrote or will write. It is also
+  refused when it links to, updates or names an issue that is itself still a
+  proposal. A manual edit is never refused.
+- **Scope.** An Edit note change names the section the run read. It carries the hash
+  of the text read, and may change only lines inside that section while the section
+  still has that text.
+- **Prerequisites.** A change is accepted only when each prerequisite stands in the
+  files. A pending prerequisite is accepted with it after confirmation. A
+  prerequisite that was never written, was rejected or is in conflict blocks it.
+  Discard asks before undoing the written changes that need what it drops.
+- **Keys (revises DEC-020).** A proposal reserves its new issues' numbers in
+  `projects.json` before the journal is written, so a key is never given to another
+  issue. A rejected proposal leaves a gap in the numbering, and its old link says it
+  was rejected.
+- **Group decisions.** A confirmed decision on several related changes is saved on
+  each of them before the first is carried out. Recovery finishes it in order.
+
+**Alternatives.**
+- *Tracking chains of overlapping edits.* Each decision order and conflict choice
+  would need its own reversal rules, which is the source of R4-2. Refusing the
+  overlap is simpler, and the user decides the first change before proposing again.
+- *Not writing `projects.json` from a review run (DEC-020).* This kept reversal to
+  one file, but let a saved link open different work (R4-7).
+## DEC-023: A timed due date belongs to its own zone, and the calendar shows it in the workspace zone
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 5 stage 1; repair R4-10)
+
+**Decision.**
+- An all-day due date is a local date in the workspace zone, as before.
+- A timed due date keeps its own IANA zone. Editing its date keeps its local time in
+  that zone ("23:30 London" stays 23:30 London).
+- The date editor names the zone, and when it differs from the workspace zone, says on
+  which day the calendar shows it.
+- The calendar places each item on its day in the workspace zone, and shows a timed
+  item's time in that zone.
+- A local time that does not exist on the chosen day, because the clocks go forward,
+  moves forward by the gap. Nexus says so before saving. A time that occurs twice when
+  the clocks go back uses its first occurrence.
+
+**Alternatives.**
+- *Editing every date in the workspace zone.* Moving a London deadline would change
+  its London time across a clock change, which is not what its owner set.
+- *Refusing a time in a gap.* The forward shift is the common convention for
+  calendars, and the notice makes it visible.
+## DEC-024: Tracking needs strong evidence, prose cannot override it, and headings are aligned document-wide
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 5 stage 1; repairs R4-4 and R4-8).
+  Refines DEC-018.
+
+**Decision.**
+- **Tracked.** A "tracked" entry is confirmed only for a strong match: most of the issue
+  title's content words appear in the action, at least two of them unless the title
+  has one. One shared word is a weak match, and is shown as not confirmed, with the
+  word.
+- **Untracked.** An "untracked" entry is not confirmed when a record the run read
+  matches it, strongly or weakly, even with full coverage.
+- **Prose.** When an answer gives tracking entries, a free-text fact about one of those
+  actions is shown under "Not confirmed". Only Nexus's own sentences state tracking. A
+  discrepancy about an action is kept when it cites the issue that tracks it.
+- **Evaluator.** The live check fails any recorded statement about the journey's
+  actions other than those sentences. It takes the journey as a scenario.
+- **Headings.** The headings of two versions of a note are aligned across the whole
+  document. Unchanged lines keep their identity, and a changed heading follows its
+  section's body. Each decision records how slugs moved. An Ask citation names the
+  accepted heading at the time of the answer, and follows later moves.
+
+**Alternatives.**
+- *Matching by meaning with a model.* That is not evidence that Nexus can check
+  itself.
+- *Matching by position or slug.* This is what broke on collisions and changed
+  heading counts (R4-8).

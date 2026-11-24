@@ -8,7 +8,7 @@ function Sources({ item, message, conversationId }: { item: AnswerItem; message:
       {item.sources.map((h) => {
         const c = message.answer?.citations[h];
         if (!c) return null;
-        return <Link key={h} className="citation" to={citationHref(c, conversationId)} title={`Open ${c.label}`}>{c.label}</Link>;
+        return <Link key={h} className="citation" to={citationHref(c, conversationId, message.at)} title={`Open ${c.label}`}>{c.label}</Link>;
       })}
     </span>
   );

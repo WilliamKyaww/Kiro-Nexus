@@ -7,6 +7,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { parseHeadings, sections } from "@nexus/markdown";
+import { resolveHeadingParam } from "../../../apps/web/src/notes/headings";
 import { SearchIndex } from "../notes/search";
 import { ReviewEngine } from "../review/engine";
 import { WorkspaceService, copySampleWorkspace } from "../workspace/service";
@@ -23,6 +25,7 @@ let engine: ReviewEngine;
 let changeId: string;
 
 const tools = () => makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), newConsulted());
+const aliases = async (path = NOTE) => engine.headingAliases(path, (await service.readNoteRaw(path))?.content ?? null);
 const waitFor = async <T>(fn: () => T | undefined, ms = 3000): Promise<T> => {
   const end = Date.now() + ms;
   for (;;) {
@@ -77,7 +80,71 @@ describe("while the rename is pending", () => {
   });
 
   it("maps the accepted slug to the heading on disk for a citation", async () => {
-    expect(engine.headingAliases(NOTE)).toEqual([{ slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "pending-rename" }]);
+    expect(await aliases()).toEqual([{ slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "pending-rename", ref: "accepted", at: null }]);
+  });
+});
+
+// R4-8 (Codex review of run 4, reproduced with the read tool, the journal and the page resolver):
+// renaming an earlier heading to the name of a later one made Ask and the note page open
+// different sections, and a rename plus an inserted heading in one edit made the renamed
+// heading unreadable. Headings are now aligned across the whole document.
+describe("document-wide heading identity", () => {
+  const WEEK = "plans/week.md";
+  const week = "# Week notes\n\nFictional sample data.\n\n## Alpha\n\n- Priya checks the preview copy\n\n## Beta\n\nNothing yet.\n";
+  /** The section text the note page would show for a citation, through the real resolver. */
+  const pageText = async (slug: string, at: string) => {
+    const raw = (await service.readNoteRaw(WEEK))!;
+    const target = resolveHeadingParam(slug, parseHeadings(raw.content).map((h) => h.slug), await aliases(WEEK), { ref: "accepted", at });
+    return target ? sections(raw.content).find((s) => s.headingSlug === target.slug)?.text ?? null : null;
+  };
+  const propose = async (before: string, after: string) => {
+    const note = (await service.readNoteRaw(WEEK)) ?? (await service.createNote(WEEK, week));
+    return (await engine.propose({ kind: "fixed-demo", label: "Test (fixed, not AI)" }, [{ opId: `w-${Date.now()}`, kind: "note.replaceSpan", file: WEEK, baseRevision: note.revision, before, after }], "demo")).changes[0]!.changeId;
+  };
+
+  it("a heading renamed to the name of a later one: Ask and the note page open the same section in every state", async () => {
+    await service.createNote(WEEK, week);
+    const id = await propose("## Alpha\n", "## Beta\n");
+    const t = tools();
+    const later = await t.read_note_section({ path: WEEK, headingSlug: "beta" });
+    expect(later).toMatchObject({ headingSlug: "beta", text: "Nothing yet." });
+    const answeredAt = new Date().toISOString();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(await pageText("beta", answeredAt)).toBe("Nothing yet.");          // pending
+    expect(await pageText("alpha", answeredAt)).toBe("- Priya checks the preview copy");
+    await engine.accept(id);
+    expect(await pageText("beta", answeredAt)).toBe("Nothing yet.");          // accepted
+    expect(await pageText("alpha", answeredAt)).toBe("- Priya checks the preview copy");
+    // A citation from after the acceptance names the new accepted headings directly.
+    const now = new Date().toISOString();
+    expect(await pageText("beta-1", now)).toBe("Nothing yet.");
+  });
+
+  it("the same citations after the rename is rejected", async () => {
+    await service.createNote(WEEK, week);
+    const id = await propose("## Alpha\n", "## Beta\n");
+    const answeredAt = new Date().toISOString();
+    await new Promise((r) => setTimeout(r, 5));
+    await engine.reject(id);
+    expect(await pageText("beta", answeredAt)).toBe("Nothing yet.");
+    expect(await pageText("alpha", answeredAt)).toBe("- Priya checks the preview copy");
+  });
+
+  it("a rename and an inserted heading in one edit: the renamed heading reads as its accepted section", async () => {
+    await service.createNote(WEEK, week);
+    const id = await propose("## Alpha\n\n- Priya checks the preview copy\n", "## Preview\n\n- Priya checks the preview copy\n\n## Extra\n\n- Tomasz adds a line\n");
+    await waitFor(() => index.search("Tomasz adds a line").find((r) => r.path === WEEK));
+    const t = tools();
+    expect(await t.read_note_section({ path: WEEK, headingSlug: "preview" })).toMatchObject({ headingSlug: "alpha", text: "- Priya checks the preview copy" });
+    expect(await t.read_note_section({ path: WEEK, headingSlug: "extra" })).toMatchObject({ error: "heading not found", note: expect.stringMatching(/would add/) });
+    const hit = (await t.search_notes({ query: "Priya preview copy" })).results.find((r) => r.path === WEEK);
+    expect(hit).toMatchObject({ headingSlug: "alpha" });
+    const answeredAt = new Date().toISOString();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(await pageText("alpha", answeredAt)).toBe("- Priya checks the preview copy");
+    expect(await pageText("beta", answeredAt)).toBe("Nothing yet.");
+    await engine.accept(id);
+    expect(await pageText("alpha", answeredAt)).toBe("- Priya checks the preview copy");
   });
 });
 
@@ -89,7 +156,7 @@ describe("after a decision", () => {
     expect(hit).toMatchObject({ headingSlug: "pending-preview" });
     expect(hit).not.toHaveProperty("pendingHeading");
     expect(await t.read_note_section({ path: NOTE, headingSlug: "pending-preview" })).toMatchObject({ headingText: "Pending preview", pendingReview: [] });
-    expect(engine.headingAliases(NOTE)).toEqual([{ slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "renamed" }]);
+    expect(await aliases()).toEqual([{ slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "renamed", ref: "accepted", at: expect.any(String) }]);
   });
 
   it("after rejection, the original heading is back on disk, and the proposed slug leads to it", async () => {
@@ -100,6 +167,6 @@ describe("after a decision", () => {
     expect(hit).toMatchObject({ headingSlug: "approved-heading" });
     expect(hit).not.toHaveProperty("pendingHeading");
     expect(await t.read_note_section({ path: NOTE, headingSlug: "approved-heading" })).toMatchObject({ headingText: "Approved heading" });
-    expect(engine.headingAliases(NOTE)).toEqual([{ slug: "pending-preview", to: "approved-heading", toText: "Approved heading", reason: "rename-rejected" }]);
+    expect(await aliases()).toEqual([{ slug: "pending-preview", to: "approved-heading", toText: "Approved heading", reason: "rename-rejected", ref: "disk", at: expect.any(String) }]);
   });
 });

@@ -307,3 +307,24 @@ acceptance condition has been seen to pass.
   - **Not verified:** clicking a citation during a pending rename in the
     browser. There is no route yet that proposes an arbitrary rename;
     milestone 5's Edit journey adds agent proposals.
+- [x] 10. Repairs from the review of run 4 (run 5 stage 1)
+  - **R4-4:** contradictory tracking claims could be recorded and could pass
+    the evaluator. Tracking now needs strong positive evidence. An
+    "untracked" entry is not confirmed when a record the run read matches.
+    A free-text fact about a tracked action is not recorded. The evaluator
+    checks the whole displayed answer, and takes a scenario (DEC-024).
+  - **R4-8:** heading identity broke on collisions and on a rename plus an
+    inserted heading. Headings are now aligned across the whole document
+    (`server/src/notes/align.ts`). Each decision records how slugs moved,
+    and citations resolve by the accepted heading and the answer's time
+    (DEC-024).
+  - **R4-11:** retrieval-first now honours the issue cap exactly.
+  - **Verified by Kiro, 2026-11-24:**
+    - `matching.test.ts` (3 new tests);
+    - `live-check-cli.test.ts` (2 new tests, covering both turns and a
+      second vocabulary);
+    - `rename.test.ts` (3 new tests: pending, accepted and rejected);
+    - `cap.test.ts` (3 tests).
+
+    Each new test fails on an export of `251188e`. The record is
+    `docs/reviews/2026-11-24-run4-review.md`.

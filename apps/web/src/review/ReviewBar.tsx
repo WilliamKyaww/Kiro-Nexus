@@ -9,7 +9,7 @@ export function ReviewBar() {
   const { decide, feedback, runAction } = useReviewActions();
   // Focus the confirmation once its button is enabled (the refused request has settled).
   const confirmButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => { if (confirm && !decide.isPending) confirmButton.current?.focus(); }, [confirm, decide.isPending]);
+  useEffect(() => { if (confirm && !decide.isPending && !runAction.isPending) confirmButton.current?.focus(); }, [confirm, decide.isPending, runAction.isPending]);
   const incomplete = useIncompleteRuns();
   const location = useLocation();
   const navigate = useNavigate();
@@ -82,21 +82,31 @@ export function ReviewBar() {
         </div>
       ))}
       {confirm ? (
-        <div className="confirm-related" role="group" aria-label={confirm.action === "accept" ? "Accept related changes" : "Reject related changes"}>
-          <p>
-            {/* Summaries carry their own quotation marks, so they are not quoted again here. */}
-            <strong>{confirm.action === "accept" ? "Accepting:" : "Rejecting:"}</strong> {confirm.change.summary}
-          </p>
-          <p>
-            {confirm.action === "accept"
-              ? <>It needs {confirm.others.length === 1 ? "another change that is" : `${confirm.others.length} other changes that are`} still awaiting review. Accept them together?</>
-              : <>This also rejects and undoes {confirm.others.length === 1 ? "the change that depends on it" : `the ${confirm.others.length} changes that depend on it`}. Your newer edits are kept.</>}
-          </p>
+        <div className="confirm-related" role="group" aria-label={confirm.action === "accept" ? "Accept related changes" : confirm.action === "reject" ? "Reject related changes" : "Discard and undo related changes"}>
+          {confirm.action === "discard" ? (
+            <p>Discarding the unwritten changes also rejects and undoes {confirm.others.length === 1 ? "this written change, which needs them" : `these ${confirm.others.length} written changes, which need them`}. Your newer edits are kept.</p>
+          ) : (
+            <>
+              <p>
+                {/* Summaries carry their own quotation marks, so they are not quoted again here. */}
+                <strong>{confirm.action === "accept" ? "Accepting:" : "Rejecting:"}</strong> {confirm.change.summary}
+              </p>
+              <p>
+                {confirm.action === "accept"
+                  ? <>It needs {confirm.others.length === 1 ? "another change that is" : `${confirm.others.length} other changes that are`} still awaiting review. Accept them together?</>
+                  : <>This also rejects and undoes {confirm.others.length === 1 ? "the change that depends on it" : `the ${confirm.others.length} changes that depend on it`}. Your newer edits are kept.</>}
+              </p>
+            </>
+          )}
           <ul className="plain">{confirm.others.map((o) => <li key={o.changeId}>{o.summary}</li>)}</ul>
           <div className="review-actions">
-            <button type="button" className="primary" ref={confirmButton} disabled={decide.isPending}
-              onClick={() => decide.mutate({ change: confirm.change, action: confirm.action, together: true })}>
-              {confirm.action === "accept" ? (confirm.others.length === 1 ? "Accept both" : `Accept all ${confirm.others.length + 1}`) : (confirm.others.length === 1 ? "Reject both" : `Reject all ${confirm.others.length + 1}`)}
+            <button type="button" className="primary" ref={confirmButton} disabled={decide.isPending || runAction.isPending}
+              onClick={() => (confirm.action === "discard"
+                ? runAction.mutate({ runId: confirm.runId, action: "discard", together: true })
+                : decide.mutate({ change: confirm.change, action: confirm.action, together: true }))}>
+              {confirm.action === "accept" ? (confirm.others.length === 1 ? "Accept both" : `Accept all ${confirm.others.length + 1}`)
+                : confirm.action === "reject" ? (confirm.others.length === 1 ? "Reject both" : `Reject all ${confirm.others.length + 1}`)
+                : "Discard and undo"}
             </button>
             <button type="button" onClick={() => setReviewUi({ confirm: null })}>Cancel</button>
           </div>

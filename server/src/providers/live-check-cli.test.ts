@@ -49,9 +49,10 @@ describe("live-check CLI against the local fixture", () => {
     expect(r.report.checks.map((c: { name: string }) => c.name)).toEqual([
       "Turn 1: answer completed",
       "Turn 1: evidence sufficient",
-      "Turn 1: Will's judge instructions are untracked, from the kickoff's Actions heading, confirmed by the evidence",
+      "Turn 1: Will's judge instructions are untracked, from the Actions heading, confirmed by the evidence",
       "Turn 1: Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence",
       "Turn 1: no confirmed entry contradicts these",
+      "Turn 1: the recorded facts and discrepancies say nothing else about these actions",
       "Turn 1: the Actions heading citation opens",
       "Turn 1: the NEX-1 citation opens",
       "Turn 1: Ask left the notes and issues unchanged",
@@ -60,6 +61,7 @@ describe("live-check CLI against the local fixture", () => {
       "Turn 2: Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence",
       "Turn 2: Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence",
       "Turn 2: no confirmed entry contradicts these",
+      "Turn 2: the recorded facts and discrepancies say nothing else about these actions",
       "Turn 2: the Actions heading citation opens",
       "Turn 2: the NEX-1 citation opens",
       "Turn 2: the NEX-2 citation opens",
@@ -100,7 +102,7 @@ describe("live-check CLI against the local fixture", () => {
     const unsure = await runCli({ NEXUS_LIVE_MODEL: "nexus-test-double-unsure" });
     expect(unsure.report.checks.find((c: { name: string }) => c.name === "Turn 1: evidence sufficient")).toMatchObject({ ok: false });
     const heading = await runCli({ NEXUS_LIVE_MODEL: "nexus-test-double-heading" });
-    expect(heading.report.checks.find((c: { name: string }) => c.name.startsWith("Turn 1: Will's judge"))).toMatchObject({ ok: false, detail: expect.stringContaining("not confirmed: Not confirmed: NEX-1 shares no words") });
+    expect(heading.report.checks.find((c: { name: string }) => c.name.startsWith("Turn 1: Will's judge"))).toMatchObject({ ok: false, detail: expect.stringContaining("not confirmed: Not confirmed: NEX-1 (Build calendar view) shares no words") });
     expect(heading.report.checks.find((c: { name: string }) => c.name.startsWith("Turn 1: Hein's calendar"))).toMatchObject({ ok: true });
   });
 });
@@ -127,7 +129,7 @@ describe("turn evaluation", () => {
       { text: "NEX-1 does not track the calendar work.", sources: ["S1", "S2"] },
     ], []);
     expect(failed(m, 1)).toEqual(expect.arrayContaining([
-      "Will's judge instructions are untracked, from the kickoff's Actions heading, confirmed by the evidence",
+      "Will's judge instructions are untracked, from the Actions heading, confirmed by the evidence",
       "Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence",
     ]));
     // A correct entry next to a confirmed entry that says the opposite fails too.
@@ -144,7 +146,7 @@ describe("turn evaluation", () => {
 
   it("requires the evidence to confirm each entry, and NEX-2 in the second turn", () => {
     expect(failed(message([], [entry(JUDGE, "untracked", [], false), entry(CAL, "tracked", ["S2"])]), 1))
-      .toEqual(["Will's judge instructions are untracked, from the kickoff's Actions heading, confirmed by the evidence"]);
+      .toEqual(["Will's judge instructions are untracked, from the Actions heading, confirmed by the evidence"]);
     const secondTurn = message([], [entry(JUDGE, "tracked", ["S3"]), entry(CAL, "tracked", ["S2"])]);
     expect(failed(secondTurn, 2)).toEqual([]);
     // In the second turn, a confirmed "untracked" entry is wrong and contradicts the expected one.
@@ -152,6 +154,44 @@ describe("turn evaluation", () => {
       .toEqual(["Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence", "no confirmed entry contradicts these"]);
     expect(failed(secondTurn, 2, issues1)).toEqual(["the NEX-2 citation opens"]); // cited, but the issue does not exist
     expect(evaluateTurn(secondTurn, 2, { actionsHeadingExists: false, existingIssues: issues2 }).find((c) => c.name.endsWith("the Actions heading citation opens"))?.ok).toBe(false);
+  });
+
+  // R4-4 (Codex review of run 4): correct structured entries plus a recorded free-text fact
+  // that denies the calendar match passed every first-turn check.
+  const sentence = { judgeMissing: "“Will writes the judge instructions” has no matching issue.", calendar: "“Hein builds the calendar view” is tracked by NEX-1 (Build calendar view, in progress)." };
+  it("fails a correct answer whose recorded facts also contradict it, in either turn (R4-4)", () => {
+    const right = [entry(JUDGE, "untracked", []), entry(CAL, "tracked", ["S2"])];
+    const shown = (extra: Array<{ text: string; sources: string[] }>) => message([{ text: sentence.judgeMissing, sources: ["S1"] }, { text: sentence.calendar, sources: ["S1", "S2"] }, ...extra], right);
+    expect(failed(shown([]), 1)).toEqual([]);
+    for (const text of ["NEX-1 does not track the calendar work.", "No issue tracks the calendar view yet.", "The calendar view is not on the board."]) {
+      expect(failed(shown([{ text, sources: ["S1", "S2"] }]), 1), text).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    }
+    // Turn 2: a stray fact that the judge instructions are still missing fails as well.
+    const turn2 = message([{ text: "The judge instructions are still missing.", sources: ["S1"] }], [entry(JUDGE, "tracked", ["S3"]), entry(CAL, "tracked", ["S2"])]);
+    expect(failed(turn2, 2)).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    // A discrepancy that cites the issue tracking the action is a fair statement about it.
+    const disc = { ...shown([]), answer: { ...shown([]).answer, discrepancies: [{ text: "The note marks “Hein builds the calendar view” as not done, but NEX-1 is in progress.", sources: ["S1", "S2"] }] } };
+    expect(failed(disc, 1)).toEqual([]);
+  });
+
+  it("uses no kickoff words: the same rules in a second fictional workspace (R4-4)", () => {
+    const planning = {
+      notePath: "standups/2026-11-20 planning.md", headingSlug: "action-items", heading: "Action items",
+      missing: { action: "Priya drafts the onboarding guide", label: "Priya's onboarding guide", issueAfter: "OPS-2" },
+      tracked: { action: "Tomasz migrates the billing tests", label: "Tomasz's billing tests", issue: "OPS-1" },
+    };
+    const cites = {
+      S1: { handle: "S1", label: "Planning › Action items", target: { kind: "note", path: planning.notePath, headingSlug: "action-items", headingText: "Action items" } },
+      S2: { handle: "S2", label: "OPS-1 Migrate the billing tests", target: { kind: "issue", key: "OPS-1" } },
+      S3: { handle: "S3", label: "OPS-2 Draft the onboarding guide", target: { kind: "issue", key: "OPS-2" } },
+    };
+    const msg = (facts: Array<{ text: string; sources: string[] }>, tracking: unknown[]) => ({ status: "complete", answer: { facts, discrepancies: [], suggestions: [], tracking, insufficientEvidence: false, insufficientReason: null, citations: cites } });
+    const run = (m: unknown, turn: 1 | 2) => evaluateTurn(m, turn, { actionsHeadingExists: true, existingIssues: new Set(turn === 1 ? ["OPS-1"] : ["OPS-1", "OPS-2"]), scenario: planning }).filter((c) => !c.ok).map((c) => c.name.replace(/^Turn \d: /, ""));
+    const turn1 = [entry(planning.missing.action, "untracked", []), entry(planning.tracked.action, "tracked", ["S2"])];
+    expect(run(msg([], turn1), 1)).toEqual([]);
+    expect(run(msg([{ text: "OPS-1 is unrelated to the billing tests.", sources: ["S1", "S2"] }], turn1), 1)).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    expect(run(msg([], [entry(planning.missing.action, "tracked", ["S3"]), entry(planning.tracked.action, "tracked", ["S2"])]), 2)).toEqual([]);
+    expect(run(msg([], turn1), 2)).toEqual(["Priya's onboarding guide are tracked by OPS-2, from the Action items heading, confirmed by the evidence", "no confirmed entry contradicts these"]);
   });
 });
 

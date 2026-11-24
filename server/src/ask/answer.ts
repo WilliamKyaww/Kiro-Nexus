@@ -96,10 +96,53 @@ export function coverageQualifier(c: IssueCoverage): string {
 
 const STATUS_TEXT: Record<string, string> = { todo: "to do", in_progress: "in progress", done: "done" };
 
-/** Content words for overlap checks: 4+ letters, with simple plural and tense endings removed. */
+/**
+ * Content words for overlap checks: 4+ letters, with simple plural and tense endings and a
+ * final "e" removed, so that "writes" and "Write" or "notes" and "note" compare equal.
+ */
 export function contentWords(text: string): Set<string> {
-  const stem = (w: string) => w.replace(/(ings?|ed|es|s)$/, "");
+  const stem = (w: string) => w.replace(/(ings?|ed|es|s)$/, "").replace(/e$/, "");
   return new Set((text.toLowerCase().match(/[a-z0-9]{4,}/g) ?? []).map(stem).filter((w) => w.length >= 3));
+}
+
+/**
+ * How well an issue record matches an action (R4-4). Strong: most of the issue title's
+ * content words are in the action (at least two, unless the title has only one). Weak: some
+ * word of the title or description is shared, which alone does not show that the issue tracks
+ * the action ("Book judge travel" against "Will writes the judge instructions").
+ */
+export function matchStrength(action: string, issue: { title: string; description: string }): { level: "strong" | "weak" | "none"; shared: string[] } {
+  const a = contentWords(action);
+  const title = contentWords(issue.title);
+  const inTitle = [...title].filter((w) => a.has(w));
+  if (title.size && inTitle.length >= Math.min(2, title.size) && inTitle.length / title.size >= 0.6) return { level: "strong", shared: inTitle };
+  const shared = [...new Set([...title, ...contentWords(issue.description)])].filter((w) => a.has(w));
+  return { level: shared.length ? "weak" : "none", shared };
+}
+
+/**
+ * The words that identify an action, without its owner: in "Hein builds the calendar view"
+ * the leading name is who does it, not what it is, and is often an ordinary word ("Will").
+ */
+export function actionWords(action: string): Set<string> {
+  const tokens = action.trim().split(/\s+/);
+  const owner = tokens.length >= 3 && /^[A-Z][a-z]+$/.test(tokens[0]!) && /^[a-z]+s$/.test(tokens[1]!) ? tokens[0]!.toLowerCase() : null;
+  const words = contentWords(action);
+  if (owner) words.delete(owner.replace(/(ings?|ed|es|s)$/, "").replace(/e$/, ""));
+  return words;
+}
+
+/** Whether a statement is about an action: it shares a word that identifies the action. */
+function isAbout(text: string, action: string): boolean {
+  const have = contentWords(text);
+  return [...actionWords(action)].some((w) => have.has(w));
+}
+
+/** The words of a text whose stems are in `stems`, as written, for a readable qualifier. */
+function asWritten(text: string, stems: string[]): string[] {
+  const out = new Set<string>();
+  for (const w of text.match(/[A-Za-z0-9]{4,}/g) ?? []) if (contentWords(w).size && stems.includes([...contentWords(w)][0]!)) out.add(w.toLowerCase());
+  return [...out];
 }
 
 /** Most of the action's words appear on one line of the section the run read. */
@@ -153,18 +196,25 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
     else if (t.status === "tracked") {
       if (issueHandles.length === 0) problem = "Not confirmed: no issue record from this run was cited.";
       else {
-        const words = contentWords(t.action);
-        const unrelated = issueHandles.filter((h) => {
+        // Every cited issue needs strong positive evidence (R4-4).
+        for (const h of issueHandles) {
           const rec = handles.evidenceOf(h)?.issue;
-          const have = contentWords(`${rec?.title ?? ""} ${rec?.description ?? ""}`);
-          return ![...words].some((w) => have.has(w));
-        });
-        if (unrelated.length) {
-          const keys = unrelated.map((h) => handles.evidenceOf(h)?.issue?.key ?? h).join(", ");
-          problem = `Not confirmed: ${keys} shares no words with this action, and a link to the same heading does not show which action an issue tracks.`;
+          const m = matchStrength(t.action, { title: rec?.title ?? "", description: rec?.description ?? "" });
+          const name = rec ? `${rec.key} (${rec.title})` : h;
+          if (m.level === "none") { problem = `Not confirmed: ${name} shares no words with this action, and a link to the same heading does not show which action an issue tracks.`; break; }
+          if (m.level === "weak") { problem = `Not confirmed: ${name} shares only “${asWritten(`${rec?.title ?? ""} ${rec?.description ?? ""}`, m.shared).join("”, “")}” with this action, which does not show that it tracks it.`; break; }
         }
       }
     } else if (!coverage.complete) problem = coverageQualifier(coverage);
+    else {
+      // An absence claim must not contradict a record the run read (R4-4).
+      const records = handles.all().filter((c) => c.target.kind === "issue").map((c) => handles.evidenceOf(c.handle)?.issue).filter((r): r is NonNullable<typeof r> => !!r);
+      const matches = records.map((r) => ({ r, m: matchStrength(t.action, r) }));
+      const strong = matches.find((x) => x.m.level === "strong");
+      const weak = matches.find((x) => x.m.level === "weak");
+      if (strong) problem = `Not confirmed: ${strong.r.key} (${strong.r.title}) appears to match this action.`;
+      else if (weak) problem = `Not confirmed: ${weak.r.key} (${weak.r.title}) may match this action (it shares “${asWritten(`${weak.r.title} ${weak.r.description}`, weak.m.shared).join("”, “")}”).`;
+    }
 
     const entry: TrackingEntry = { action: t.action, source: note ?? "", status: t.status, issues: t.status === "tracked" ? issueHandles : [], reason: t.reason, confirmed: problem === null, problem };
     tracking.push(entry);
@@ -181,19 +231,32 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
 
   // 2. Free-text facts and discrepancies. With issue coverage incomplete, one that rests on
   // a section of actions but cites no issue record cannot be confirmed (a structural rule).
-  const place = (list: AnswerItem[], item: AnswerItem) => {
+  // When the answer gives tracking entries, they are the checked statement about each action:
+  // a free-text fact about one of those actions is not recorded beside them, so unchecked prose
+  // cannot contradict the visible result (R4-4). A discrepancy about one is kept only when it
+  // cites an issue that Nexus confirmed tracks that action (for example a status mismatch).
+  const tracked = tracking.map((t) => ({ action: t.action, confirmedIssues: t.confirmed && t.status === "tracked" ? t.issues : [] }));
+  const aboutTracked = (item: AnswerItem) => tracked.filter((t) => isAbout(item.text, t.action));
+  const place = (list: AnswerItem[], item: AnswerItem, kind: "fact" | "discrepancy") => {
+    // Only statements that cite what a tracking claim rests on (a section of actions, or an
+    // issue record) can restate one.
+    const actions = item.sources.some(hasTasks) || item.sources.some(isIssue) ? aboutTracked(item) : [];
+    if (actions.length && (kind === "fact" || !actions.every((t) => t.confirmedIssues.some((h) => item.sources.includes(h))))) {
+      unconfirmed.push({ ...item, qualifier: "Not confirmed: Nexus checks whether an action is tracked only through its own sentences above, not through the model's wording." });
+      return;
+    }
     const aboutActions = item.sources.some(hasTasks) && !item.sources.some(isIssue);
     if (!coverage.complete && aboutActions) unconfirmed.push({ ...item, qualifier: coverageQualifier(coverage) });
     else list.push(item);
   };
   for (const f of a.facts) {
     const s = clean(f.sources);
-    if (s.length) place(facts, { text: f.text, sources: s });
+    if (s.length) place(facts, { text: f.text, sources: s }, "fact");
     else { demoted += 1; suggestions.push({ text: f.text, sources: [], unsupported: true }); }
   }
   for (const d of a.discrepancies) {
     const s = clean(d.sources);
-    if (s.length) place(discrepancies, { text: d.text, sources: s });
+    if (s.length) place(discrepancies, { text: d.text, sources: s }, "discrepancy");
     else { demoted += 1; suggestions.push({ text: d.text, sources: [], unsupported: true }); }
   }
   for (const g of a.suggestions) suggestions.push({ text: g.text, sources: clean(g.sources) });

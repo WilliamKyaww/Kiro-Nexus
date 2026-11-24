@@ -65,20 +65,48 @@ export function splice(content: string, start: number, length: number, replaceme
   return usesCrlf(content) ? joined.replace(/\n/g, "\r\n") : joined;
 }
 
-export interface SpanEdit { before: string; after: string }
+/** Lines [start, end) of a note that an edit may touch: one section, or the whole note. */
+export interface LineRange { start: number; end: number }
+export interface SpanEdit { before: string; after: string; range?: LineRange }
+
+/**
+ * A section of a note as an edit scope: the heading line through the line before the next
+ * heading, or the whole note for `null`. `text` is compared with the text a run read.
+ */
+export interface Scope { range: LineRange; text: string }
+export function scopeOf(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>): Scope | null {
+  const lines = docLines(content);
+  if (headingSlug === null) return { range: { start: 0, end: lines.length }, text: toLf(content).trim() };
+  const i = headings.findIndex((h) => h.slug === headingSlug);
+  if (i < 0) return null;
+  const start = headings[i]!.line;
+  const end = headings[i + 1]?.line ?? lines.length;
+  return { range: { start, end }, text: lines.slice(start + 1, end).join("\n").trim() };
+}
+
+/** Find `text` as whole lines, only inside `range` when one is given. */
+function locateIn(content: string, text: string, range: LineRange | undefined): LocateResult {
+  if (!range) return locate(content, text, null);
+  const span = spanLines(text);
+  const found = occurrences(docLines(content), span).filter((i) => i >= range.start && i + span.length <= range.end);
+  if (found.length === 0) return { status: "missing" };
+  if (found.length > 1) return { status: "ambiguous", count: found.length };
+  return { status: "ok", start: found[0]!, length: span.length };
+}
 
 /**
  * Apply several non-overlapping edits that were each located uniquely in
- * `content`. Returns the new content and, for each edit, where its `after`
- * text sits in the result plus the neighbouring lines there.
+ * `content` (inside its range, when an edit has one). Returns the new content
+ * and, for each edit, where its `before` text was and where its `after` text
+ * sits in the result, plus the neighbouring lines there.
  */
 export function applyEdits(content: string, edits: SpanEdit[]):
-  | { ok: true; content: string; placed: Array<{ start: number; length: number; context: SpanContext }> }
+  | { ok: true; content: string; placed: Array<{ start: number; length: number; context: SpanContext }>; located: Array<{ start: number; length: number }> }
   | { ok: false; index: number; reason: "missing" | "ambiguous" | "overlap" | "empty" } {
   const located: Array<{ index: number; start: number; length: number }> = [];
   for (const [index, edit] of edits.entries()) {
     if (spanLines(edit.before).length === 0) return { ok: false, index, reason: "empty" };
-    const r = locate(content, edit.before, null);
+    const r = locateIn(content, edit.before, edit.range);
     if (r.status !== "ok") return { ok: false, index, reason: r.status };
     located.push({ index, start: r.start, length: r.length });
   }
@@ -98,7 +126,9 @@ export function applyEdits(content: string, edits: SpanEdit[]):
     placed[l.index] = { start, length: newLength, context: contextAt(finalLines, start, newLength) };
     delta += newLength - l.length;
   }
-  return { ok: true, content: result, placed };
+  const original = new Array<{ start: number; length: number }>(edits.length);
+  for (const l of located) original[l.index] = { start: l.start, length: l.length };
+  return { ok: true, content: result, placed, located: original };
 }
 
 export function normaliseSpan(text: string): string {

@@ -56,9 +56,16 @@ Composer (mode: edit) ─► POST /conversations/:id/ask { question, mode }
   rejects the whole proposal (`VALIDATION` with per-operation reasons),
   which goes back to the model as a tool result.
 - Each run makes one successful proposal and at most three attempts.
-- Keys: `max(nextIssueNumber, highest used + 1)`. A rejected agent issue's
-  key may be reused later, because `projects.json` is not written by a
-  review run. This keeps the reversal to a single file.
+- Keys: `max(nextIssueNumber, highest used + 1)`. The proposal reserves
+  that number in `projects.json` before the journal is written, so a
+  rejected agent issue's key is never given to another issue (DEC-022,
+  repair R4-7; this replaces the first design, which reused keys).
+- Note edits are scoped (DEC-022, repair R4-1). `edit_note` names the
+  section the run read. Nexus sends the section's heading on disk and the
+  hash of the text read, and the engine matches the lines only inside that
+  section while it still has that text.
+- Proposals may not overlap open changes, or build on an issue that is
+  still a proposal (repairs R4-2 and R4-9).
 - `effectiveAcceptedIssues` drops pending created issues and pending added
   links. `query_issues` lists pending new issues separately as
   `proposedIssues`.

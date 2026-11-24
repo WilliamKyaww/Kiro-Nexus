@@ -37,8 +37,14 @@ export function changeUrl(c: Pick<ChangeView, "kind" | "file" | "recordKey" | "c
     : `/issues/${encodeURIComponent(c.recordKey ?? "")}?change=${encodeURIComponent(c.changeId)}`;
 }
 
-/** Related changes that must be decided together (architecture 7.4), awaiting the user's confirmation. */
-export interface DecisionConfirm { change: ChangeView; action: "accept" | "reject"; others: Array<{ changeId: string; summary: string }> }
+/**
+ * Related changes that must be decided together (architecture 7.4), awaiting the user's
+ * confirmation. For "discard", the run's unwritten changes are dropped and `others` (written
+ * changes that need them) are rejected and undone first (R4-3).
+ */
+export type DecisionConfirm =
+  | { action: "accept" | "reject"; change: ChangeView; others: Array<{ changeId: string; summary: string }> }
+  | { action: "discard"; runId: string; others: Array<{ changeId: string; summary: string }> };
 
 // --- Tiny store: which rejected change is waiting for optional feedback, the last message, and
 // a decision waiting for confirmation because related changes would be decided with it. ---
@@ -86,7 +92,7 @@ export function useReviewActions() {
       return api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/${action}${flag}`);
     },
     onSuccess: async (result, { change, action, together }) => {
-      const others = together ? uiState.confirm?.others ?? [] : [];
+      const others = together && uiState.confirm?.action !== "discard" ? uiState.confirm?.others ?? [] : [];
       const also = others.length ? `, with ${others.length === 1 ? "the change it is tied to" : `${others.length} related changes`}` : "";
       if (action === "accept") setReviewUi({ message: `Accepted: ${change.summary}${also}`, feedbackFor: null, confirm: null });
       if (action === "keep-current") setReviewUi({ message: `Kept the current version: ${change.summary}`, feedbackFor: null, confirm: null });
@@ -116,14 +122,19 @@ export function useReviewActions() {
     onSuccess: () => setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change." }),
   });
   const runAction = useMutation({
-    mutationFn: ({ runId, action }: { runId: string; action: "retry" | "discard" }) => api.post<RunOutcome>(`/review/runs/${encodeURIComponent(runId)}/${action}`),
-    onSuccess: async (o, { action }) => {
+    mutationFn: ({ runId, action, together = false }: { runId: string; action: "retry" | "discard"; together?: boolean }) =>
+      api.post<RunOutcome>(`/review/runs/${encodeURIComponent(runId)}/${action}${together && action === "discard" ? "?withDependents=1" : ""}`),
+    onSuccess: async (o, { action, together }) => {
       const failed = o.files.filter((f) => f.state === "failed");
       const conflicted = o.files.filter((f) => f.state === "conflicted");
+      const undone = together ? uiState.confirm?.others.length ?? 0 : 0;
       setReviewUi({
         feedbackFor: null,
+        confirm: null,
         message: action === "discard"
-          ? "Discarded the changes that were never written. The files were not touched."
+          ? undone
+            ? `Discarded the changes that were never written, and rejected and undid ${undone === 1 ? "the change that needed them" : `the ${undone} changes that needed them`}.`
+            : "Discarded the changes that were never written. The files were not touched."
           : failed.length
             ? `Retry failed again: ${failed.map((f) => f.error ?? f.path).join("; ")}`
             : conflicted.length
@@ -132,7 +143,14 @@ export function useReviewActions() {
       });
       await refresh();
     },
-    onError: (e) => setReviewUi({ message: (e as Error).message }),
+    onError: (e, { runId, action }) => {
+      const details = e instanceof ApiError ? (e.details as { reason?: string; changes?: Array<{ changeId: string; summary: string }> } | undefined) : undefined;
+      if (action === "discard" && e instanceof ApiError && e.code === "CONFLICT" && details?.reason === "has-dependents" && details.changes?.length) {
+        setReviewUi({ confirm: { action: "discard", runId, others: details.changes }, message: null });
+        return;
+      }
+      setReviewUi({ message: (e as Error).message, confirm: null });
+    },
   });
   return { decide, feedback, runAction };
 }

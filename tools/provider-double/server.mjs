@@ -221,7 +221,7 @@ function editPlan(section, untracked, project) {
     operations.push({ op: "create_issue", ref, project, title: issueTitle(t.action), description: `From ${section.headingPath.join(" › ")}: “${t.action}”.` });
     operations.push({ op: "link_issue", issue: ref, note: section.path, heading: section.headingSlug });
     const line = lines.find((l) => /^\s*[-*] \[( |x|X)\] /.test(l) && l.trimEnd().endsWith(t.action));
-    if (line) operations.push({ op: "edit_note", note: section.path, before: line, after: `${line.trimEnd()} ({{issue:${ref}}})` });
+    if (line) operations.push({ op: "edit_note", note: section.path, heading: section.headingSlug ?? null, before: line, after: `${line.trimEnd()} ({{issue:${ref}}})` });
   });
   return { operations, summary: `Track ${untracked.length} untracked action${untracked.length === 1 ? "" : "s"} from ${section.headingPath.join(" › ")}.` };
 }

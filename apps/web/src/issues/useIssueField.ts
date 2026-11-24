@@ -8,9 +8,11 @@ import { ApiError, api } from "../api";
 export function useIssueField() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ issue, patch }: { issue: Issue; patch: IssuePatch }) => {
-      const baseValues = Object.fromEntries(Object.keys(patch).map((f) => [f, issue[f as keyof IssuePatch]])) as IssuePatch;
-      return api.patch<IssueView>(`/issues/${encodeURIComponent(issue.key)}`, { baseRevision: issue.revision, patch, baseValues });
+    // `base` is the issue as the user saw it when the edit began (R4-5). Without one, the edit
+    // is based on the issue as passed, which is right for a single action such as a drag.
+    mutationFn: ({ issue, patch, base }: { issue: Issue; patch: IssuePatch; base?: { revision: number; values: IssuePatch } }) => {
+      const baseValues = base?.values ?? Object.fromEntries(Object.keys(patch).map((f) => [f, issue[f as keyof IssuePatch]])) as IssuePatch;
+      return api.patch<IssueView>(`/issues/${encodeURIComponent(issue.key)}`, { baseRevision: base?.revision ?? issue.revision, patch, baseValues });
     },
     onSettled: async () => {
       await Promise.all([

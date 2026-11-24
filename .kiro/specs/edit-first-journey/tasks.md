@@ -40,6 +40,23 @@ yet.
       dependents. Cancel changes nothing. **Reject all 3** restores the
       note line and removes NEX-2, and the manual edit stays.
   - _Requirements: 3, 4.1_
+- [x] 6. Repairs from the review of run 4 (run 5 stage 1)
+  - The findings are R4-1 (wrong section), R4-2 (overlapping proposals),
+    R4-3 (an accept without its prerequisite), R4-6 (workspace binding),
+    R4-7 (key reuse) and R4-9 (cross-run references and interrupted group
+    decisions). They are recorded, with their resolution, in
+    `docs/reviews/2026-11-24-run4-review.md`. The design is in DEC-022.
+  - **Verified by Kiro, 2026-11-24:**
+    - `server/src/review/repairs.test.ts` (12 tests);
+    - `server/src/ask/edit-http.test.ts` (1 test, real service);
+    - `create.test.ts`, updated: NEX-3 follows a rejected NEX-2;
+    - `tests/e2e/r5-repairs.spec.ts` "R4-3" and "R4-7".
+
+    Each new test fails on an export of `251188e` and passes after the
+    repair.
+  - **Also:** a failed Edit turn offers **Retry Edit**, which asks first
+    when the turn already proposed changes.
+  - _Requirements: 2.2, 2.4, 2.5, 3.4 to 3.7_
 - [ ] 5. Not in this slice: the correction loop and other operations
   - Feedback that starts a correction run whose change `supersedes` the
     rejected one (PRD-064).

@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
-import { dueLocalDate, localDateOf, type ChangeView, type Issue, type WorkspaceView } from "@nexus/schema";
+import { dueLocalDate, localDateOf, localTimeOf, type ChangeView, type Issue, type WorkspaceView } from "@nexus/schema";
 import { api } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
 import { addMonths, dayTitle, monthOf, monthTitle, monthWeeks } from "../calendar/month";
@@ -62,7 +62,7 @@ export function CalendarPage() {
                 <span className="day-title" aria-hidden="true">{dayTitle(day.date)}</span>
                 {items.length ? (
                   <ul className="day-items">
-                    {items.map((item) => <li key={`${item.issue.id}-${item.kind}`}><CalendarItem item={item} changes={changes} /></li>)}
+                    {items.map((item) => <li key={`${item.issue.id}-${item.kind}`}><CalendarItem item={item} changes={changes} tz={tz} /></li>)}
                   </ul>
                 ) : null}
               </li>
@@ -75,9 +75,12 @@ export function CalendarPage() {
   );
 }
 
-function CalendarItem({ item, changes }: { item: Item; changes: ChangeView[] }) {
+function CalendarItem({ item, changes, tz }: { item: Item; changes: ChangeView[]; tz: string }) {
   const [open, setOpen] = useState(false);
   const { issue } = item;
+  // A timed due date sits on its day in the workspace zone; its time there explains the day (R4-10).
+  const due = issue.due && "dateTime" in issue.due ? issue.due : null;
+  const time = due ? <span className="cal-time" title={`${localTimeOf(due.dateTime, due.timeZone)} in ${due.timeZone}`}>{localTimeOf(due.dateTime, tz)}</span> : null;
   if (item.kind === "proposed") {
     return (
       <Link className="cal-item proposed" to={`/issues/${encodeURIComponent(issue.key)}${item.changeId ? `?change=${encodeURIComponent(item.changeId)}` : ""}`}
@@ -89,7 +92,7 @@ function CalendarItem({ item, changes }: { item: Item; changes: ChangeView[] }) 
   return (
     <div className="cal-entry" data-testid={`due-${issue.key}`}>
       <button type="button" className="cal-item" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="issue-key">{issue.key}</span> {issue.title}
+        {time} <span className="issue-key">{issue.key}</span> {issue.title}
       </button>
       {open ? (
         <div className="cal-popover">

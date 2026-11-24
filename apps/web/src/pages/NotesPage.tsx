@@ -11,7 +11,7 @@ import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
-import { resolveHeadingParam, type HeadingAlias } from "../notes/headings";
+import { resolveHeadingParam, type HeadingAlias, type HeadingRef } from "../notes/headings";
 
 /** Workspace identity that scopes drafts; "none" before a workspace is known. */
 function useWorkspaceId(): string {
@@ -146,17 +146,21 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
   const discardDraft = () => { drafts.clear(wsId, path); setConflict(null); };
   const doSave = () => { if (draft !== null && base && !save.isPending) save.mutate({ content: draft, baseRevision: base }); };
 
-  // Scroll to and indicate the linked heading. A heading renamed by a reviewed change (pending,
-  // accepted or rejected) is found by following the rename, at most a few steps.
+  // Scroll to and indicate the linked heading. A heading moved by a reviewed change (pending,
+  // accepted or rejected) is found by following the move. An Ask citation names a heading of
+  // the accepted text at the time of the answer, so it always consults the moves: its slug may
+  // exist on disk as a different section (R4-8).
+  const ref: HeadingRef = params.get("ref") === "accepted" ? { ref: "accepted", at: params.get("at") } : {};
   const headingMissing = !!(heading && note.data && !note.data.headings.some((h) => h.slug === heading));
   const aliases = useQuery({
     queryKey: ["review", "heading-aliases", path],
-    enabled: headingMissing,
+    enabled: headingMissing || (!!heading && ref.ref === "accepted"),
     queryFn: () => api.get<{ aliases: HeadingAlias[] }>(`/review/heading-aliases?path=${encodeURIComponent(path)}`),
   });
-  const resolved = useMemo(() => (heading && note.data
-    ? resolveHeadingParam(heading, note.data.headings.map((h) => h.slug), aliases.data?.aliases ?? [])
-    : null), [heading, note.data, aliases.data]);
+  const aliasesReady = !(ref.ref === "accepted" && heading) || aliases.isSuccess || aliases.isError;
+  const resolved = useMemo(() => (heading && note.data && aliasesReady
+    ? resolveHeadingParam(heading, note.data.headings.map((h) => h.slug), aliases.data?.aliases ?? [], ref)
+    : null), [heading, note.data, aliases.data, aliasesReady, ref.ref, ref.at]);
   const targetSlug = resolved?.slug ?? null;
   useEffect(() => {
     if (mode !== "preview" || !targetSlug) return;

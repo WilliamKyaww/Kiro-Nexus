@@ -1,9 +1,10 @@
 # State
 
-- **Date updated:** 2026-11-24 (run 4 delivered: Ask repairs, a first B3
-  slice and the first Edit journey)
-- **Active phase:** none authorised. Run 4 is used up. Slice C's live check
-  (task 5) is waiting for Will's free key.
+- **Date updated:** 2026-11-24 (run 5 in progress: run-4 repairs, then B4
+  ordinary reminders)
+- **Active phase:** run 5 (below). Stage 1 repairs the run-4 review
+  findings R4-1 to R4-11. Stage 2 builds B4 ordinary reminders. Slice C's
+  live check (task 5) is still waiting for Will's free key.
 - **Last spec:** `.kiro/specs/edit-first-journey/`. Tasks 1 to 4 are done,
   and task 5 (the correction loop and a live Edit check) is not
   authorised. Also touched in run 4: `.kiro/specs/ask-readonly/` (tasks 7
@@ -29,6 +30,51 @@
   - After every major implementation or update, write a reviewer relay
     for Will to send to Astra 6.2 in the Codex extension (DEC-021,
     `AGENTS.md` "Reviews"). Minor changes and tweaks need none.
+- **Current run 5: run-4 repairs, then B4 ordinary reminders (granted by
+  Will on 2026-11-24, by sending
+  `.tmp/review-run4/2026-11-24-consolidated-relay.md`; it survives context
+  compaction).**
+  - **Stage 1.** Reproduce and repair the review findings R4-1 to R4-11
+    (reviewer: the Codex extension, designated Astra 6.2, run by Will).
+    - For each one: state its acceptance condition, verify it, and record
+      the evidence and resolution under DEC-021.
+    - R4-6 came from reading the source, so verify it the same way.
+    - Priority: R4-2, R4-5, R4-7 and R4-10, because reminders depend on
+      accepted dates, concurrent edits, durable targets and time zones.
+    - If a finding needs Will, record exactly what is blocked and finish
+      the independent work.
+  - **Stage 2.** B4 ordinary reminders (journey J4, with AI off):
+    - the sources: PRD-040, PRD-041, PRD-043, PRD-044 and PRD-066,
+      architecture sections 6, 7.7 and 8, and DEC-009;
+    - the native spec at `.kiro/specs/reminders/`, self-reviewed;
+    - delivery: in-app and Electron native, a click that opens the item,
+      "Send test reminder", and timing in Settings;
+    - durable identity and workspace association;
+    - at-most-once delivery through the delivery log;
+    - "While you were away";
+    - event reminders through the shared event contract, using a
+      synthetic event if Hein's event service is not there yet.
+
+    Hein keeps event creation, editing and deletion, the agenda, card
+    ordering and the final design. Personalised wording stays with
+    slice D.
+  - **Allowed:** self-review of the B4 spec and routine implementation
+    decisions; a local commit after each verified milestone (DEC-004).
+  - **Boundaries:**
+    - fictional workspaces and installed local tools only;
+    - leave Will's demos (`.tmp/try`, `.tmp/ask-demo`) alone, and the
+      reviewer's scratch folders in `.tmp/review-run4/`;
+    - leave Will's pending decision on `vitest.config.ts` alone;
+    - no credentials, no paid services and no remote publication.
+  - **Finish:**
+    - typecheck, the full unit discovery (with `.tmp/vitest.config.ts`),
+      the Edge and Electron E2E suite, and the secret scan;
+    - update the specs, `STATE.md`, `BACKLOG.md` and `FEATURES.md`;
+    - report the commit hashes and any open dependency;
+    - write one DEC-021 relay that covers both stages.
+
+    Q1, live Edit and the judge route (Q5) keep their own evidence
+    requirements.
 - **Run 4: Ask repairs, B3 board and calendar, first Edit journey
   (granted by Will on 2026-11-24): used up.** All five milestones are
   delivered (the run-4 milestone log below). Its scope, kept for the
@@ -106,10 +152,9 @@
     - Agent writes, reminder delivery and remote publication are outside
       this run.
 - **Previous overnight authorisation:** used up.
-- **Not authorised now:** any new slice or increment, until Will or Hein
-  names one. This includes:
-  - the rest of D (the correction loop, new notes, "Restore original");
-  - B4 (reminders);
+- **Not authorised now:** anything beyond run 5. This includes:
+  - the rest of D (the correction loop, new notes, "Restore original",
+    personalised reminders);
   - Hein's B3 handoff, which is his to start.
 - **Never authorised without an explicit request:**
   - remote Git actions, publication, deployments, account changes and paid
@@ -190,6 +235,12 @@ code):**
   cause is unknown.
 
 **No human has reviewed the corrective pass yet.**
+
+## Milestone log (run 5)
+
+| Milestone | Commit | Evidence |
+| --- | --- | --- |
+| Stage 1. Repairs R4-1 to R4-11 from the run-4 review (DEC-022 to DEC-024) | see below | `docs/reviews/2026-11-24-run4-review.md`. Each new test fails on an export of `251188e`. 200 unit and integration tests, and 38 browser tests, pass |
 
 ## Milestone log (run 4)
 

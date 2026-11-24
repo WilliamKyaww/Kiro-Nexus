@@ -71,8 +71,17 @@ export function IssuePage() {
     onError: onConflict,
   });
 
-  if (issue.error) return <section className="page"><ErrorNote error={issue.error} /><Link to="/projects">All projects</Link></section>;
+  if (issue.error) {
+    const missing = issue.error instanceof ApiError && issue.error.code === "NOT_FOUND";
+    return <section className="page">{missing ? <IssueGone issueKey={key} /> : <ErrorNote error={issue.error} />}<Link to="/projects">All projects</Link></section>;
+  }
   if (!issue.data) return <section className="page" aria-busy="true"><p className="muted">Loading issue…</p></section>;
+  // A reminder links to an issue by key and ID. Keys are never reused (R4-7), so a mismatch
+  // means the link is not for this issue.
+  const linkedId = params.get("id");
+  if (linkedId && linkedId !== issue.data.id) {
+    return <section className="page"><h1>Issue not found</h1><p role="alert">This link was for an issue that no longer exists. {issue.data.key} is a different issue.</p><Link to={`/issues/${encodeURIComponent(issue.data.key)}`}>Open {issue.data.key} anyway</Link></section>;
+  }
   const i = issue.data;
   // Fields being edited show the draft; every other field shows the newest value, so others' edits stay visible.
   const value = { title: i.title, description: i.description, status: i.status, priority: i.priority, due: i.due, ...form };
@@ -157,6 +166,24 @@ export function IssuePage() {
     </section>
   );
 }
+/** An issue key that does not exist: say whether it was a proposal that was rejected (R4-7). */
+function IssueGone({ issueKey }: { issueKey: string }) {
+  const proposed = useQuery({
+    queryKey: ["review", "proposed-issue", issueKey],
+    queryFn: () => api.get<{ proposed: null | { key: string; title: string; state: string; at: string; source: string } }>(`/review/proposed-issue?key=${encodeURIComponent(issueKey)}`),
+  });
+  const p = proposed.data?.proposed;
+  const when = p ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(p.at)) : "";
+  return (
+    <div role="alert">
+      <h1>{issueKey} does not exist</h1>
+      {p && (p.state === "rejected" || p.state === "superseded")
+        ? <p>{issueKey} “{p.title}” was proposed by an edit ({p.source}) and rejected on {when}, so it was never added. Nexus does not give its key to another issue.</p>
+        : <p>No issue has the key {issueKey} in this workspace.</p>}
+    </div>
+  );
+}
+
 function NoteLinks({ issue, onChange, busy, pendingLinks }: { issue: IssueView; onChange: (links: NoteLink[]) => void; busy: boolean; pendingLinks: Map<string, ChangeView> }) {
   const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<{ notes: string[] }>("/notes") });
   const [notePath, setNotePath] = useState("");

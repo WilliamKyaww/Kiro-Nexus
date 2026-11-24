@@ -12,6 +12,8 @@ import { ReviewEngine } from "../review/engine";
 import { WorkspaceService, copySampleWorkspace } from "../workspace/service";
 import { runAsk } from "./coordinator";
 import { toProposedOperations } from "./edit";
+import { HandleRegistry } from "./handles";
+import { makeAskTools, newConsulted } from "./tools";
 import { readOnlyWorkspace } from "./workspace";
 
 const KEY = "nexus-fake-edit-key-7c2d";
@@ -117,14 +119,20 @@ describe("Edit mode", () => {
 
   it("takes base revisions and current values from the workspace, not from the model", async () => {
     const raw = await service.readNoteRaw(NOTE);
+    const ws = readOnlyWorkspace(service, index, engine);
+    const consulted = newConsulted();
+    await makeAskTools(ws, new HandleRegistry(), consulted).read_note_section({ path: NOTE, headingSlug: "actions" });
     const mapped = await toProposedOperations([
       { op: "update_issue", issue: "nex-1", field: "priority", value: "urgent" },
-      { op: "edit_note", note: NOTE, before: "- [ ] Hein builds the calendar view", after: "- [x] Hein builds the calendar view" },
-    ], readOnlyWorkspace(service, index, engine), "op-x");
+      { op: "edit_note", note: NOTE, heading: "actions", before: "- [ ] Hein builds the calendar view", after: "- [x] Hein builds the calendar view" },
+    ], ws, "op-x", consulted.reads);
     expect("operations" in mapped && mapped.operations).toEqual([
       expect.objectContaining({ kind: "record.updateField", recordKey: "NEX-1", baseRevision: 1, before: "high", after: "urgent" }),
-      expect.objectContaining({ kind: "note.replaceSpan", file: NOTE, baseRevision: raw!.revision }),
+      expect.objectContaining({ kind: "note.replaceSpan", file: NOTE, baseRevision: raw!.revision, scope: { headingSlug: "actions", sectionHash: expect.any(String) } }),
     ]);
+    // A note edit needs a section this run read.
+    expect(await toProposedOperations([{ op: "edit_note", note: NOTE, heading: "decisions", before: "x", after: "y" }], ws, "op-z", consulted.reads))
+      .toEqual({ error: expect.stringMatching(/read the section that holds these lines/) });
     const unknown = await toProposedOperations([{ op: "link_issue", issue: "NEX-9", note: NOTE, heading: "actions" }], readOnlyWorkspace(service, index, engine), "op-y");
     expect(unknown).toEqual({ error: "Operation 1: no issue NEX-9, and no create_issue with that ref." });
   });

@@ -115,8 +115,10 @@ describe("a new issue, its link and the note line, as one reviewed run", () => {
     await open();
     const open2 = await engine.views("open");
     expect(open2.map((v) => [v.kind, v.state])).toEqual([["note.replaceSpan", "pending"], ["record.create", "pending"], ["record.addLink", "pending"]]);
-    expect((await issues()).find((i) => i.key === "NEX-2")).toMatchObject({ title: "Write the judge instructions" });
-    expect(await noteText()).toContain("(NEX-2)");
+    // The rejected first proposal's NEX-2 is never given to another issue (R4-7).
+    expect((await issues()).find((i) => i.key === "NEX-2")).toBeUndefined();
+    expect((await issues()).find((i) => i.key === "NEX-3")).toMatchObject({ title: "Write the judge instructions" });
+    expect(await noteText()).toContain("(NEX-3)");
   });
 
   it("refuses a note edit or link that refers to an issue the proposal does not create, and writes nothing", async () => {
