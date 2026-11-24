@@ -321,7 +321,7 @@ most one active implementation slice at a time (R-T2).
 | # | Question | Proposed answer | Owner | Decide by |
 | --- | --- | --- | --- | --- |
 | Q1 | Which free model route is actually usable with tool calling? | Keep the question open during slice C. Test the candidates listed in `techstack.md` live and record the results | Will | 30 Nov |
-| Q5 | What is the team-provided evaluation route for judges (PRD-091)? Options include a hosted proxy with a team key and a strict quota, or a time-limited free key per judge | Decide in slice C, alongside Q1. It must hold no private key in the distributable | Will | 1 Dec |
+| Q5 | What is the team-provided evaluation route for judges (PRD-091)? Options include a hosted proxy with a team key and a strict quota, or a time-limited free key per judge | A relay with per-judge access codes is proposed (not built or tested) in `docs/judge-ai-route.md`. It must hold no private key in the distributable | Will | 1 Dec |
 | Q2 | Should we enter any bonus categories? | Decide after the feature freeze | Will and Hein | 3 Dec |
 | Q3 | Is runtime MCP worth building? | No, unless slice D finishes by 1 Dec | Will | 1 Dec |
 | Q4 | Will judges get a signed Windows build? | No. Document the SmartScreen prompt and also offer the run-from-source route | Will | 3 Dec |

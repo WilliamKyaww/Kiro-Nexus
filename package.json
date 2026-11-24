@@ -21,7 +21,9 @@
     "test:review": "vitest run server/src/review",
     "test:e2e": "node scripts/build.mjs && playwright test",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
-    "scan:secrets": "node scripts/secret-scan.mjs"
+    "scan:secrets": "node scripts/secret-scan.mjs",
+    "double": "node tools/provider-double/server.mjs 47200",
+    "live:check": "node scripts/live-ask-check.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.12",

@@ -293,3 +293,60 @@ model cannot reverse.
   requirement (PRD-091, Q5).
 - A scripted replay may demonstrate the interface, but is never evidence of
   live AI behaviour.
+
+## DEC-015: Issue saves merge field by field
+
+- **Status:** Accepted (Kiro, 2026-11-24, during Phase 1 repair 3 under
+  Will's authorisation; awaiting human review)
+
+**Context.** Two tabs editing one issue silently overwrote each other after
+a live refresh. The form used the newest revision as its base, so the
+server could not detect the conflict.
+
+**Decision.**
+- The form captures its editing base when the first field changes.
+- `PATCH /issues/:key` takes `baseValues`. If the revision is stale, each
+  patched field is applied when its current value still equals the base
+  value, or already equals the new value. Otherwise it is a conflict,
+  reported with theirs and yours.
+- Without `baseValues`, a stale write is still refused outright.
+
+**Alternatives.**
+- *Refuse every stale save.* Safe, but annoying when two people edit
+  different fields.
+- *A last-write-wins model.* This caused the bug.
+
+## DEC-016: Writes left after a failed write are "not attempted", never written on restart
+
+- **Status:** Accepted (Kiro, 2026-11-24, Phase 1 repair 1; awaiting human
+  review). Amends architecture section 7.3.
+
+**Decision.**
+- When a file write fails, the files after it are marked `failed`
+  ("not attempted"), not left `planned`. Otherwise restart recovery would
+  roll them forward without being asked.
+- **Retry** re-plans the outstanding files against their current contents,
+  and journals the new hashes before writing.
+- **Discard** writes nothing.
+
+## DEC-017: Ask is read-only by construction, and its answers are validated by the server
+
+- **Status:** Accepted (Kiro, 2026-11-24, slice C under Will's
+  authorisation; awaiting human review)
+
+**Decision.**
+- Ask runs receive a `ReadOnlyWorkspace` facade with no write methods, and
+  only the tools `search_notes`, `read_note_section`, `query_issues` and
+  `final_answer`. Any other tool call is refused and recorded.
+- The service assigns citation handles for each run, removes unknown
+  handles, demotes unsupported facts to suggestions, and computes the
+  "Consulted" scope note itself.
+- The only write an Ask makes is its conversation file.
+- Repeatable tests use a deterministic, labelled test double. It is never
+  evidence of live AI behaviour (DEC-014).
+
+**Alternatives.**
+- *Trusting the system prompt to keep the model read-only.* This fails
+  under prompt injection.
+- *Letting the model state its own coverage.* The model could overstate
+  it.

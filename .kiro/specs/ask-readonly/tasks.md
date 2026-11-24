@@ -74,7 +74,17 @@ acceptance condition has been seen to pass.
     6. Conversations persist across a restart.
   - _Requirements: 5.4, 6_
 
-- [ ] 4. End-to-end proof in two fictional workspaces (increment C4)
+- [x] 4. End-to-end proof in two fictional workspaces (increment C4)
+  - **Verified by Kiro, 2026-11-24, using the double (a fixture, not AI):**
+    - `tests/e2e/c4-ask-proof.spec.ts` (2 tests):
+      - the kickoff answer;
+      - the Actions and NEX-1 citations, each opened and returned from;
+      - NEX-2 created by hand, then recognised;
+      - workspace hashes unchanged except `.nexus/conversations/`;
+      - persistence across a restart;
+      - the second "planning" workspace with OPS keys.
+    - `ask.test.ts` repeats the second-workspace check at the service
+      level.
   - **Acceptance:** a Playwright journey on the kickoff sample:
     1. Ask the question, and the answer names the judge-instructions action
        as untracked and NEX-1 as tracking the calendar work.
@@ -87,7 +97,16 @@ acceptance condition has been seen to pass.
     only `.nexus/conversations/` changed.
   - _Requirements: 4.2, 7.1–7.3_
 
-- [ ] 5. Live check, Q1 and Q5 documentation
+- [~] 5. Live check, Q1 and Q5 documentation
+  - **Done:**
+    - `docs/judge-ai-route.md` sets out the proposed team relay (Option A,
+      not built), the judge's own key and a local model, each marked as
+      tested or not.
+    - `npm run live:check` was written and checked to refuse to run
+      without a key.
+  - **Not done:** the live check. No free provider profile or credential
+    was configured for this project, and Kiro did not search for one. Q1
+    stays open. The exact steps for Will are in `docs/judge-ai-route.md`.
   - **Acceptance:**
     - A live check against a real free route runs only if a configured
       free profile exists. Otherwise the exact steps for Will are recorded,

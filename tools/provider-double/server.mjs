@@ -10,6 +10,7 @@
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 
 const STOP = new Set("a an and are as at be by did do does for from has have how i in is it its of on or still that the their them there this to was we were what which who will with without no not any issue issues tracked yet".split(" "));
 const stem = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/(ing|ed|es|s)$/, "");
@@ -178,7 +179,7 @@ export function startProviderDouble(port = 0) {
   });
 }
 
-if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, "/").replace(/^\//, "")}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const d = await startProviderDouble(Number(process.argv[2] ?? 0));
   console.log(JSON.stringify({ event: "ready", baseUrl: d.baseUrl, note: "Test double: deterministic fixture, not AI." }));
 }
