@@ -284,3 +284,26 @@ acceptance condition has been seen to pass.
     exit statuses are unchanged. Both evaluator bugs have regression tests.
   - **Not done:** a live run. Q1 stays open until Will's free-provider run
     exits 0.
+- [x] 9. Pending heading renames (requirement 10; run 4)
+  - **Defect (reproduced by Codex on `4093fa1`, and by Kiro by running the
+    new test against the old search code):**
+    - while "Approved heading" was being renamed to "Pending preview", Ask
+      found no section for "Approved heading";
+    - the result for "Pending preview" carried the proposed slug, and
+      reading it failed.
+  - **Fix:**
+    - Ask search maps disk sections to accepted sections and also
+      searches the accepted text (`SearchIndex.searchContents`). Results
+      carry `pendingHeading` and the rename in `pendingReview`.
+    - A section read resolves a proposed slug to the accepted section.
+    - Links follow `headingAliases` on the Notes page and say why.
+    - The UI's own search still shows the disk text.
+  - **Verified by Kiro:**
+    - `rename.test.ts` (5 tests): pending, accepted and rejected, covering
+      search by the accepted heading, the proposed heading and the body
+      text, reads by either slug, and the aliases.
+    - `headings.test.ts` (3 tests) covers the page's resolver.
+    - The notes, review and Ask browser tests still pass.
+  - **Not verified:** clicking a citation during a pending rename in the
+    browser. There is no route yet that proposes an arbitrary rename;
+    milestone 5's Edit journey adds agent proposals.

@@ -51,6 +51,12 @@ export function reviewRoutes(state: AppState) {
     });
     const id = (request: { params: unknown }) => (request.params as { id: string }).id;
     app.get("/api/v1/review/runs/incomplete", async () => ({ runs: await requireEngine(state).incompleteRuns() }));
+    app.get("/api/v1/review/heading-aliases", async (request) => {
+      const path = String((request.query as { path?: string }).path ?? "");
+      if (!path) throw new NexusError("VALIDATION", "path is required");
+      const rel = state.requireService().notePath(path).rel;
+      return { aliases: requireEngine(state).headingAliases(rel) };
+    });
     app.post("/api/v1/review/runs/:id/retry", async (request) => requireEngine(state).retry(id(request)));
     app.post("/api/v1/review/runs/:id/discard", async (request) => requireEngine(state).discard(id(request)));
     app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request)));

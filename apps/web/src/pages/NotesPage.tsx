@@ -11,6 +11,7 @@ import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
+import { resolveHeadingParam, type HeadingAlias } from "../notes/headings";
 
 /** Workspace identity that scopes drafts; "none" before a workspace is known. */
 function useWorkspaceId(): string {
@@ -145,11 +146,18 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
   const discardDraft = () => { drafts.clear(wsId, path); setConflict(null); };
   const doSave = () => { if (draft !== null && base && !save.isPending) save.mutate({ content: draft, baseRevision: base }); };
 
-  // Scroll to and indicate the linked heading.
-  const targetSlug = useMemo(() => {
-    if (!heading || !note.data) return null;
-    return note.data.headings.some((h) => h.slug === heading) ? heading : null;
-  }, [heading, note.data]);
+  // Scroll to and indicate the linked heading. A heading renamed by a reviewed change (pending,
+  // accepted or rejected) is found by following the rename, at most a few steps.
+  const headingMissing = !!(heading && note.data && !note.data.headings.some((h) => h.slug === heading));
+  const aliases = useQuery({
+    queryKey: ["review", "heading-aliases", path],
+    enabled: headingMissing,
+    queryFn: () => api.get<{ aliases: HeadingAlias[] }>(`/review/heading-aliases?path=${encodeURIComponent(path)}`),
+  });
+  const resolved = useMemo(() => (heading && note.data
+    ? resolveHeadingParam(heading, note.data.headings.map((h) => h.slug), aliases.data?.aliases ?? [])
+    : null), [heading, note.data, aliases.data]);
+  const targetSlug = resolved?.slug ?? null;
   useEffect(() => {
     if (mode !== "preview" || !targetSlug) return;
     const el = previewRef.current?.querySelector<HTMLElement>(`#h-${CSS.escape(targetSlug)}`);
@@ -219,7 +227,16 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
             <button type="button" className="link-button" onClick={discardDraft}>Discard draft</button>
           </div>
         ) : null}
-        {heading && !targetSlug ? <p className="notice">The linked heading was not found in this note. It may have been renamed.</p> : null}
+        {heading && !targetSlug && (!headingMissing || !aliases.isPending) ? <p className="notice">The linked heading was not found in this note. It may have been renamed.</p> : null}
+        {resolved?.via ? (
+          <p className="notice" role="status" data-testid="heading-alias">
+            {resolved.via.reason === "pending-rename"
+              ? <>This heading has a rename awaiting review. It now reads “{resolved.via.toText}”.</>
+              : resolved.via.reason === "renamed"
+                ? <>This heading was renamed to “{resolved.via.toText}” by an accepted change.</>
+                : <>A proposed rename of this heading was rejected, so it reads “{resolved.via.toText}” again.</>}
+          </p>
+        ) : null}
         {conflict ? (
           <div className="conflict" role="alert" data-testid="compare">
             <p><strong>The file and your draft differ.</strong> Compare them, then choose which to keep. Nothing is overwritten until you choose.</p>

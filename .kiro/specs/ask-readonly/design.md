@@ -250,10 +250,17 @@ NEX-2 with `POST /issues` between the turns, and evaluates `answer.tracking`.
   `pendingReview`.
 - **Section reads:** a read resolves a proposed slug to the accepted
   section, with a note that explains the mapping.
-- **Navigation:** `GET /notes/content` gains `headingAliases`: for each
-  pending or accepted heading-line change, it maps the other slug to the
-  heading on disk. The Notes page uses it when a slug is not on disk, and
-  says "This heading has a pending rename" or "This heading was renamed".
+- **Navigation:** `GET /review/heading-aliases?path=` serves
+  `ReviewEngine.headingAliases(path)`, which maps one slug to another for
+  each heading-line change:
+  - pending: accepted → proposed;
+  - accepted: old → new;
+  - rejected: proposed → original.
+
+  When a link's slug is not on disk, the Notes page asks for the aliases,
+  follows them (`resolveHeadingParam`, at most five steps) and says which
+  rename it followed. The aliases sit in the review routes, not in
+  `GET /notes/content`, because only the review engine knows the changes.
 
 ## Self-review (Kiro, 2026-11-24, run 4)
 

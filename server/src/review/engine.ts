@@ -6,6 +6,7 @@ import {
   IssuesFile, OPEN_STATES, ProposedOperation, ReviewRun, serialise,
   type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT, type RunOutcome,
 } from "@nexus/schema";
+import { parseHeadings } from "@nexus/markdown";
 import { NexusError } from "../errors";
 import { faultPoint } from "../faults";
 import { sha256 } from "../workspace/atomic";
@@ -57,6 +58,28 @@ export class ReviewEngine {
   /** Changes whose effect is not yet final, used by the scheduler (D-C3). */
   unsettledChanges(): ChangeRecord[] {
     return this.allChanges().map((x) => x.change).filter((c) => OPEN_STATES.includes(c.state));
+  }
+
+  /**
+   * Heading renames made by changes to one note, so that a link to a heading still opens it
+   * during review, after acceptance and after rejection (Ask requirement 10.2).
+   */
+  headingAliases(path: string): Array<{ slug: string; to: string; toText: string; reason: "pending-rename" | "renamed" | "rename-rejected" }> {
+    const out: Array<{ slug: string; to: string; toText: string; reason: "pending-rename" | "renamed" | "rename-rejected" }> = [];
+    for (const { change } of this.allChanges()) {
+      if (change.kind !== "note.replaceSpan" || change.file !== path) continue;
+      const from = parseHeadings(String(change.before));
+      const to = parseHeadings(String(change.after));
+      if (!from.length || from.length !== to.length) continue;
+      from.forEach((f, i) => {
+        const t = to[i]!;
+        if (f.slug === t.slug) return;
+        if (OPEN_STATES.includes(change.state)) out.push({ slug: f.slug, to: t.slug, toText: t.text, reason: "pending-rename" });
+        else if (change.state === "accepted") out.push({ slug: f.slug, to: t.slug, toText: t.text, reason: "renamed" });
+        else out.push({ slug: t.slug, to: f.slug, toText: f.text, reason: "rename-rejected" });
+      });
+    }
+    return out;
   }
 
   async views(filter: "open" | "all"): Promise<ChangeView[]> {

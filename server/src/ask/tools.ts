@@ -6,7 +6,7 @@ import { parseHeadings, sections as splitSections } from "@nexus/markdown";
 import { effectiveAcceptedIssues } from "../scheduler/reminders";
 import { sameValue } from "../util/json";
 import { locate, splice } from "../review/spans";
-import { snippet, type SearchResult } from "../notes/search";
+import { SearchIndex, snippet, type SearchResult } from "../notes/search";
 import { taskItems, type HandleRegistry } from "./handles";
 
 const ACTIONS_NOTE = "These are the section's actions. For each one, say in tracking whether an issue tracks it, comparing the action with issue titles and descriptions by meaning.";
@@ -65,6 +65,40 @@ function textMatches(haystack: string, text: string): boolean {
 
 export const ASK_TOOL_NAMES = ["search_notes", "read_note_section", "query_issues", "final_answer"] as const;
 
+type PendingEdit = { proposed: string; replaces: string };
+type NoteSection = ReturnType<typeof splitSections>[number];
+
+/**
+ * The accepted section that corresponds to a section found in one form of a note. `slug` is
+ * from the accepted text when `fromAccepted`, otherwise from the disk text: a disk section maps
+ * by position when the number of sections is unchanged (a heading rename), otherwise by slug.
+ */
+function mapSection(disk: string, accepted: string, slug: string | null, fromAccepted: boolean): NoteSection | null {
+  const acc = splitSections(accepted);
+  if (fromAccepted) return acc.find((s) => s.headingSlug === slug) ?? null;
+  const onDisk = splitSections(disk);
+  const i = onDisk.findIndex((s) => s.headingSlug === slug);
+  if (i >= 0 && onDisk.length === acc.length) return acc[i] ?? null;
+  return acc.find((s) => s.headingSlug === slug) ?? null;
+}
+
+/** Pending edits inside a section of the accepted text, including one that rewrites its heading line. */
+function pendingFor(section: NoteSection, accepted: string, pending: PendingEdit[]): PendingEdit[] {
+  const headingLine = section.headingSlug !== null ? (accepted.split(/\r?\n/)[section.startLine] ?? "").trim() : null;
+  return pending.filter((p) => (p.replaces && section.text.includes(p.replaces))
+    || (headingLine !== null && p.replaces.split(/\r?\n/).some((l) => l.trim() === headingLine)));
+}
+
+/** The heading a pending edit would give the section, when one of its edits renames the heading. */
+function proposedHeading(edits: PendingEdit[]): string | null {
+  for (const e of edits) {
+    const before = parseHeadings(e.replaces);
+    const after = parseHeadings(e.proposed);
+    if (before.length && after.length && before[0]!.text !== after[0]!.text) return after[0]!.text;
+  }
+  return null;
+}
+
 /** Accepted text of a note: pending agent edits are undone in memory for reading only. */
 function acceptedContent(content: string, path: string, unsettled: ChangeRecord[]): { content: string; pending: Array<{ proposed: string; replaces: string }> } {
   let accepted = content;
@@ -82,37 +116,56 @@ function acceptedContent(content: string, path: string, unsettled: ChangeRecord[
 export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, consulted: Consulted) {
   const unsettled = () => ws.unsettledChanges();
 
-  /** The accepted text of one section, and the pending edits inside it, as read_note_section reports them. */
-  async function acceptedSection(path: string, slug: string | null) {
-    const raw = await ws.readNote(path);
-    if (!raw) return null;
-    const { content, pending } = acceptedContent(raw.content, raw.path, unsettled());
-    const section = splitSections(content).find((s) => s.headingSlug === slug);
-    if (!section) return null;
-    return { text: section.text, pending: pending.filter((p) => section.text.includes(p.replaces)) };
+  /** Notes with edits awaiting review, in their disk and accepted forms (requirement 10). */
+  async function pendingNotes() {
+    const files = new Set(unsettled().filter((c) => c.kind === "note.replaceSpan" && (c.state === "pending" || c.state === "conflicted")).map((c) => c.file));
+    const out = new Map<string, { disk: string; accepted: string; pending: Array<{ proposed: string; replaces: string }> }>();
+    for (const path of files) {
+      const raw = await ws.readNote(path);
+      if (!raw) continue;
+      const a = acceptedContent(raw.content, raw.path, unsettled());
+      out.set(raw.path, { disk: raw.content, accepted: a.content, pending: a.pending });
+    }
+    return out;
   }
 
   async function search_notes(args: z.infer<typeof SearchNotesArgs>) {
     const limit = args.limit ?? 6;
-    const found = ws.search(args.query, limit + 1);
-    const truncated = found.length > limit;
-    // The index holds the text on disk, which includes edits still awaiting review. Snippets
-    // are rebuilt from the accepted text so that they agree with read_note_section.
-    const pendingFiles = new Set(unsettled().filter((c) => c.kind === "note.replaceSpan" && (c.state === "pending" || c.state === "conflicted")).map((c) => c.file));
-    const results = [];
-    for (const r of found.slice(0, limit)) {
-      let text = r.snippet;
-      let pendingReview: Array<{ proposed: string; replaces: string }> = [];
-      if (pendingFiles.has(r.path)) {
-        const accepted = await acceptedSection(r.path, r.headingSlug);
-        if (accepted) { text = snippet(accepted.text, r.terms); pendingReview = accepted.pending; }
-      }
-      results.push({
-        handle: handles.note(r.path, r.headingSlug, r.headingPath.length ? r.headingPath : []),
-        path: r.path, headingSlug: r.headingSlug, headingPath: r.headingPath, snippet: text,
-        ...(pendingReview.length ? { pendingReview } : {}),
+    // The index holds the text on disk, which includes edits still awaiting review. For notes
+    // with such edits, results are reported in their accepted form (heading, slug and snippet),
+    // so that they agree with read_note_section. The accepted text is searched too, so an
+    // accepted heading that a pending edit renames on disk can still be found.
+    const pendingByPath = await pendingNotes();
+    const merged = new Map<string, SearchResult & { pendingReview?: PendingEdit[]; pendingHeading?: string }>();
+    const add = (r: SearchResult, fromAccepted: boolean) => {
+      const p = pendingByPath.get(r.path);
+      if (!p) { if (!merged.has(`${r.path}#${r.headingSlug}`)) merged.set(`${r.path}#${r.headingSlug}`, r); return; }
+      const section = mapSection(p.disk, p.accepted, r.headingSlug, fromAccepted);
+      if (!section) return;
+      const key = `${r.path}#${section.headingSlug}`;
+      const prev = merged.get(key);
+      if (prev && prev.score >= r.score) return;
+      const edits = pendingFor(section, p.accepted, p.pending);
+      merged.set(key, {
+        ...r, headingSlug: section.headingSlug, headingText: section.headingText, headingPath: section.headingPath,
+        snippet: snippet(section.text, r.terms),
+        ...(edits.length ? { pendingReview: edits } : {}),
+        ...(proposedHeading(edits) ? { pendingHeading: proposedHeading(edits)! } : {}),
       });
+    };
+    for (const r of ws.search(args.query, limit + 1)) add(r, false);
+    if (pendingByPath.size) {
+      const acceptedHits = SearchIndex.searchContents([...pendingByPath].map(([path, p]) => ({ path, content: p.accepted })), args.query, limit + 1);
+      for (const r of acceptedHits) add(r, true);
     }
+    const ordered = [...merged.values()].sort((a, b) => b.score - a.score);
+    const truncated = ordered.length > limit;
+    const results = ordered.slice(0, limit).map((r) => ({
+      handle: handles.note(r.path, r.headingSlug, r.headingPath.length ? r.headingPath : []),
+      path: r.path, headingSlug: r.headingSlug, headingPath: r.headingPath, snippet: r.snippet,
+      ...(r.pendingReview ? { pendingReview: r.pendingReview } : {}),
+      ...(r.pendingHeading ? { pendingHeading: r.pendingHeading, pendingHeadingNote: `A rename of this heading to “${r.pendingHeading}” is awaiting review; the accepted heading is “${r.headingText}”.` } : {}),
+    }));
     consulted.searches.push({ query: args.query, results: results.length, truncated });
     return { results, truncated };
   }
@@ -124,21 +177,28 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     const all = splitSections(content);
     const slug = args.headingSlug ?? null;
     if (slug !== null) {
-      const section = all.find((s) => s.headingSlug === slug);
+      // Accepted slug first; a proposed (pending) slug resolves to the accepted section.
+      const section = all.find((s) => s.headingSlug === slug) ?? (pending.length ? mapSection(raw.content, content, slug, false) : null);
       if (!section) {
         return { error: "heading not found", path: raw.path, requestedHeading: slug, availableHeadings: parseHeadings(content).map((h) => ({ slug: h.slug, text: h.text })) };
       }
       consulted.sectionsRead.push(section.headingPath.join(" › "));
-      const sectionPending = pending.filter((p) => section.text.includes(p.replaces));
+      const sectionPending = pendingFor(section, content, pending);
+      const renamed = proposedHeading(sectionPending);
+      const resolvedNote = section.headingSlug !== slug
+        ? { requestedHeading: slug, resolvedNote: `“${slug}” is a heading proposed by an edit awaiting review. This is the accepted section, “${section.headingText}”.` }
+        : {};
       const text = section.text.slice(0, 6000);
       const handle = handles.note(raw.path, section.headingSlug, section.headingPath);
       const actions = taskItems(text);
       handles.saw(handle, { sectionText: text, tasks: actions });
       return {
         handle, path: raw.path, headingSlug: section.headingSlug, headingPath: section.headingPath, headingText: section.headingText,
+        ...resolvedNote,
         text, truncated: section.text.length > 6000,
         ...(actions.length ? { actions, actionsNote: ACTIONS_NOTE } : {}),
         pendingReview: sectionPending,
+        ...(renamed ? { pendingHeading: renamed } : {}),
       };
     }
     const title = parseHeadings(content)[0]?.text;

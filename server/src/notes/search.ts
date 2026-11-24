@@ -70,38 +70,58 @@ export class SearchIndex {
     const raw = await this.service.readNoteRaw(path).catch(() => null);
     this.remove(path);
     if (!raw || raw.content.length > MAX_NOTE_BYTES) return;
-    const docs: SectionDoc[] = sections(raw.content).map((s, i) => ({
-      id: `${raw.rel}#${i}`,
-      path: raw.rel,
-      title: noteTitle(raw.rel),
-      heading: s.headingPath.join(" "),
-      text: s.text,
-      headingSlug: s.headingSlug,
-      headingText: s.headingText,
-      headingPath: s.headingPath,
-    }));
-    if (docs.length === 0) docs.push({ id: `${raw.rel}#0`, path: raw.rel, title: noteTitle(raw.rel), heading: "", text: "", headingSlug: null, headingText: null, headingPath: [] });
+    const docs = sectionDocs(raw.rel, raw.content);
     this.index.addAll(docs);
     for (const d of docs) this.docs.set(d.id, d);
     this.idsByPath.set(raw.rel, docs.map((d) => d.id));
   }
 
   search(query: string, limit = 20): SearchResult[] {
-    const q = query.trim();
-    if (!q) return [];
-    // All words first (precise). A natural-language question rarely matches every word,
-    // so fall back to any word, still ranked by heading and title boosts.
-    let hits = this.index.search(q);
-    if (hits.length === 0 && /\s/.test(q)) hits = this.index.search(q, { combineWith: "OR" });
-    return hits.slice(0, limit).flatMap((hit) => {
-      const doc = this.docs.get(String(hit.id));
-      if (!doc) return [];
-      return [{
-        path: doc.path, headingSlug: doc.headingSlug, headingText: doc.headingText, headingPath: doc.headingPath,
-        snippet: snippet(doc.text, hit.terms), score: Math.round(hit.score * 100) / 100, terms: hit.terms,
-      }];
-    });
+    return runSearch(this.index, this.docs, query, limit);
   }
+
+  /**
+   * Search notes given as text rather than as the files on disk (Ask uses this for the
+   * accepted text of notes with edits awaiting review). Same options and fallback as search.
+   */
+  static searchContents(notes: Array<{ path: string; content: string }>, query: string, limit = 20): SearchResult[] {
+    const index = SearchIndex.fresh();
+    const docs = new Map<string, SectionDoc>();
+    for (const n of notes) for (const d of sectionDocs(n.path, n.content)) { index.add(d); docs.set(d.id, d); }
+    return runSearch(index, docs, query, limit);
+  }
+}
+
+function sectionDocs(rel: string, content: string): SectionDoc[] {
+  const docs: SectionDoc[] = sections(content).map((s, i) => ({
+    id: `${rel}#${i}`,
+    path: rel,
+    title: noteTitle(rel),
+    heading: s.headingPath.join(" "),
+    text: s.text,
+    headingSlug: s.headingSlug,
+    headingText: s.headingText,
+    headingPath: s.headingPath,
+  }));
+  if (docs.length === 0) docs.push({ id: `${rel}#0`, path: rel, title: noteTitle(rel), heading: "", text: "", headingSlug: null, headingText: null, headingPath: [] });
+  return docs;
+}
+
+function runSearch(index: MiniSearch<SectionDoc>, docs: Map<string, SectionDoc>, query: string, limit: number): SearchResult[] {
+  const q = query.trim();
+  if (!q) return [];
+  // All words first (precise). A natural-language question rarely matches every word,
+  // so fall back to any word, still ranked by heading and title boosts.
+  let hits = index.search(q);
+  if (hits.length === 0 && /\s/.test(q)) hits = index.search(q, { combineWith: "OR" });
+  return hits.slice(0, limit).flatMap((hit) => {
+    const doc = docs.get(String(hit.id));
+    if (!doc) return [];
+    return [{
+      path: doc.path, headingSlug: doc.headingSlug, headingText: doc.headingText, headingPath: doc.headingPath,
+      snippet: snippet(doc.text, hit.terms), score: Math.round(hit.score * 100) / 100, terms: hit.terms,
+    }];
+  });
 }
 
 export function snippet(text: string, terms: string[]): string {
