@@ -9,7 +9,7 @@
 | Why was a consequential choice made? | `DECISIONS.md` |
 | What did Will ask for? | `docs/intake/2026-11-24-product-brief.md` |
 | What do the hackathon rules require? | `docs/intake/kiroween-rules-summary.md` (live rules prevail) |
-| What is the product, its architecture and stack? | `docs/PRD/` (from work item 2) |
+| What is the product, its architecture and stack? | `docs/PRD/structure.md`, `architecture.md`, `techstack.md` |
 | What exactly does a slice require, and how is it built? | `.kiro/specs/<slice>/requirements.md`, `design.md` |
 | Which tasks remain in a slice? | `.kiro/specs/<slice>/tasks.md` (the only task checklist) |
 | Standing Kiro guidance | `.kiro/steering/` |
