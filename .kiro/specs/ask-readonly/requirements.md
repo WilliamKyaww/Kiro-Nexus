@@ -148,3 +148,68 @@ Edits by the agent are slice D, and the Edit mode stays unavailable.
 4. A live check against a real free route SHALL be run only if a configured
    free profile exists. Otherwise the exact steps SHALL be left for Will,
    and Q1 stays open.
+
+### Requirement 8: Matching meeting actions to issues (added 2026-11-24, Will's run 4)
+
+Codex tested Groq and NVIDIA live on `e61a3d4`. Both missed NEX-1 after
+searching issues with Hein's name. On `4093fa1`, "Hein calendar view"
+still returned no issue. Codex also saw "The judge instructions do not
+appear on the board" recorded as a fact after 0 of 1 issues had been read.
+
+1. WHEN a text lookup of issue records matches nothing, THEN the result
+   SHALL list the relevant project's records instead (bounded by the page
+   size, with paging), and SHALL say that no record matched the words.
+2. The answer contract SHALL carry tracking claims as structured entries:
+   the action, the note section it comes from, "tracked" or "untracked",
+   and the issues cited. Nexus SHALL compose the visible sentence for each
+   entry itself.
+3. Nexus SHALL check each tracking entry against the evidence of the run,
+   and SHALL NOT depend on the claim's wording:
+   1. the action must occur in a note section read in the run;
+   2. a "tracked" entry must cite an issue record retrieved in the run,
+      and that issue's title or description must share a word with the
+      action, because a link to a shared heading does not show which
+      action an issue tracks;
+   3. an "untracked" entry is a recorded fact only if the run read every
+      issue record.
+
+   An entry that fails a check SHALL be shown under "Not confirmed",
+   with the reason.
+4. In tool mode, WHEN the model gives its final answer while issue records
+   remain unread, and the answer concerns issues (it has tracking entries,
+   cites an issue or a section with task-list items, or the run queried
+   issues), THEN Nexus SHALL read the remaining records itself, at most
+   once and within the issue cap (200), and ask the model to confirm or
+   revise its answer.
+5. WHEN coverage is still incomplete, THEN a fact or discrepancy that cites
+   a section with task-list items but no issue record SHALL be shown under
+   "Not confirmed". The English-phrase heuristic SHALL be removed.
+
+### Requirement 9: The live check proves the two-turn journey (added 2026-11-24)
+
+1. The live check SHALL evaluate the structured tracking entries:
+   1. "Will writes the judge instructions" must be untracked and sourced
+      from the kickoff's Actions heading;
+   2. "Hein builds the calendar view" must be tracked by NEX-1;
+   3. both citation targets must exist.
+
+   A sentence that cites NEX-1 but says it does not track the calendar
+   work SHALL NOT pass. A correct answer SHALL NOT fail because of the
+   order of its citations.
+2. It SHALL then create "Write the judge instructions" through the issue
+   API, ask again in the same conversation, and require NEX-2 to be
+   tracked.
+3. It SHALL check that the notes and issues are byte-for-byte unchanged by
+   each Ask run.
+4. The exit statuses SHALL stay as before, with 6 for the fixture.
+
+### Requirement 10: Pending heading renames (added 2026-11-24)
+
+1. WHILE a heading rename is pending review, Ask search SHALL find the
+   section by its accepted heading and text, and SHALL report the proposed
+   heading as pending. Reading a section by either the accepted or the
+   proposed slug SHALL return the accepted section, with the rename listed
+   under `pendingReview`.
+2. A citation to that section SHALL open its heading in the note during
+   review, after acceptance and after rejection. After acceptance, the
+   renamed heading is found by following the accepted rename.

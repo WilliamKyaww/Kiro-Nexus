@@ -32,7 +32,7 @@ const MODES = [
   { mode: "tools", model: "nexus-test-double", tools: true },
   { mode: "retrieval-first", model: "nexus-test-double-structured", tools: false },
 ] as const;
-const ask = (m: (typeof MODES)[number], model: string = m.model, limits?: { retrievalIssueCap?: number }) =>
+const ask = (m: (typeof MODES)[number], model: string = m.model, limits?: { issueCap?: number }) =>
   runAsk({ workspace: readOnlyWorkspace(service, index, engine), question: QUESTION, profile: profile(model, m.tools), key: KEY, receivingHost: "127.0.0.1", limits });
 const texts = (items: Array<{ text: string }>) => items.map((i) => i.text).join("\n");
 
@@ -75,8 +75,9 @@ describe.each(MODES)("evidence coverage in $mode mode", (m) => {
 
   it("qualifies an absence claim where the user reads it when coverage stays incomplete", async () => {
     await fiftyOneIssues("Write the judge instructions");
-    // A model that does not page (tool mode), or a retrieval cap below the total.
-    const r = m.tools ? await ask(m, "nexus-test-double-lazy") : await ask(m, m.model, { retrievalIssueCap: 50 });
+    // A model that does not page (tool mode) or a retrieval cap below the total, with an issue
+    // cap below the total so that Nexus cannot complete the coverage itself either.
+    const r = await ask(m, m.tools ? "nexus-test-double-lazy" : m.model, { issueCap: 50 });
     expect(texts(r.answer.facts)).not.toMatch(/has no matching issue/);
     expect(r.answer.unconfirmed).toEqual([
       expect.objectContaining({ text: expect.stringMatching(/Will writes the judge instructions.*has no matching issue/), qualifier: "Not confirmed: Nexus read 50 of 51 issues in this run, so a matching issue may exist." }),

@@ -7,7 +7,9 @@ import { effectiveAcceptedIssues } from "../scheduler/reminders";
 import { sameValue } from "../util/json";
 import { locate, splice } from "../review/spans";
 import { snippet, type SearchResult } from "../notes/search";
-import type { HandleRegistry } from "./handles";
+import { taskItems, type HandleRegistry } from "./handles";
+
+const ACTIONS_NOTE = "These are the section's actions. For each one, say in tracking whether an issue tracks it, comparing the action with issue titles and descriptions by meaning.";
 
 export interface ReadOnlyWorkspace {
   readonly manifest: Readonly<WorkspaceManifest>;
@@ -29,6 +31,8 @@ export interface Consulted {
   issueIdsSeen: Set<string>;
   /** How many issue records the workspace holds (accepted view). */
   issueTotal: number;
+  /** Issue records Nexus read itself before accepting the answer (requirement 8.4). */
+  completedByNexus?: number;
 }
 
 export const newConsulted = (): Consulted => ({ searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0 });
@@ -126,19 +130,28 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
       }
       consulted.sectionsRead.push(section.headingPath.join(" › "));
       const sectionPending = pending.filter((p) => section.text.includes(p.replaces));
+      const text = section.text.slice(0, 6000);
+      const handle = handles.note(raw.path, section.headingSlug, section.headingPath);
+      const actions = taskItems(text);
+      handles.saw(handle, { sectionText: text, tasks: actions });
       return {
-        handle: handles.note(raw.path, section.headingSlug, section.headingPath),
-        path: raw.path, headingSlug: section.headingSlug, headingPath: section.headingPath, headingText: section.headingText,
-        text: section.text.slice(0, 6000), truncated: section.text.length > 6000,
+        handle, path: raw.path, headingSlug: section.headingSlug, headingPath: section.headingPath, headingText: section.headingText,
+        text, truncated: section.text.length > 6000,
+        ...(actions.length ? { actions, actionsNote: ACTIONS_NOTE } : {}),
         pendingReview: sectionPending,
       };
     }
     const title = parseHeadings(content)[0]?.text;
     consulted.sectionsRead.push(`${title ?? raw.path} (whole note)`);
+    const text = content.slice(0, 6000);
+    const handle = handles.note(raw.path, null, title ? [title] : []);
+    const actions = taskItems(text);
+    handles.saw(handle, { sectionText: text, tasks: actions });
     return {
-      handle: handles.note(raw.path, null, title ? [title] : []),
-      path: raw.path, headingSlug: null, headingPath: title ? [title] : [], headingText: null,
-      text: content.slice(0, 6000), truncated: content.length > 6000, pendingReview: pending,
+      handle, path: raw.path, headingSlug: null, headingPath: title ? [title] : [], headingText: null,
+      text, truncated: content.length > 6000,
+      ...(actions.length ? { actions, actionsNote: ACTIONS_NOTE } : {}),
+      pendingReview: pending,
     };
   }
 
@@ -151,11 +164,16 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     const text = args.text?.toLowerCase().trim();
     const keys = args.keys?.length ? new Set(args.keys.map((k) => k.toUpperCase())) : null;
     consulted.issueTotal = accepted.length;
-    const matching = accepted.filter((i) =>
+    const inScope = accepted.filter((i) =>
       (!args.projectKey || keyOf.get(i.projectId) === args.projectKey.toUpperCase())
       && (!args.status || i.status === args.status)
-      && (!keys || keys.has(i.key))
-      && (!text || textMatches(`${i.title} ${i.description}`, text)));
+      && (!keys || keys.has(i.key)));
+    let matching = inScope.filter((i) => !text || textMatches(`${i.title} ${i.description}`, text));
+    // An empty narrow lookup is not evidence of absence: a note names the owner ("Hein
+    // builds the calendar view") while the issue title does not ("Build calendar view").
+    // Recover by listing the project's records so the model can compare them by meaning.
+    const textMatched = !text || matching.length > 0;
+    if (!textMatched) matching = inScope;
     const offset = Math.min(args.offset ?? 0, matching.length);
     const page = matching.slice(offset, offset + ISSUE_PAGE);
     const nextOffset = offset + page.length < matching.length ? offset + page.length : null;
@@ -166,8 +184,10 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
       for (const c of changes) {
         if (c.kind === "record.updateField" && c.target.recordId === i.id && c.target.field && sameValue(current[c.target.field], c.after)) proposed[c.target.field] = c.after;
       }
+      const handle = handles.issue(i.key, i.title);
+      handles.saw(handle, { issue: { key: i.key, title: i.title, description: i.description, status: i.status } });
       return {
-        handle: handles.issue(i.key, i.title),
+        handle,
         key: i.key, project: keyOf.get(i.projectId) ?? null, title: i.title, status: i.status, priority: i.priority,
         due: i.due, description: i.description.slice(0, 500),
         linkedNotes: i.noteLinks.map((l) => ({ path: l.notePath, heading: l.headingText })),
@@ -177,13 +197,19 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     const filters = Object.fromEntries(Object.entries(args).filter(([k, v]) => k !== "offset" && v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0)));
     const truncated = nextOffset !== null;
     consulted.issueQueries.push({ filters, returned: issues.length, total: matching.length, truncated, projects: args.projectKey ? [args.projectKey.toUpperCase()] : projects.map((p) => p.key) });
-    const notes = ["Status and due values are the accepted values. proposedPendingReview shows values awaiting the user's review; they are not yet true."];
+    const notes = [
+      "Status and due values are the accepted values. proposedPendingReview shows values awaiting the user's review; they are not yet true.",
+      "linkedNotes says where an issue was discussed. A link to a heading does not show which item under that heading the issue tracks: compare the issue's title and description with each action.",
+    ];
+    if (!textMatched) {
+      notes.unshift(`No issue matched the words “${args.text}”. Names of people and wording often differ between notes and issue titles, so the records of the project${args.projectKey ? "" : "s"} are listed instead. Compare them with the action by meaning before deciding that it has no issue.`);
+    }
     if (truncated) {
       notes.push(`Only issues ${offset + 1} to ${offset + issues.length} of ${matching.length} are listed. Before saying that no issue matches something, call query_issues again with offset ${nextOffset} to read the rest, or look it up with the text filter.`);
     }
     return {
       projectsInWorkspace: projects.map((p) => p.key),
-      filters, total: matching.length, offset, returned: issues.length, truncated, nextOffset, issues,
+      filters, ...(text ? { textMatched } : {}), total: matching.length, offset, returned: issues.length, truncated, nextOffset, issues,
       note: notes.join(" "),
     };
   }

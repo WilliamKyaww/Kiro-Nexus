@@ -17,6 +17,11 @@ export const StoredAnswer = z.object({
   facts: z.array(Item), discrepancies: z.array(Item), suggestions: z.array(Item),
   // Added in the corrective pass; older conversation files have no such list.
   unconfirmed: z.array(Item).default([]),
+  // Added in run 4: structured tracking claims and whether the evidence confirmed them.
+  tracking: z.array(z.object({
+    action: z.string(), source: z.string(), status: z.enum(["tracked", "untracked"]), issues: z.array(z.string()),
+    reason: z.string(), confirmed: z.boolean(), problem: z.string().nullable(),
+  })).default([]),
   insufficientEvidence: z.boolean(), insufficientReason: z.string().nullable(),
   citations: z.record(z.string(), Citation), removedCitations: z.number(), demoted: z.number(),
 });

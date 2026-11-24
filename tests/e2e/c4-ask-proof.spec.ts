@@ -149,7 +149,8 @@ test("a follow-up uses the same conversation and the current workspace", async (
 
 test("an absence claim made without reading every issue is shown as not confirmed", async ({ page }) => {
   const ws = join(base, "ws");
-  svc = await startService(join(base, "profile"), ws, ["--init-sample"]);
+  // The test-only cap stops Nexus reading the other records itself, so coverage stays incomplete.
+  svc = await startService(join(base, "profile"), ws, ["--init-sample"], { NEXUS_ASK_ISSUE_CAP: "50" });
   const api = await apiSession(svc);
   const project = (await api("GET", "/projects")).body.projects[0];
   for (let i = 2; i <= 50; i++) await api("POST", "/issues", { projectId: project.id, title: `Fictional filler task ${String(i).padStart(2, "0")}` });
@@ -159,7 +160,7 @@ test("an absence claim made without reading every issue is shown as not confirme
   await askFromHome(page, QUESTION);
   const answer = lastAnswer(page);
   await expect(answer.getByRole("region", { name: "Recorded facts" })).not.toContainText("has no matching issue");
-  const unconfirmed = answer.getByRole("region", { name: "Not confirmed (Nexus did not read every record)" });
+  const unconfirmed = answer.getByRole("region", { name: "Not confirmed by the evidence" });
   await expect(unconfirmed).toContainText("“Will writes the judge instructions” has no matching issue.");
   await expect(unconfirmed).toContainText("Not confirmed: Nexus read 50 of 51 issues in this run, so a matching issue may exist.");
   await expect(answer).toContainText("Scope limited: only 50 of 51 issues were read.");

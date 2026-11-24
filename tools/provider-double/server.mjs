@@ -12,6 +12,10 @@
 //   nexus-test-double-nocite      cites the note but never the issue records
 //   nexus-test-double-echo        echoes the key in error messages (tool probe and questions)
 //   nexus-test-double-lazy        reads only the first page of issues, then answers
+//   nexus-test-double-narrow      looks each action up by its words (owner's name included)
+//   nexus-test-double-heading     claims an issue tracks every action under the heading it links to
+//   nexus-test-double-noissues    never reads issues; answers "do not appear on the board" as a fact
+// Every variant uses records Nexus supplies when it answers "not accepted yet" to final_answer.
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -58,18 +62,29 @@ function readQuestion(question, contextText) {
   return { topic, only };
 }
 
-export function buildAnswer({ section, issues, invent = false, citeIssues = true, only = null }) {
-  if (!section || typeof section.text !== "string") {
-    return { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "No relevant note section was found." };
-  }
+/**
+ * The fixed rule: checklist items in the consulted section, matched to issues by title words,
+ * reported as structured tracking entries (Nexus composes the visible sentences).
+ * `headingLinks` imitates a model that treats a link to the section's heading as tracking
+ * every action under it.
+ */
+export function buildAnswer({ section, issues, invent = false, citeIssues = true, only = null, headingLinks = false }) {
+  const none = { facts: [], discrepancies: [], suggestions: [], tracking: [], insufficientEvidence: true };
+  if (!section || typeof section.text !== "string") return { ...none, insufficientReason: "No relevant note section was found." };
   const items = [...section.text.matchAll(/^\s*[-*] \[( |x|X)\] (.+)$/gm)].map((m) => ({ done: m[1].toLowerCase() === "x", text: m[2].trim() }));
-  if (items.length === 0) {
-    return { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "The consulted section has no checklist of actions." };
-  }
+  if (items.length === 0) return { ...none, insufficientReason: "The consulted section has no checklist of actions." };
   const facts = [];
   const discrepancies = [];
   const suggestions = [];
+  const tracking = [];
   for (const item of items) {
+    if (headingLinks) {
+      const linked = (issues ?? []).filter((i) => (i.linkedNotes ?? []).some((l) => l.heading && l.heading === section.headingText));
+      if (linked.length) {
+        tracking.push({ action: item.text, source: section.handle, status: "tracked", issues: linked.map((i) => i.handle), reason: `${linked.map((i) => i.key).join(", ")} links to this heading.` });
+        continue;
+      }
+    }
     const itemWords = new Set(words(item.text));
     let best = null;
     let bestScore = 0;
@@ -81,19 +96,19 @@ export function buildAnswer({ section, issues, invent = false, citeIssues = true
     }
     if (best) {
       const status = STATUS_TEXT[best.status] ?? best.status;
-      const sources = citeIssues ? [section.handle, best.handle] : [section.handle];
-      facts.push({ text: `“${item.text}” is tracked by ${best.key} (${best.title}, ${status}).`, sources });
+      tracking.push({ action: item.text, source: section.handle, status: "tracked", issues: citeIssues ? [best.handle] : [], reason: `${best.key} (${best.title}) shares the action's words.` });
       if (item.done !== (best.status === "done")) {
+        const sources = citeIssues ? [section.handle, best.handle] : [section.handle];
         discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${status}.`, sources });
       }
     } else if (only !== "tracked") {
-      facts.push({ text: `“${item.text}” has no matching issue.`, sources: [section.handle] });
+      tracking.push({ action: item.text, source: section.handle, status: "untracked", issues: [], reason: "No issue title shares the action's words." });
       suggestions.push({ text: `Create an issue for “${item.text}”.`, sources: [section.handle] });
     }
   }
-  if (only === "tracked" && facts.length === 0) facts.push({ text: "None of these actions has a matching issue yet.", sources: [section.handle] });
+  if (only === "tracked" && tracking.length === 0) facts.push({ text: "None of these actions has a matching issue yet.", sources: [section.handle] });
   if (invent) facts.push({ text: "An invented claim with a made-up citation.", sources: ["S99"] });
-  return { facts, discrepancies, suggestions, insufficientEvidence: false };
+  return { facts, discrepancies, suggestions, tracking, insufficientEvidence: false, insufficientReason: null };
 }
 
 function toolCall(name, args, n) {
@@ -142,16 +157,34 @@ function agentStep(body, variant) {
   if (picked && section === undefined) {
     return { tool_calls: [toolCall("read_note_section", { path: picked.path, headingSlug: picked.headingSlug ?? undefined }, n)] };
   }
+  // Records Nexus supplied with a "not accepted yet" reply to an earlier final_answer.
+  const supplied = resultsOf("final_answer").flatMap((r) => r?.issues ?? []);
+  const answered = resultsOf("final_answer").length > 0;
+  const sectionOk = section && !section.error ? section : null;
   const pages = resultsOf("query_issues");
-  if (pages.length === 0) return { tool_calls: [toolCall("query_issues", {}, n)] };
-  // Read the remaining records before deciding that an item has no issue (except -lazy).
-  const lastPage = pages.at(-1);
-  if (variant !== "lazy" && lastPage?.nextOffset !== null && lastPage?.nextOffset !== undefined) {
-    return { tool_calls: [toolCall("query_issues", { offset: lastPage.nextOffset }, n)] };
+  if (!answered) {
+    if (variant === "noissues") {
+      // Imitates the live model Codex saw: no issue lookup at all, then a free-text claim.
+      return { tool_calls: [toolCall("final_answer", { facts: sectionOk ? [{ text: "The judge instructions do not appear on the board.", sources: [sectionOk.handle] }] : [], discrepancies: [], suggestions: [], tracking: [], insufficientEvidence: false, insufficientReason: null }, n)] };
+    }
+    if (variant === "narrow" && sectionOk) {
+      // Imitates the live models: one text lookup per action, owner's name included.
+      const actions = (sectionOk.actions ?? []).map((a) => a.text);
+      if (pages.length < actions.length) return { tool_calls: [toolCall("query_issues", { text: actions[pages.length] }, n)] };
+    } else {
+      if (pages.length === 0) return { tool_calls: [toolCall("query_issues", {}, n)] };
+      // Read the remaining records before deciding that an item has no issue (except -lazy).
+      const lastPage = pages.at(-1);
+      if (variant !== "lazy" && lastPage?.nextOffset !== null && lastPage?.nextOffset !== undefined) {
+        return { tool_calls: [toolCall("query_issues", { offset: lastPage.nextOffset }, n)] };
+      }
+    }
   }
   const seen = new Set();
-  const issues = pages.flatMap((p) => p?.issues ?? []).filter((i) => !seen.has(i.key) && seen.add(i.key));
-  const answer = buildAnswer({ section: section && !section.error ? section : null, issues, invent: variant === "invent", citeIssues: variant !== "nocite", only });
+  // Whatever the lookups returned (for -narrow, the project's records after an empty lookup).
+  const fromPages = pages.flatMap((p) => p?.issues ?? []);
+  const issues = [...fromPages, ...supplied].filter((i) => !seen.has(i.key) && seen.add(i.key));
+  const answer = buildAnswer({ section: sectionOk, issues, invent: variant === "invent", citeIssues: variant !== "nocite", only, headingLinks: variant === "heading" });
   return { tool_calls: [toolCall("final_answer", answer, n)] };
 }
 

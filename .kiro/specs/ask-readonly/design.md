@@ -170,3 +170,103 @@ OpenAI-compatible profile, so no provider key ships in the build.
   heuristic. That is acceptable, because it stands in for the model in
   tests only and is labelled. Real answer quality depends on the live model
   (Q1).
+
+## Matching actions to issues (requirement 8)
+
+### Answer contract
+
+`final_answer` gains a `tracking` array. The schema requires it; it may be
+empty.
+
+```ts
+tracking: [{ action: string, source: string /* note handle */,
+  status: "tracked" | "untracked", issues: string[] /* issue handles */, reason: string }]
+```
+
+`validateAnswer` checks each entry against what the run retrieved:
+
+| Check | Evidence | When it fails |
+| --- | --- | --- |
+| The action is in the cited section | The section's text as read in this run (`HandleRegistry` keeps it): 80% of the action's words (4+ letters, light stemming) appear on one line | Not confirmed: "Nexus could not find this action in the cited section." |
+| A tracked entry cites a retrieved issue | Issue handles from this run | Not confirmed: "no issue record from this run was cited." |
+| The issue is about the action | The issue's title or description shares a word with the action | Not confirmed: "NEX-1 shares no words with this action; a link to the same heading does not show which action an issue tracks." |
+| An untracked entry rests on every record | `issueCoverage(consulted).complete` | Not confirmed: "Nexus read N of M issues in this run, so a matching issue may exist." |
+
+Confirmed entries become the first recorded facts, using sentences Nexus
+composes:
+
+- for a tracked entry: "“A” is tracked by NEX-1 (title, status).";
+- for an untracked entry: "“A” has no matching issue."
+
+The structured list is also stored as `answer.tracking`, for the live check
+and later the Edit hand-off. The `ABSENCE` regular expression is removed.
+When coverage is incomplete, a free-text fact or discrepancy that cites a
+section containing task-list items (`- [ ]` or `- [x]`) and no issue record
+moves to "Not confirmed" with the coverage qualifier. That rule is
+structural, not lexical.
+
+### Retrieval
+
+- **Empty lookup:** `query_issues({ text })` with no match returns the
+  records matching the other filters (one page, `textMatched: false`). Its
+  note says that names and wording often differ between notes and issues,
+  so the records should be compared by meaning.
+- **Section reads:** results list the section's `actions` (task-list items
+  with `done`).
+- **Issue results:** each issue's `linkedNotes` is explained as "a link to
+  a heading, not to an action".
+- **Completion (tool mode):** when `final_answer` arrives with issue
+  records unread and the answer concerns issues (see requirement 8.4),
+  the coordinator pages through the remaining records, using up to
+  `ISSUE_CAP` (200) records and one step. It returns them as the
+  `final_answer` tool result, with "confirm or revise", and waits for a
+  second `final_answer`. `consulted.completedByNexus` records this, and
+  the scope note says so. `NEXUS_ASK_ISSUE_CAP` lowers the cap, for tests
+  only.
+
+### Test-double variants added
+
+| Model | Behaviour |
+| --- | --- |
+| `-narrow` | Looks each action up with `query_issues({ text: <action words, including the owner> })`, as the live models did |
+| `-heading` | Claims an issue tracks every action under the heading it links to |
+| `-noissues` | Never queries issues. It answers with the free-text fact "The judge instructions do not appear on the board." and no tracking entries, then uses records if Nexus supplies them |
+
+The double now reports tracking as entries rather than as fact sentences.
+
+## Live journey check (requirement 9)
+
+`scripts/live-ask-check.mjs` runs two turns in one conversation and hashes
+the notes and `.nexus/issues.json` before and after each Ask. It creates
+NEX-2 with `POST /issues` between the turns, and evaluates `answer.tracking`.
+
+## Pending heading renames (requirement 10)
+
+- **Search:** for notes with a pending `note.replaceSpan`, disk sections
+  are mapped to accepted sections. The mapping is by position when the
+  section counts match, otherwise by slug. A temporary index of the
+  accepted sections is searched as well, so the accepted text can be
+  found. Every result reports the accepted heading and snippet, plus
+  `pendingReview`.
+- **Section reads:** a read resolves a proposed slug to the accepted
+  section, with a note that explains the mapping.
+- **Navigation:** `GET /notes/content` gains `headingAliases`: for each
+  pending or accepted heading-line change, it maps the other slug to the
+  heading on disk. The Notes page uses it when a slug is not on disk, and
+  says "This heading has a pending rename" or "This heading was renamed".
+
+## Self-review (Kiro, 2026-11-24, run 4)
+
+- **Changed during review:**
+  - The first idea was a longer list of absence phrases. It was replaced
+    by structured entries and evidence checks, as Will asked.
+  - Auto-completing issue coverage for every question was rejected,
+    because it costs a model step and free-tier tokens on questions that
+    have nothing to do with issues. It is triggered only by evidence that
+    the answer concerns issues.
+- **Residual risk:**
+  - The word-overlap checks are heuristics. They err towards "Not
+    confirmed", never towards a false recorded fact.
+  - A model that ignores `tracking` and writes free text keeps today's
+    behaviour, but the completion step still gives it every record. The
+    live check then fails, which is the honest result.

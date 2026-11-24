@@ -9,8 +9,9 @@ export interface Citation {
   target: { kind: "note"; path: string; headingSlug: string | null; headingText: string | null } | { kind: "issue"; key: string };
 }
 export interface AnswerItem { text: string; sources: string[]; unsupported?: boolean; qualifier?: string }
+export interface TrackingEntry { action: string; source: string; status: "tracked" | "untracked"; issues: string[]; reason: string; confirmed: boolean; problem: string | null }
 export interface StoredAnswer {
-  facts: AnswerItem[]; discrepancies: AnswerItem[]; suggestions: AnswerItem[]; unconfirmed?: AnswerItem[];
+  facts: AnswerItem[]; discrepancies: AnswerItem[]; suggestions: AnswerItem[]; unconfirmed?: AnswerItem[]; tracking?: TrackingEntry[];
   insufficientEvidence: boolean; insufficientReason: string | null;
   citations: Record<string, Citation>; removedCitations: number; demoted: number;
 }

@@ -3,15 +3,23 @@
 import { NexusError } from "../errors";
 import type { ProviderProfile } from "../providers/profiles";
 import { ProviderError, chat, type ChatMessage } from "../providers/openai";
-import { FINAL_ANSWER_SCHEMA, FINAL_ANSWER_TOOL, validateAnswer, type ValidatedAnswer } from "./answer";
+import { FINAL_ANSWER_SCHEMA, FINAL_ANSWER_TOOL, RawAnswer, validateAnswer, type ValidatedAnswer } from "./answer";
 import { contextBlock, type PriorTurn } from "./context";
 import { HandleRegistry } from "./handles";
 import { ASK_TOOL_NAMES, DATA_NOTICE, QueryIssuesArgs, ReadSectionArgs, SearchNotesArgs, TOOL_DEFINITIONS, issueCoverage, makeAskTools, newConsulted, type Consulted, type ReadOnlyWorkspace } from "./tools";
 
 export const MAX_STEPS = 8;
 export const RUN_BUDGET_MS = 3 * 60 * 1000;
-/** Retrieval-first mode reads issue records page by page up to this many. */
-export const RETRIEVAL_ISSUE_CAP = 200;
+/**
+ * The most issue records Nexus reads for one answer: retrieval-first mode reads up to this
+ * many, and tool mode completes coverage itself when no more than this many exist.
+ * NEXUS_ASK_ISSUE_CAP lowers it, for tests only.
+ */
+export const ISSUE_CAP = 200;
+const issueCapFromEnv = () => {
+  const n = Number(process.env.NEXUS_ASK_ISSUE_CAP);
+  return Number.isInteger(n) && n >= 0 && n < ISSUE_CAP ? n : ISSUE_CAP;
+};
 
 const SYSTEM = [
   "You are Nexus Ask, a read-only assistant for one local workspace of Markdown notes and project issues.",
@@ -20,7 +28,8 @@ const SYSTEM = [
   "Cite sources only by the handles given in tool results (S1, S2, ...).",
   "Put only statements directly supported by cited sources in facts. Put conflicts between sources in discrepancies. Put recommendations in suggestions.",
   "Issue status and due dates come from query_issues. A proposedPendingReview value is awaiting review and is not yet true; the accepted value is the fact. The same applies to pendingReview text in notes.",
-  "Before stating that no issue matches something, read every issue record (call query_issues again with nextOffset until it is null) or look the item up with the text filter. Nexus marks absence claims as not confirmed unless every record was read.",
+  "When the question is about which actions are tracked or missing, give one tracking entry per action of the relevant note section, and do not repeat them as facts. Compare each action with the issue records by meaning: a note often names the owner (\"Hein builds the calendar view\") while the issue title does not (\"Build calendar view\"). A link from an issue to a heading does not show which action under that heading it tracks.",
+  "Before saying that an action is untracked, read every issue record (call query_issues again with nextOffset until it is null). If a text lookup finds nothing, the result lists the project's records instead: compare against those. Nexus confirms an untracked entry only when every record was read, and may read the remaining records for you before accepting your answer.",
   "Earlier turns of the conversation may be given as context. Use them to understand the question (for example what \"those\" refers to), but find the evidence again with this run's tools: earlier answers may be out of date, and only handles from this run's tool results are valid citations.",
   "If the evidence is insufficient, set insufficientEvidence to true and say why.",
   "Finish by calling final_answer.",
@@ -54,6 +63,7 @@ function scopeNote(c: Consulted, ws: ReadOnlyWorkspace): string {
     parts.push(`issue records from ${queried.join(", ") || "no projects"} (${coverage.read} of ${coverage.total} read)`);
     const lookups = c.issueQueries.filter((q) => Object.keys(q.filters).length).length;
     if (lookups) parts.push(`${lookups} targeted issue lookup${lookups === 1 ? "" : "s"}`);
+    if (c.completedByNexus) parts.push(`Nexus read the other ${c.completedByNexus} issue record${c.completedByNexus === 1 ? "" : "s"} before accepting the answer`);
   }
   const limits: string[] = [];
   if (c.searches.some((s) => s.truncated)) limits.push("more note sections matched than were returned");
@@ -75,8 +85,8 @@ export async function runAsk(opts: {
   receivingHost: string;
   signal?: AbortSignal;
   onProgress?: (p: AskProgress) => void;
-  /** For tests: a lower retrieval-first issue cap. */
-  limits?: { retrievalIssueCap?: number };
+  /** For tests: a lower issue cap (retrieval-first reading and tool-mode completion). */
+  limits?: { issueCap?: number };
   /** Earlier answered turns of this conversation, oldest first (bounded by contextBlock). */
   history?: PriorTurn[];
 }): Promise<AskResult> {
@@ -99,6 +109,36 @@ export async function runAsk(opts: {
     fixture, steps, rejectedToolCalls: rejected, consulted, scopeNote: scopeNote(consulted, workspace), plainReplyIgnored, contextTurns: context?.turns ?? 0,
   });
   const wrap = (data: unknown) => JSON.stringify({ notice: DATA_NOTICE, data });
+  const cap = opts.limits?.issueCap ?? issueCapFromEnv();
+  let completed = false;
+
+  /** Whether a proposed final answer rests on issue records the run has not fully read. */
+  const concernsIssues = (args: unknown): boolean => {
+    const coverage = issueCoverage(consulted);
+    if (coverage.complete || coverage.total > cap) return false;
+    const a = RawAnswer.safeParse(args);
+    if (!a.success) return false;
+    const cited = [...a.data.facts, ...a.data.discrepancies].flatMap((i) => i.sources);
+    const isIssue = (h: string) => handles.get(h)?.target.kind === "issue";
+    const hasTasks = (h: string) => (handles.evidenceOf(h)?.tasks?.length ?? 0) > 0;
+    return a.data.tracking.length > 0 || cited.some(isIssue) || cited.some(hasTasks) || consulted.issueQueries.length > 0;
+  };
+
+  /** Page through every issue record and return, compactly, those the run had not yet seen. */
+  const readRemainingIssues = async () => {
+    const seenBefore = new Set(consulted.issueIdsSeen);
+    const byKey = new Map(workspace.issues().map((i) => [i.key, i.id]));
+    const out: Awaited<ReturnType<typeof tools.query_issues>>["issues"] = [];
+    let page = await tools.query_issues({});
+    out.push(...page.issues);
+    while (page.nextOffset !== null) {
+      page = await tools.query_issues({ offset: page.nextOffset });
+      out.push(...page.issues);
+    }
+    return out
+      .filter((i) => !seenBefore.has(byKey.get(i.key) ?? ""))
+      .map(({ linkedNotes: _linked, description, ...rest }) => ({ ...rest, description: description.slice(0, 200) }));
+  };
 
   try {
     if (mode === "retrieval-first") {
@@ -122,7 +162,6 @@ export async function runAsk(opts: {
         if (!("error" in s)) sections.push(s);
       }
       // Read the issue records page by page, so that an absence claim can rest on all of them.
-      const cap = opts.limits?.retrievalIssueCap ?? RETRIEVAL_ISSUE_CAP;
       const all: Awaited<ReturnType<typeof tools.query_issues>>["issues"] = [];
       let page = await tools.query_issues({});
       all.push(...page.issues);
@@ -180,7 +219,24 @@ export async function runAsk(opts: {
         const name = call.function.name;
         let args: unknown = {};
         try { args = JSON.parse(call.function.arguments || "{}"); } catch { args = null; }
-        if (name === "final_answer") return finish(args, step);
+        if (name === "final_answer") {
+          // Requirement 8.4: an answer about issues given before every record was read gets the
+          // remaining records once (within the cap) and is asked again; otherwise it stands.
+          if (!completed && step < MAX_STEPS && concernsIssues(args)) {
+            completed = true;
+            const before = issueCoverage(consulted).read;
+            const added = await readRemainingIssues();
+            consulted.completedByNexus = issueCoverage(consulted).read - before;
+            opts.onProgress?.({ step, activity: "Reading the remaining issue records" });
+            messages.push({ role: "tool", tool_call_id: call.id, content: wrap({
+              accepted: false,
+              note: `Nexus has not accepted this answer yet. You had read ${before} of ${consulted.issueTotal} issue records, so Nexus read the other ${added.length} for you (below). Compare each action with every record by meaning, not by a shared heading link, then call final_answer again with your confirmed or revised answer.`,
+              issues: added,
+            }) });
+            continue;
+          }
+          return finish(args, step);
+        }
         let result: unknown;
         if (!(ASK_TOOL_NAMES as readonly string[]).includes(name)) {
           rejected.push(name);

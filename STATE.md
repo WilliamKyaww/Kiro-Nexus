@@ -1,10 +1,10 @@
 # State
 
-- **Date updated:** 2026-11-24 (corrective pass finished; waiting for Will
-  and Hein)
-- **Active phase:** none. The corrective pass on `e61a3d4` is complete:
-  six fixes, each committed separately. Slice C's live check (task 5) is
-  waiting for Will's free key.
+- **Date updated:** 2026-11-24 (Ask repairs, B3 and first Edit journey in
+  progress)
+- **Active phase:** the current run below: Ask repairs (milestones 1 to 3),
+  then the B3 board and calendar slice, then the first Edit journey. Slice
+  C's live check (task 5) is waiting for Will's free key.
 - **Last spec:** `.kiro/specs/ask-readonly/`. Tasks 1 to 4 and 6 are done;
   task 5 (the live check) is partly done.
 - **Baselines:**
@@ -22,6 +22,44 @@
 - **Standing:** local milestone commits under DEC-004. Stage only the
   relevant files by name, review the staged diff, add no AI trailers, report
   the short hash, and never push.
+- **Current run: Ask repairs, B3 board and calendar, first Edit journey
+  (granted by Will on 2026-11-24; it survives context compaction).**
+  - **Scope:**
+    1. Ask reliably matches meeting actions to issues. It recovers from an
+       empty narrow search by checking the project's records and comparing
+       the actual actions. A shared heading is not evidence of which action
+       an issue tracks. A claim about an action's tracking is a recorded
+       fact only if the run's evidence supports it, which does not depend
+       on a list of English phrases.
+    2. The live CLI proves the two-turn journey (missing action, then NEX-2
+       created through the issue API and recognised in the same
+       conversation), checks that Ask leaves notes and issues unchanged,
+       and fixes two evaluator bugs. Fixture exit 6 stays. Q1 closes only
+       after a real free-provider pass, and Q5 stays open.
+    3. Search, section reads and citation navigation agree during a pending
+       heading rename, and after its acceptance or rejection.
+    4. A first working B3 slice: a three-column board with the backlog kept,
+       creating and opening issues, drag and keyboard status changes,
+       priority and due dates, and a month view of dated issues. A due-date
+       edit from either view updates the same issue and survives a restart.
+       It must work with AI off, by keyboard and at narrow width. Calendar
+       events, the agenda view and the final visual design stay with Hein,
+       and B3 stays partially complete.
+    5. The first Ask → Edit → Review journey (one J7 slice). It uses typed
+       operations and the existing journal, per-change decisions,
+       dependencies, preserved manual edits and restart recovery. Ask stays
+       read-only.
+  - **Allowed:** self-review of native specs and routine decisions without
+    waiting; a local commit after each verified repair or increment.
+  - **Boundaries:**
+    - isolated fictional workspaces;
+    - leave Will's demos (`.tmp/try`, `.tmp/ask-demo`) alone;
+    - no credential search and no paid services;
+    - no remote publication.
+  - **Found at the start:** `vitest.config.ts` was deleted in the working
+    tree, with no replacement. Kiro did not restore it or commit the
+    deletion. Tests in this run use a temporary copy,
+    `.tmp/vitest.config.ts`.
 - **Corrective pass on `e61a3d4` (granted by Will on 2026-11-24): used
   up.** Items 1 to 6 are delivered (the milestone log below). Its
   boundaries matched the repair and Ask run below. Agent edits, reminders,

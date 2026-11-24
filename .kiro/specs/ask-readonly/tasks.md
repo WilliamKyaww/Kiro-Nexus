@@ -229,3 +229,35 @@ acceptance condition has been seen to pass.
       - `context.test.ts` covers the bounds.
       - `c4-ask-proof.spec.ts` covers the follow-up in the browser,
         including opening a citation and returning.
+
+- [x] 7. Match meeting actions to issues by evidence (requirement 8; run 4)
+  - **Reproduced by Kiro on `4093fa1`'s server code** (with a throwaway
+    test, since deleted):
+    - `query_issues({ text: "Hein calendar view" })` returned 0 issues;
+    - a model that never queried issues (`-noissues`) had "The judge
+      instructions do not appear on the board." recorded as a fact. The
+      scope note said "issue records were not consulted".
+  - **Fix:** structured `tracking` entries, checked against the run's
+    evidence, with Nexus composing the sentences. Also:
+    - an empty text lookup falls back to the project's records;
+    - sections list their actions, and heading links carry a caveat;
+    - tool mode reads the remaining records before accepting an answer
+      about issues;
+    - a structural rule for free-text facts about sections of actions;
+    - the `ABSENCE` phrase list is removed;
+    - the answer card's section is now titled "Not confirmed by the
+      evidence".
+  - **Verified by Kiro (test double):**
+    - `matching.test.ts` (7 tests):
+      - the fallback lookup;
+      - `-narrow` answers correctly after looking up "Hein builds the
+        calendar view";
+      - `-heading`'s claim that NEX-1 tracks the judge action is not
+        confirmed;
+      - `-noissues` gets the record from Nexus and answers correctly, or,
+        with the cap at 0, its claim is not confirmed;
+      - the validator's rules, including an absence claim worded so that
+        no phrase list would catch it.
+    - `coverage.test.ts`, `ask.test.ts`, `ask-http.test.ts` and
+      `c4-ask-proof.spec.ts` pass with the new contract.
+  - **Not verified:** a live model.

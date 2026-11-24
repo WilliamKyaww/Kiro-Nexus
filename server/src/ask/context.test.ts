@@ -7,7 +7,7 @@ const turn = (n: number, text = `Fact ${n}.`, status: Message["status"] = "compl
   {
     id: `a${n}`, role: "assistant", at: "", runId: `run${n}`, text: null, status, meta: null, error: null,
     answer: status !== "complete" ? null : {
-      facts: [{ text, sources: ["S1", "S2"] }], discrepancies: [], suggestions: [{ text: "Create one.", sources: [] }], unconfirmed: [],
+      facts: [{ text, sources: ["S1", "S2"] }], discrepancies: [], suggestions: [{ text: "Create one.", sources: [] }], unconfirmed: [], tracking: [],
       insufficientEvidence: false, insufficientReason: null, removedCitations: 0, demoted: 0,
       citations: {
         S1: { handle: "S1", label: "Kickoff › Actions", target: { kind: "note", path: "k.md", headingSlug: "actions", headingText: "Actions" } },
