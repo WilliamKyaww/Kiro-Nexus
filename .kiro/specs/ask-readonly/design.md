@@ -24,13 +24,16 @@
 
 ```ts
 search_notes({ query: string, limit?: 1..10 })
-  → { results: [{ handle, path, headingPath, snippet }], truncated }
+  → { results: [{ handle, path, headingPath, snippet /* accepted text */,
+      pendingReview?: [{ proposed, replaces }] }], truncated }
 read_note_section({ path: string, headingSlug?: string })
   → { handle, path, headingText, text, pendingReview: [{ proposed, replaces }] }
   | { error: "heading not found", available: string[] }
-query_issues({ projectKey?, status?, text?, keys?: string[] })
+query_issues({ projectKey?, status?, text?, keys?: string[], offset? })
   → { projects: string[], issues: [{ handle, key, title, status, priority,
-      due /* accepted */, proposed?: { field: value } }], truncated }
+      due /* accepted */, proposed?: { field: value } }],
+      total, offset, returned, truncated, nextOffset /* null when done */ }
+  // 50 per page. text matches the phrase, or every word of it.
 final_answer({ facts: [{ text, sources }], discrepancies: [{ text, sources }],
   suggestions: [{ text, sources? }], insufficientEvidence: boolean, insufficientReason? })
 ```
@@ -40,16 +43,28 @@ final_answer({ facts: [{ text, sources }], discrepancies: [{ text, sources }],
 1. The service runs `search_notes(question)`.
 2. It reads the top four sections, and any section whose heading matches a
    word in the question.
-3. It runs `query_issues({})`, covering all projects but capped at 100
-   issues.
-4. It sends the results as one data message and asks for `final_answer`
-   JSON through `response_format`.
+3. It runs `query_issues` page by page across all projects, up to 200
+   issues, in a compact form (description cut to 120 characters).
+4. It sends the results as one data message, with how many of the issue
+   records it includes, and asks for `final_answer` JSON through
+   `response_format`.
+
+## Evidence coverage (corrective pass)
+
+The run records every issue ID returned to the model, and the number of
+issue records in the workspace. When it has not seen them all, any fact or
+discrepancy that claims no issue tracks something (a wording heuristic that
+errs towards qualifying) moves to `unconfirmed`. Its qualifier reads "Not
+confirmed: Nexus read N of M issues in this run, so a matching issue may
+exist." The scope note says "only N of M issues were read".
 
 ## Answer rendering
 
 The answer card has these parts:
 
 - **Recorded facts**
+- **Not confirmed (Nexus did not read every record)**, each with its
+  qualifier
 - **Discrepancies**, shown with both sources
 - **Suggestions**, labelled as not established
 - an **insufficient evidence** banner when it applies
@@ -68,7 +83,8 @@ the conversation it receives:
 1. It calls `search_notes` with the question's content words.
 2. It calls `read_note_section` on the hit whose heading best matches the
    question (for example "Actions").
-3. It calls `query_issues({})`.
+3. It calls `query_issues({})`, then again with `nextOffset` until every
+   page has been read.
 4. It takes the `- [ ]` and `- [x]` checklist items from that section and
    matches each one to an issue title by word overlap (stemmed).
 5. It answers with:
@@ -91,6 +107,8 @@ Its behaviour is chosen by the model name:
 | `-none` | Refuses both tools and `response_format` (400) |
 | `-unsure` | Always answers "insufficient evidence" |
 | `-nocite` | Cites the note but never the issue records |
+| `-echo` | Echoes the key in error messages (tool probe and questions) |
+| `-lazy` | Reads only the first page of issues before answering |
 
 Every response carries `x-nexus-fixture: 1`.
 

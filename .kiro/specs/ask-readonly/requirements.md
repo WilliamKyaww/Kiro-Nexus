@@ -106,6 +106,14 @@ Edits by the agent are slice D, and the Edit mode stays unavailable.
    1. the service retrieves;
    2. the service supplies the results with their handles;
    3. the model returns the answer JSON.
+7. (Added in the corrective pass, 2026-11-24.) A claim that no issue
+   tracks something SHALL be shown as a recorded fact only if the run read
+   every issue record. Otherwise it SHALL be shown under "Not confirmed",
+   with how many records were read. Issue queries SHALL page, so that the
+   model can read the rest or make a targeted lookup.
+8. (Added in the corrective pass.) Search snippets SHALL show the same
+   accepted note text as section reads, with pending edits reported as
+   proposed.
 
 ### Requirement 6: Home and conversations (PRD-010)
 

@@ -24,6 +24,7 @@ function Section({ title, items, message, conversationId, kind }: { title: strin
           <li key={i}>
             <span>{item.text}</span>
             {item.unsupported ? <span className="unsupported"> (not supported by a cited source)</span> : null}
+            {item.qualifier ? <span className="qualifier"> {item.qualifier}</span> : null}
             <Sources item={item} message={message} conversationId={conversationId} />
           </li>
         ))}
@@ -43,6 +44,7 @@ export function AnswerCard({ message, conversationId }: { message: Message; conv
         <p className="insufficient" role="note"><strong>Not enough evidence.</strong> {a.insufficientReason ?? "The workspace does not contain enough to answer this."}</p>
       ) : null}
       <Section title="Recorded facts" items={a.facts} message={message} conversationId={conversationId} kind="facts" />
+      <Section title="Not confirmed (Nexus did not read every record)" items={a.unconfirmed ?? []} message={message} conversationId={conversationId} kind="unconfirmed" />
       <Section title="Discrepancies" items={a.discrepancies} message={message} conversationId={conversationId} kind="discrepancies" />
       <Section title="Suggestions (not established facts)" items={a.suggestions} message={message} conversationId={conversationId} kind="suggestions" />
       {a.removedCitations > 0 ? <p className="muted">Nexus removed {a.removedCitations} citation{a.removedCitations === 1 ? "" : "s"} that did not match any source it retrieved.</p> : null}

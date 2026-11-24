@@ -34,11 +34,13 @@ export const FINAL_ANSWER_TOOL = {
   },
 };
 
-export interface AnswerItem { text: string; sources: string[]; unsupported?: boolean }
+export interface AnswerItem { text: string; sources: string[]; unsupported?: boolean; qualifier?: string }
 export interface ValidatedAnswer {
   facts: AnswerItem[];
   discrepancies: AnswerItem[];
   suggestions: AnswerItem[];
+  /** Claims that something does not exist, made without seeing every record. Shown with their qualifier. */
+  unconfirmed: AnswerItem[];
   insufficientEvidence: boolean;
   insufficientReason: string | null;
   citations: Record<string, Citation>;
@@ -48,7 +50,21 @@ export interface ValidatedAnswer {
   demoted: number;
 }
 
-export function validateAnswer(raw: unknown, handles: HandleRegistry): ValidatedAnswer {
+/**
+ * Claims that no issue tracks something. This is a wording heuristic: it errs towards
+ * qualifying, which is the safe direction, and only matters when coverage is incomplete.
+ */
+export const ABSENCE = /\b(no\b[^.]{0,30}\b(issue|ticket|task)s?\b|not (yet )?(been )?(tracked|covered|created|logged)|untracked|without (an? )?(matching |corresponding )?(issue|ticket)|lacks? (an? )?(issue|ticket)|missing (an? )?(issue|ticket)|nothing tracks|isn't tracked)/i;
+
+export interface IssueCoverage { read: number; total: number; complete: boolean }
+
+export function coverageQualifier(c: IssueCoverage): string {
+  return c.read === 0
+    ? "Not confirmed: Nexus did not read the issue records in this run, so a matching issue may exist."
+    : `Not confirmed: Nexus read ${c.read} of ${c.total} issues in this run, so a matching issue may exist.`;
+}
+
+export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: IssueCoverage): ValidatedAnswer {
   const parsed = RawAnswer.safeParse(raw);
   const a = parsed.success ? parsed.data : { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "The model's answer could not be read." };
   let removed = 0;
@@ -67,20 +83,26 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry): Validated
   const facts: AnswerItem[] = [];
   const discrepancies: AnswerItem[] = [];
   const suggestions: AnswerItem[] = [];
+  const unconfirmed: AnswerItem[] = [];
+  // An absence claim is a recorded fact only if this run saw every issue record.
+  const place = (list: AnswerItem[], item: AnswerItem) => {
+    if (!coverage.complete && ABSENCE.test(item.text)) unconfirmed.push({ ...item, qualifier: coverageQualifier(coverage) });
+    else list.push(item);
+  };
   for (const f of a.facts) {
     const s = clean(f.sources);
-    if (s.length) facts.push({ text: f.text, sources: s });
+    if (s.length) place(facts, { text: f.text, sources: s });
     else { demoted += 1; suggestions.push({ text: f.text, sources: [], unsupported: true }); }
   }
   for (const d of a.discrepancies) {
     const s = clean(d.sources);
-    if (s.length) discrepancies.push({ text: d.text, sources: s });
+    if (s.length) place(discrepancies, { text: d.text, sources: s });
     else { demoted += 1; suggestions.push({ text: d.text, sources: [], unsupported: true }); }
   }
   for (const g of a.suggestions) suggestions.push({ text: g.text, sources: clean(g.sources) });
-  const insufficient = a.insufficientEvidence || (facts.length === 0 && discrepancies.length === 0);
+  const insufficient = a.insufficientEvidence || (facts.length === 0 && discrepancies.length === 0 && unconfirmed.length === 0);
   return {
-    facts, discrepancies, suggestions,
+    facts, discrepancies, suggestions, unconfirmed,
     insufficientEvidence: insufficient,
     insufficientReason: insufficient ? (a.insufficientReason ?? (facts.length === 0 ? "No statement could be supported by a cited source." : null)) : null,
     citations: Object.fromEntries(used),

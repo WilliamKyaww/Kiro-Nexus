@@ -12,7 +12,7 @@ import { demoOperations } from "../review/index";
 import { WorkspaceService, copySampleWorkspace } from "../workspace/service";
 import { runAsk } from "./coordinator";
 import { HandleRegistry } from "./handles";
-import { makeAskTools, type Consulted } from "./tools";
+import { makeAskTools, newConsulted, type Consulted } from "./tools";
 import { readOnlyWorkspace } from "./workspace";
 
 const KEY = "nexus-fake-ask-key-3b9e";
@@ -76,7 +76,7 @@ describe("kickoff workspace", () => {
     expect(cites).toContainEqual(expect.objectContaining({ target: { kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions" } }));
     expect(cites).toContainEqual(expect.objectContaining({ label: "NEX-1 Build calendar view", target: { kind: "issue", key: "NEX-1" } }));
     expect(r.answer.removedCitations).toBe(0);
-    expect(r.scopeNote).toMatch(/issues from NEX \(1 of 1\)/);
+    expect(r.scopeNote).toMatch(/issue records from NEX \(1 of 1 read\)/);
     expect(await hashTree(ws)).toEqual(before);
   });
 
@@ -143,7 +143,7 @@ describe("kickoff workspace", () => {
 describe("tools: pending values and headings", () => {
   it("reports pending review values as proposed, with the accepted value as the fact", async () => {
     await engine.propose({ kind: "fixed-demo", label: "Demo operations (fixed, not AI)" }, await demoOperations(service), "demo");
-    const consulted: Consulted = { searches: [], sectionsRead: [], issueQueries: [] };
+    const consulted: Consulted = newConsulted();
     const tools = makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), consulted);
     const issues = await tools.query_issues({});
     expect(issues.issues[0]).toMatchObject({ key: "NEX-1", due: { date: "2026-12-05" }, proposedPendingReview: { due: { date: "2026-12-03" } } });
@@ -154,7 +154,7 @@ describe("tools: pending values and headings", () => {
   it("reports a missing or renamed heading with the headings that exist", async () => {
     const note = await service.readNote("meetings/2026-11-24 kickoff.md");
     await service.saveNote(note.path, note.content.replace("## Actions", "## Next steps"), note.revision);
-    const tools = makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), { searches: [], sectionsRead: [], issueQueries: [] });
+    const tools = makeAskTools(readOnlyWorkspace(service, index, engine), new HandleRegistry(), newConsulted());
     const r = await tools.read_note_section({ path: note.path, headingSlug: "actions" });
     expect(r).toMatchObject({ error: "heading not found", requestedHeading: "actions" });
     expect((r as { availableHeadings: Array<{ slug: string }> }).availableHeadings.map((h) => h.slug)).toContain("next-steps");

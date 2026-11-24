@@ -4,7 +4,7 @@ import { z } from "zod";
 import { NexusError } from "../errors";
 import { newId, type WorkspaceService } from "../workspace/service";
 
-const Item = z.object({ text: z.string(), sources: z.array(z.string()), unsupported: z.boolean().optional() });
+const Item = z.object({ text: z.string(), sources: z.array(z.string()), unsupported: z.boolean().optional(), qualifier: z.string().optional() });
 const Citation = z.object({
   handle: z.string(),
   label: z.string(),
@@ -15,6 +15,8 @@ const Citation = z.object({
 });
 export const StoredAnswer = z.object({
   facts: z.array(Item), discrepancies: z.array(Item), suggestions: z.array(Item),
+  // Added in the corrective pass; older conversation files have no such list.
+  unconfirmed: z.array(Item).default([]),
   insufficientEvidence: z.boolean(), insufficientReason: z.string().nullable(),
   citations: z.record(z.string(), Citation), removedCitations: z.number(), demoted: z.number(),
 });

@@ -210,6 +210,8 @@ a.button.primary:hover { background: #0b544d; }
 .citation { font-size: 0.8rem; border: 1px solid var(--accent); border-radius: 999px; padding: 0 0.5rem; text-decoration: none; white-space: nowrap; }
 .citation:hover { background: var(--accent-soft); }
 .unsupported { color: var(--danger); font-size: 0.85rem; }
+.answer-section.unconfirmed h3 { color: var(--pending); }
+.qualifier { color: var(--pending); font-size: 0.85rem; }
 .insufficient { background: var(--pending-bg); border: 1px solid var(--pending); border-radius: 8px; padding: 0.5rem 0.75rem; }
 .fixture-banner { margin: 0 0 0.5rem; padding: 0.3rem 0.6rem; border: 1px dashed var(--pending); border-radius: 6px; color: var(--pending); font-weight: 600; font-size: 0.85rem; }
 .answer-meta { font-size: 0.85rem; margin: 0.6rem 0 0; }

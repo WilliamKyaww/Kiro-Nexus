@@ -21,6 +21,8 @@ export interface SearchResult {
   headingPath: string[];
   snippet: string;
   score: number;
+  /** The index terms that matched, so a caller can rebuild the snippet from other text. */
+  terms: string[];
 }
 
 const MAX_NOTE_BYTES = 2_000_000;
@@ -96,13 +98,13 @@ export class SearchIndex {
       if (!doc) return [];
       return [{
         path: doc.path, headingSlug: doc.headingSlug, headingText: doc.headingText, headingPath: doc.headingPath,
-        snippet: snippet(doc.text, hit.terms), score: Math.round(hit.score * 100) / 100,
+        snippet: snippet(doc.text, hit.terms), score: Math.round(hit.score * 100) / 100, terms: hit.terms,
       }];
     });
   }
 }
 
-function snippet(text: string, terms: string[]): string {
+export function snippet(text: string, terms: string[]): string {
   const flat = text.replace(/\s+/g, " ").trim();
   if (!flat) return "";
   const lower = flat.toLowerCase();

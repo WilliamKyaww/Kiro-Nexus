@@ -11,6 +11,7 @@
 //   nexus-test-double-unsure      always answers "insufficient evidence"
 //   nexus-test-double-nocite      cites the note but never the issue records
 //   nexus-test-double-echo        echoes the key in error messages (tool probe and questions)
+//   nexus-test-double-lazy        reads only the first page of issues, then answers
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -105,6 +106,7 @@ function agentStep(body, variant) {
     const call = [...calls].reverse().find((c) => c.function?.name === name);
     return call ? results.get(call.id) : undefined;
   };
+  const resultsOf = (name) => calls.filter((c) => c.function?.name === name).map((c) => results.get(c.id)).filter((r) => r !== undefined);
   const n = calls.length + 1;
   if (variant === "writer" && !calls.some((c) => c.function?.name === "propose_changes")) {
     return { tool_calls: [toolCall("propose_changes", { operations: [] }, n)] };
@@ -119,9 +121,16 @@ function agentStep(body, variant) {
   if (picked && section === undefined) {
     return { tool_calls: [toolCall("read_note_section", { path: picked.path, headingSlug: picked.headingSlug ?? undefined }, n)] };
   }
-  const issues = resultOf("query_issues");
-  if (issues === undefined) return { tool_calls: [toolCall("query_issues", {}, n)] };
-  const answer = buildAnswer({ section: section && !section.error ? section : null, issues: issues?.issues, invent: variant === "invent", citeIssues: variant !== "nocite" });
+  const pages = resultsOf("query_issues");
+  if (pages.length === 0) return { tool_calls: [toolCall("query_issues", {}, n)] };
+  // Read the remaining records before deciding that an item has no issue (except -lazy).
+  const lastPage = pages.at(-1);
+  if (variant !== "lazy" && lastPage?.nextOffset !== null && lastPage?.nextOffset !== undefined) {
+    return { tool_calls: [toolCall("query_issues", { offset: lastPage.nextOffset }, n)] };
+  }
+  const seen = new Set();
+  const issues = pages.flatMap((p) => p?.issues ?? []).filter((i) => !seen.has(i.key) && seen.add(i.key));
+  const answer = buildAnswer({ section: section && !section.error ? section : null, issues, invent: variant === "invent", citeIssues: variant !== "nocite" });
   return { tool_calls: [toolCall("final_answer", answer, n)] };
 }
 

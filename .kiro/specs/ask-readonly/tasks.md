@@ -165,3 +165,25 @@ acceptance condition has been seen to pass.
       echoes only `*`, handles backspace, paste markers and Ctrl+C, and
       restores the terminal. These prompt tests use a simulated terminal;
       a real console was not driven.
+  - [x] 6.3 Absence claims need full issue coverage, and snippets show accepted text
+    - **Defect, reproduced by Kiro on `e61a3d4`:** with 51 issues and "Write
+      the judge instructions" at NEX-51, both modes read 50 and recorded
+      "has no matching issue" as a fact. The search snippet for the kickoff
+      Actions showed the proposed `- [x]`, while the section read showed the
+      accepted `- [ ]`.
+    - **Fix:** `query_issues` pages (`offset`, `nextOffset`), its `text`
+      filter also matches every word, and a truncated page tells the model
+      how to read the rest. The run tracks which issue records it has seen.
+      Without full coverage, absence claims move to "Not confirmed" with a
+      qualifier, and the scope note says how many were read.
+      Retrieval-first mode reads up to 200 issues page by page. Search
+      snippets for notes with pending edits are rebuilt from the accepted
+      text and carry `pendingReview`. Requirements 5.7 and 5.8 were added.
+    - **Verified by Kiro (test double, both modes):** `coverage.test.ts`
+      (10 tests) covers a match at NEX-51 and a genuinely missing task
+      (stated as a fact only after 51 of 51 records were read). It also
+      covers a claim that stays qualified when coverage is incomplete
+      (`-lazy`, or a 50-issue retrieval cap), a pending checklist tick
+      reported as proposed in the data sent to the model, and snippet and
+      section agreement. `c4-ask-proof.spec.ts` shows the "Not confirmed"
+      section and its qualifier in the browser.

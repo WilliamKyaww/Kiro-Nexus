@@ -119,6 +119,24 @@ test("the kickoff question is answered from both sources, citations open and ret
   await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(2);
 });
 
+test("an absence claim made without reading every issue is shown as not confirmed", async ({ page }) => {
+  const ws = join(base, "ws");
+  svc = await startService(join(base, "profile"), ws, ["--init-sample"]);
+  const api = await apiSession(svc);
+  const project = (await api("GET", "/projects")).body.projects[0];
+  for (let i = 2; i <= 50; i++) await api("POST", "/issues", { projectId: project.id, title: `Fictional filler task ${String(i).padStart(2, "0")}` });
+  await api("POST", "/issues", { projectId: project.id, title: "Write the judge instructions" }); // NEX-51
+  await page.goto(await launchUrl(svc));
+  await addProvider(page, "Local test double (reads one page)", "nexus-test-double-lazy");
+  await askFromHome(page, QUESTION);
+  const answer = lastAnswer(page);
+  await expect(answer.getByRole("region", { name: "Recorded facts" })).not.toContainText("has no matching issue");
+  const unconfirmed = answer.getByRole("region", { name: "Not confirmed (Nexus did not read every record)" });
+  await expect(unconfirmed).toContainText("“Will writes the judge instructions” has no matching issue.");
+  await expect(unconfirmed).toContainText("Not confirmed: Nexus read 50 of 51 issues in this run, so a matching issue may exist.");
+  await expect(answer).toContainText("Scope limited: only 50 of 51 issues were read.");
+});
+
 test("a second fictional workspace gets answers from its own names and keys", async ({ page }) => {
   const ws = join(base, "planning");
   await mkdir(join(ws, "standups"), { recursive: true });
