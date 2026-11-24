@@ -5,7 +5,9 @@ import type { WorkspaceView } from "@nexus/schema";
 import { api, onSessionChange, subscribeEvents, type SessionState } from "./api";
 import { HomePage } from "./pages/HomePage";
 import { NotesPage } from "./pages/NotesPage";
-import { ProjectsPage, ProjectPage } from "./pages/ProjectsPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
+import { BoardPage } from "./pages/BoardPage";
+import { CalendarPage } from "./pages/CalendarPage";
 import { IssuePage } from "./pages/IssuePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
@@ -119,9 +121,9 @@ function Shell() {
               <Route path="/c/:id" element={<ConversationPage />} />
               <Route path="/notes" element={<NotesPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:key" element={<ProjectPage />} />
+              <Route path="/projects/:key" element={<BoardPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
-              <Route path="/calendar" element={<PlaceholderPage title="Calendar" body="The calendar is not available yet. Due dates you set on issues are already saved." />} />
+              <Route path="/calendar" element={<CalendarPage />} />
               <Route path="/notifications" element={<PlaceholderPage title="Notifications" body="Reminders are not available yet. A due date that is still awaiting review will never trigger a reminder." />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<PlaceholderPage title="Not found" body="This page does not exist." />} />

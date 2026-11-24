@@ -350,3 +350,51 @@ server could not detect the conflict.
   under prompt injection.
 - *Letting the model state its own coverage.* The model could overstate
   it.
+
+## DEC-018: Tracking claims are structured and checked against the run's evidence
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 4 under Will's
+  authorisation; awaiting human review)
+
+**Decision.**
+- An Ask answer carries each claim that an action is or is not tracked as
+  a structured `tracking` entry.
+- Nexus confirms an entry only when the evidence the run retrieved
+  supports it:
+  - the action is in a section the run read;
+  - a tracked entry cites a related issue record, not just one linked to
+    the same heading;
+  - an untracked entry rests on every issue record.
+- Nexus composes the visible sentence for each entry itself.
+- In tool mode, Nexus reads the remaining issue records itself before it
+  accepts an answer about issues.
+- The phrase list that used to detect absence claims is removed.
+
+**Alternatives.**
+- *A longer list of English phrases.* Codex showed that it misses
+  ordinary wording ("do not appear on the board"), and Will asked for the
+  distinction to rest on evidence.
+- *Reading every issue record for every question.* It costs a model step
+  and free-tier tokens on questions that have nothing to do with issues.
+
+## DEC-019: The first board uses native drag and drop with explicit keyboard moves
+
+- **Status:** Accepted (Kiro, 2026-11-24, B3 first slice under Will's
+  authorisation; open to Hein's revision)
+
+**Decision.**
+- Cards move between columns by native HTML drag and drop with the mouse.
+- With the keyboard, a focused card moves with Alt+Left Arrow and
+  Alt+Right Arrow, and each card also has a labelled status control. Each
+  move is announced.
+- Saves use the existing field merge, so only the status field is
+  written.
+
+**Alternatives.**
+- *dnd-kit (the tech stack's choice).* It adds a dependency and a licence
+  entry in Hein's area just before his design work. The data path does
+  not change if he adopts it.
+
+**Revisit when** Hein designs the final board, or touch support is needed.
+Native drag and drop does not work with touch, so touch users use the
+status control.

@@ -1,8 +1,11 @@
 // Minimal reminder computation (seam for slice B4). The scheduler only ever
 // sees accepted values: a value proposed by a change and not yet accepted is
 // never scheduled (D-C3, PRD-066).
-import type { ChangeRecord, Due, Issue } from "@nexus/schema";
+import { zonedTimeToUtc, type ChangeRecord, type Due, type Issue } from "@nexus/schema";
 import { sameValue } from "../review/records";
+
+// Shared with the board and calendar (packages/schema/src/time.ts).
+export { zonedTimeToUtc };
 
 /**
  * For each field touched by an unsettled change: if the field currently holds
@@ -18,24 +21,6 @@ export function effectiveAcceptedIssues(issues: Issue[], unsettled: ChangeRecord
     }
     return out;
   });
-}
-
-function tzOffsetMs(instant: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
-  }).formatToParts(new Date(instant));
-  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second")) - instant;
-}
-
-/** Local wall-clock time in an IANA zone to a UTC instant (DST-safe for real times). */
-export function zonedTimeToUtc(date: string, time: string, timeZone: string): Date {
-  const [y, m, d] = date.split("-").map(Number);
-  const [hh, mm] = time.split(":").map(Number);
-  const guess = Date.UTC(y!, m! - 1, d!, hh!, mm!);
-  let instant = guess - tzOffsetMs(guess, timeZone);
-  instant = guess - tzOffsetMs(instant, timeZone);
-  return new Date(instant);
 }
 
 export function reminderInstant(due: Due, timeZone: string, localTime = "09:00"): Date | null {

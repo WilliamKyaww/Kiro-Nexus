@@ -220,3 +220,61 @@ a.button.primary:hover { background: #0b544d; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--line); } }
 .back-link { margin: 0 0 0.5rem; }
+
+/* Board and calendar (B3 first slice). Placeholder styling: Hein owns the final design. */
+.board-page { max-width: 72rem; }
+.board-page .segmented { margin-bottom: 0.25rem; }
+.board-help { font-size: 0.875rem; margin: 0.5rem 0 0; }
+.board-announce { min-height: 1.5em; margin: 0.25rem 0 0.5rem; font-size: 0.9rem; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.board-column { background: var(--accent-soft); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem; min-height: 8rem; }
+.board-column.drop { outline: 3px dashed var(--accent); outline-offset: 2px; }
+.board-column h2 { margin: 0.1rem 0.25rem 0.6rem; font-size: 1rem; display: flex; gap: 0.5rem; align-items: baseline; }
+.board-column .count { font-weight: 400; color: var(--ink-soft); font-size: 0.85rem; }
+.cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.7rem; display: grid; gap: 0.35rem; cursor: grab; }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card p { margin: 0; }
+.card-title a { color: var(--ink); text-decoration: none; font-weight: 600; }
+.card-title a:hover { text-decoration: underline; }
+.card-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; font-size: 0.85rem; color: var(--ink-soft); }
+.card-meta .pending-badge { margin-left: 0; }
+.card-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; }
+label.compact { font-size: 0.8rem; font-weight: 600; }
+label.compact select { padding: 0.2rem 0.35rem; font-size: 0.875rem; }
+.proposed-tag { color: var(--pending); font-weight: 600; }
+.due-editor { display: grid; gap: 0.35rem; padding-top: 0.35rem; border-top: 1px dashed var(--line); }
+.due-editor p { margin: 0; font-size: 0.85rem; }
+.calendar-page { max-width: 72rem; }
+.calendar-nav { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+.calendar-nav h2 { margin: 0; }
+.month { margin-top: 0.75rem; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.25rem; }
+.weekdays span { font-size: 0.8rem; font-weight: 600; color: var(--ink-soft); padding: 0 0.3rem; }
+.days { list-style: none; margin: 0.25rem 0 0; padding: 0; }
+.day { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-height: 6rem; padding: 0.3rem; display: grid; align-content: start; gap: 0.25rem; min-width: 0; }
+.day.outside { background: transparent; color: var(--ink-soft); }
+.day.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.day-number { font-size: 0.8rem; font-weight: 600; }
+.day-title { display: none; }
+.day-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+.cal-item { display: block; width: 100%; text-align: left; font-size: 0.78rem; padding: 0.15rem 0.35rem; border-radius: 4px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.cal-item.proposed { border-style: dashed; border-color: var(--pending); background: var(--pending-bg); }
+.cal-entry { position: relative; }
+.cal-popover { display: grid; gap: 0.35rem; margin-top: 0.3rem; padding: 0.6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  position: absolute; z-index: 3; top: 100%; left: 0; width: max-content; min-width: 15rem; max-width: 18rem; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); }
+.day[data-weekday="5"] .cal-popover, .day[data-weekday="6"] .cal-popover { left: auto; right: 0; }
+@media (max-width: 760px) {
+  .board { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .weekdays { display: none; }
+  .days { display: block; }
+  .day { min-height: 0; margin-bottom: 0.3rem; grid-template-columns: 1fr; }
+  .day.outside { display: none; }
+  .day.empty { padding: 0.15rem 0.4rem; background: transparent; border-style: dashed; }
+  .day-number { display: none; }
+  .day-title { display: block; font-size: 0.85rem; font-weight: 600; }
+  .day.empty .day-title { font-weight: 400; color: var(--ink-soft); }
+  .cal-popover { position: static; width: auto; min-width: 0; max-width: none; box-shadow: none; }
+}
