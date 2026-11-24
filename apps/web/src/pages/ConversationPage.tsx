@@ -55,7 +55,7 @@ export function ConversationPage() {
         ))}
       </ol>
       <div ref={endRef} />
-      <p className="muted">Each question is answered afresh from the workspace. Ask never changes your files.</p>
+      <p className="muted">Ask reads your last few questions here to understand a follow-up, then checks the workspace again for every answer. It never changes your files.</p>
       <Composer conversationId={c.id} busy={busy} />
     </section>
   );

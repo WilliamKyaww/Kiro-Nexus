@@ -40,7 +40,25 @@ function toolData(text) {
 }
 
 /** The fixed rule: checklist items in the consulted section, matched to issues by title words. */
-export function buildAnswer({ section, issues, invent = false, citeIssues = true }) {
+/** Earlier questions from the conversation-context block Nexus sends with a follow-up. */
+function earlierQuestions(text) {
+  return [...String(text ?? "").matchAll(/^Question \d+: (.+)$/gm)].map((m) => m[1].trim());
+}
+
+/**
+ * The fixed reading of a question. A follow-up that refers back ("those", "them") borrows
+ * its topic from the latest earlier question; "already tracked" asks for tracked items only.
+ */
+function readQuestion(question, contextText) {
+  const refersBack = (q) => /\b(those|these|them|they|that one|it)\b/i.test(q);
+  // Follow a chain of follow-ups back to the latest question that names its own topic.
+  const anchor = [...earlierQuestions(contextText)].reverse().find((q) => !refersBack(q));
+  const topic = refersBack(question) && anchor ? `${anchor} ${question}` : question;
+  const only = /\b(already|is|are) tracked\b/i.test(question) && !/\bno issue\b/i.test(question) ? "tracked" : null;
+  return { topic, only };
+}
+
+export function buildAnswer({ section, issues, invent = false, citeIssues = true, only = null }) {
   if (!section || typeof section.text !== "string") {
     return { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "No relevant note section was found." };
   }
@@ -68,11 +86,12 @@ export function buildAnswer({ section, issues, invent = false, citeIssues = true
       if (item.done !== (best.status === "done")) {
         discrepancies.push({ text: `The note marks “${item.text}” as ${item.done ? "done" : "not done"}, but ${best.key} is ${status}.`, sources });
       }
-    } else {
+    } else if (only !== "tracked") {
       facts.push({ text: `“${item.text}” has no matching issue.`, sources: [section.handle] });
       suggestions.push({ text: `Create an issue for “${item.text}”.`, sources: [section.handle] });
     }
   }
+  if (only === "tracked" && facts.length === 0) facts.push({ text: "None of these actions has a matching issue yet.", sources: [section.handle] });
   if (invent) facts.push({ text: "An invented claim with a made-up citation.", sources: ["S99"] });
   return { facts, discrepancies, suggestions, insufficientEvidence: false };
 }
@@ -98,7 +117,9 @@ function chooseSection(results, question) {
 /** Tool-mode agent: search → read best section → query issues → final_answer. */
 function agentStep(body, variant) {
   const messages = body.messages ?? [];
-  const question = contentText([...messages].reverse().find((m) => m.role === "user"));
+  const asked = contentText([...messages].reverse().find((m) => m.role === "user" && !contentText(m).startsWith("Earlier in this conversation")));
+  const contextText = messages.filter((m) => m.role === "user").map(contentText).find((t) => t.startsWith("Earlier in this conversation")) ?? "";
+  const { topic: question, only } = readQuestion(asked, contextText);
   const calls = messages.filter((m) => m.role === "assistant").flatMap((m) => m.tool_calls ?? []);
   const results = new Map();
   for (const m of messages) if (m.role === "tool") results.set(m.tool_call_id, toolData(contentText(m)));
@@ -130,7 +151,7 @@ function agentStep(body, variant) {
   }
   const seen = new Set();
   const issues = pages.flatMap((p) => p?.issues ?? []).filter((i) => !seen.has(i.key) && seen.add(i.key));
-  const answer = buildAnswer({ section: section && !section.error ? section : null, issues, invent: variant === "invent", citeIssues: variant !== "nocite" });
+  const answer = buildAnswer({ section: section && !section.error ? section : null, issues, invent: variant === "invent", citeIssues: variant !== "nocite", only });
   return { tool_calls: [toolCall("final_answer", answer, n)] };
 }
 
@@ -139,10 +160,10 @@ function structuredAnswer(body, variant) {
   const text = (body.messages ?? []).map(contentText).join("\n");
   const marker = text.indexOf("RETRIEVED_DATA_JSON:");
   const data = marker >= 0 ? parseJson(text.slice(marker + "RETRIEVED_DATA_JSON:".length).trim().split("\nEND_RETRIEVED_DATA")[0]) : null;
-  const question = data?.question ?? "";
+  const { topic: question, only } = readQuestion(data?.question ?? "", data?.conversationContext ?? "");
   const sections = data?.sections ?? [];
   const best = chooseSection(sections, question);
-  return buildAnswer({ section: best, issues: data?.issues ?? [], invent: variant === "invent", citeIssues: variant !== "nocite" });
+  return buildAnswer({ section: best, issues: data?.issues ?? [], invent: variant === "invent", citeIssues: variant !== "nocite", only });
 }
 
 const UNSURE = { facts: [], discrepancies: [], suggestions: [], insufficientEvidence: true, insufficientReason: "Fixture variant: always reports insufficient evidence." };

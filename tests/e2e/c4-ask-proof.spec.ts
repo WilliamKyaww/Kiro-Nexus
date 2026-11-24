@@ -119,6 +119,34 @@ test("the kickoff question is answered from both sources, citations open and ret
   await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(2);
 });
 
+test("a follow-up uses the same conversation and the current workspace", async ({ page }) => {
+  const ws = join(base, "ws");
+  svc = await startService(join(base, "profile"), ws, ["--init-sample"]);
+  const api = await apiSession(svc);
+  await page.goto(await launchUrl(svc));
+  await addProvider(page, "Local test double", "nexus-test-double");
+  await askFromHome(page, QUESTION);
+  await expect(lastAnswer(page).getByRole("region", { name: "Recorded facts" })).toContainText("has no matching issue");
+  const ask = async (question: string, answers: number) => {
+    await page.getByRole("textbox", { name: "Ask about your notes and projects" }).fill(question);
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(answers);
+    return lastAnswer(page).getByRole("region", { name: "Recorded facts" });
+  };
+  const followUp = await ask("Which of those is already tracked?", 2);
+  await expect(followUp).toContainText("“Hein builds the calendar view” is tracked by NEX-1");
+  await expect(followUp).not.toContainText("judge");
+  await followUp.getByRole("link", { name: "NEX-1 Build calendar view" }).click();
+  await expect(page.getByRole("heading", { name: "NEX-1 Build calendar view" })).toBeVisible();
+  await page.getByRole("link", { name: "← Back to conversation" }).click();
+
+  const project = (await api("GET", "/projects")).body.projects[0];
+  await api("POST", "/issues", { projectId: project.id, title: "Write the judge instructions" });
+  const after = await ask("Which of those is already tracked?", 3);
+  await expect(after).toContainText("“Will writes the judge instructions” is tracked by NEX-2");
+  await expect(after).toContainText("“Hein builds the calendar view” is tracked by NEX-1");
+});
+
 test("an absence claim made without reading every issue is shown as not confirmed", async ({ page }) => {
   const ws = join(base, "ws");
   svc = await startService(join(base, "profile"), ws, ["--init-sample"]);

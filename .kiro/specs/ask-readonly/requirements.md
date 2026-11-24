@@ -123,6 +123,14 @@ Edits by the agent are slice D, and the Edit mode stays unavailable.
    retry, and AI off.
 3. Conversations SHALL be saved in `.nexus/conversations/<id>.json` through
    the workspace service, and listed on Home.
+   - (Added in the corrective pass.) A conversation SHALL answer one
+     question at a time. A send while another is in flight, up to the
+     moment its answer is saved, SHALL get a clear busy response, and no
+     turn SHALL be lost.
+   - (Added in the corrective pass.) A follow-up question SHALL receive
+     bounded recent context from the same conversation in both modes. The
+     run SHALL still retrieve the current workspace evidence and validate
+     its own citations.
 4. Edit SHALL be visible but unavailable, with an explanation.
 5. Output from the test double, or from any replay, SHALL be labelled as a
    fixture wherever it is shown.

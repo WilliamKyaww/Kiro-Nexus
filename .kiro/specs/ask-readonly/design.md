@@ -58,6 +58,28 @@ errs towards qualifying) moves to `unconfirmed`. Its qualifier reads "Not
 confirmed: Nexus read N of M issues in this run, so a matching issue may
 exist." The scope note says "only N of M issues were read".
 
+## Conversation context (corrective pass)
+
+`server/src/ask/context.ts` builds the context for a new question from the
+same conversation:
+
+- **What goes in:** the last 3 answered turns. Each turn is the question,
+  plus the answer as plain text: facts, not confirmed claims, discrepancies,
+  suggestions and insufficient evidence. Citation labels appear in
+  brackets, and handles are never included.
+- **Bounds:** each answer is cut to 1,200 characters, and the oldest turns
+  are dropped to keep the whole block within 4,000 characters.
+- **How it is sent:** it opens with "Earlier in this conversation (context
+  only …)".
+  - In tool mode, it is a user message before the question.
+  - In retrieval-first mode, it is a `conversationContext` field of the
+    data. The service also searches with the earlier questions, so a
+    follow-up such as "Which of those is already tracked?" reaches the
+    right section.
+- **What it does not change:** handles stay run-scoped, and evidence is
+  always retrieved again, so citations are validated per run. The stored
+  answer's `meta.contextTurns` records how many turns were used.
+
 ## Answer rendering
 
 The answer card has these parts:

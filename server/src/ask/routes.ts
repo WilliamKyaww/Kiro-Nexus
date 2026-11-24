@@ -10,6 +10,7 @@ import { receivingHost } from "../providers/profiles";
 import { requireEngine } from "../review";
 import type { AppState } from "../state";
 import { newId, type WorkspaceService } from "../workspace/service";
+import { priorTurns, type PriorTurn } from "./context";
 import { runAsk } from "./coordinator";
 import { ConversationStore, type Conversation } from "./conversations";
 import { readOnlyWorkspace } from "./workspace";
@@ -94,7 +95,9 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
   const runId = newId("run");
   const at = new Date().toISOString();
   const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null };
+  let history: PriorTurn[] = [];
   await conversations.update(conversationId, (c) => {
+    history = priorTurns(c.messages); // the answered turns before this question
     c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null });
     if (c.messages.filter((m) => m.role === "user").length === 1 && c.title === "New conversation") c.title = question.slice(0, 80);
     c.messages.push(pending);
@@ -109,12 +112,12 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
     let update: Partial<Conversation["messages"][number]>;
     try {
       const result = await runAsk({
-        workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal,
+        workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal, history,
         onProgress: (p) => { state.publish({ type: "ask.progress", runId, conversationId, activity: p.activity }); },
       });
       update = {
         status: "complete", answer: result.answer,
-        meta: { profileName: result.profileName, model: result.model, receivingHost: result.receivingHost, mode: result.mode, fixture: result.fixture, scopeNote: result.scopeNote, steps: result.steps, rejectedToolCalls: result.rejectedToolCalls, plainReplyIgnored: result.plainReplyIgnored },
+        meta: { profileName: result.profileName, model: result.model, receivingHost: result.receivingHost, mode: result.mode, fixture: result.fixture, scopeNote: result.scopeNote, steps: result.steps, rejectedToolCalls: result.rejectedToolCalls, plainReplyIgnored: result.plainReplyIgnored, contextTurns: result.contextTurns },
       };
     } catch (e) {
       const err = e instanceof NexusError ? { code: e.code, message: e.message } : describeProviderError(e, ctx);

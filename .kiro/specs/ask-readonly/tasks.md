@@ -209,3 +209,23 @@ acceptance condition has been seen to pass.
       delayed save gets 409, and the next send after the save is admitted.
       There were 33 repeat runs of the file. One run failed after 51 s; its
       output was not captured, and it did not recur in the other 32.
+  - [x] 6.5 Issue edits made during Save: tracked as workspace-core task 12
+  - [x] 6.6 Follow-ups use the same conversation
+    - **Defect, reproduced by Kiro on `e61a3d4`:** every run received only
+      its own question. "Which of those is already tracked?" after the
+      kickoff question returned insufficient evidence in both modes.
+    - **Fix:** the bounded context described in the design, in both modes.
+      In retrieval-first mode the earlier questions are searched as well.
+      Citations are still validated per run, and `meta.contextTurns` is
+      stored. The conversation page now says that Ask reads the last few
+      questions and checks the workspace again for every answer.
+    - **Verified by Kiro (test double):**
+      - `ask-http.test.ts` covers both modes against the real service. The
+        follow-up names only the tracked action (NEX-1) and cites the
+        Actions heading and NEX-1, retrieved in that run. The context
+        block sent to the model carries labels and no handles. After NEX-2
+        is created by hand, the next follow-up reports both actions as
+        tracked and cites NEX-2.
+      - `context.test.ts` covers the bounds.
+      - `c4-ask-proof.spec.ts` covers the follow-up in the browser,
+        including opening a citation and returning.

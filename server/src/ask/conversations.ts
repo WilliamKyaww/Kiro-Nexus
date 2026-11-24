@@ -31,6 +31,8 @@ export const Message = z.object({
   meta: z.object({
     profileName: z.string(), model: z.string(), receivingHost: z.string(), mode: z.string(), fixture: z.boolean(),
     scopeNote: z.string(), steps: z.number(), rejectedToolCalls: z.array(z.string()), plainReplyIgnored: z.boolean(),
+    // Added in the corrective pass: earlier turns given to the model as context.
+    contextTurns: z.number().optional(),
   }).nullable(),
   error: z.object({ code: z.string(), message: z.string() }).nullable(),
 });

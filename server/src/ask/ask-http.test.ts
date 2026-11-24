@@ -122,6 +122,52 @@ describe("Ask over HTTP", () => {
     }
   });
 
+  // Reproduced on e61a3d4: each run saw only its own question, so "Which of those is already
+  // tracked?" had nothing to refer to.
+  it.each([
+    ["tools", "nexus-test-double"],
+    ["retrieval-first", "nexus-test-double-structured"],
+  ])("answers a follow-up in %s mode from the conversation and the current workspace", async (mode, model) => {
+    const { api } = await setup(model);
+    const conv = (await api.post("/conversations", {})).body;
+    const ask = async (question: string, count: number) => {
+      expect((await api.post(`/conversations/${conv.id}/ask`, { question })).status).toBe(202);
+      const c = await waitForAnswer(api, conv.id, count);
+      return c.messages.filter((m: { role: string }) => m.role === "assistant")[count - 1];
+    };
+    const facts = (m: { answer: { facts: Array<{ text: string }> } }) => m.answer.facts.map((f) => f.text).join("\n");
+    const first = await ask("Which action from the kickoff still has no issue?", 1);
+    expect(first.meta.mode).toBe(mode);
+    expect(facts(first)).toMatch(/judge instructions.*has no matching issue/);
+
+    const before = double.requests.length;
+    const followUp = await ask("Which of those is already tracked?", 2);
+    expect(followUp.status).toBe("complete");
+    expect(followUp.answer.insufficientEvidence).toBe(false);
+    expect(facts(followUp)).toMatch(/Hein builds the calendar view.*tracked by NEX-1/);
+    expect(facts(followUp)).not.toMatch(/judge/);
+    expect(followUp.meta.contextTurns).toBe(1);
+    // The earlier turn reached the model as plain text without its old citation handles,
+    // and every citation in the new answer was retrieved again in this run.
+    const sent = double.requests.slice(before).map((r) => JSON.stringify(r.body.messages)).join("\n");
+    expect(sent).toContain("Which action from the kickoff still has no issue?");
+    const block = sent.match(/Earlier in this conversation[^"]*/)?.[0] ?? "";
+    expect(block).toContain("[sources: Kickoff, 24 November 2026 › Actions");
+    expect(block).not.toMatch(/\bS\d+\b/);
+    expect(Object.values(followUp.answer.citations).map((c) => (c as { target: unknown }).target)).toEqual(expect.arrayContaining([
+      { kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions" },
+      { kind: "issue", key: "NEX-1" },
+    ]));
+
+    // A manual change in the workspace shows up in the next follow-up.
+    const project = (await api.get("/projects")).body.projects[0];
+    await api.post("/issues", { projectId: project.id, title: "Write the judge instructions" });
+    const after = await ask("Which of those is already tracked?", 3);
+    expect(facts(after)).toMatch(/Will writes the judge instructions.*tracked by NEX-2/);
+    expect(facts(after)).toMatch(/Hein builds the calendar view.*tracked by NEX-1/);
+    expect(Object.values(after.answer.citations).map((c) => (c as { target: unknown }).target)).toContainEqual({ kind: "issue", key: "NEX-2" });
+  });
+
   it("keeps the one-run rule until the answer is saved, then admits the next question", async () => {
     // Widen the window between the run finishing and its answer being written.
     const { api } = await setup("nexus-test-double", { NEXUS_FAULT_DELAY: "ask:before-answer-save:1500" });

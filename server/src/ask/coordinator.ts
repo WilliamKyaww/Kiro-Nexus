@@ -4,6 +4,7 @@ import { NexusError } from "../errors";
 import type { ProviderProfile } from "../providers/profiles";
 import { ProviderError, chat, type ChatMessage } from "../providers/openai";
 import { FINAL_ANSWER_SCHEMA, FINAL_ANSWER_TOOL, validateAnswer, type ValidatedAnswer } from "./answer";
+import { contextBlock, type PriorTurn } from "./context";
 import { HandleRegistry } from "./handles";
 import { ASK_TOOL_NAMES, DATA_NOTICE, QueryIssuesArgs, ReadSectionArgs, SearchNotesArgs, TOOL_DEFINITIONS, issueCoverage, makeAskTools, newConsulted, type Consulted, type ReadOnlyWorkspace } from "./tools";
 
@@ -20,6 +21,7 @@ const SYSTEM = [
   "Put only statements directly supported by cited sources in facts. Put conflicts between sources in discrepancies. Put recommendations in suggestions.",
   "Issue status and due dates come from query_issues. A proposedPendingReview value is awaiting review and is not yet true; the accepted value is the fact. The same applies to pendingReview text in notes.",
   "Before stating that no issue matches something, read every issue record (call query_issues again with nextOffset until it is null) or look the item up with the text filter. Nexus marks absence claims as not confirmed unless every record was read.",
+  "Earlier turns of the conversation may be given as context. Use them to understand the question (for example what \"those\" refers to), but find the evidence again with this run's tools: earlier answers may be out of date, and only handles from this run's tool results are valid citations.",
   "If the evidence is insufficient, set insufficientEvidence to true and say why.",
   "Finish by calling final_answer.",
 ].join("\n");
@@ -37,6 +39,8 @@ export interface AskResult {
   consulted: Consulted;
   scopeNote: string;
   plainReplyIgnored: boolean;
+  /** How many earlier turns of the conversation were given to the model as context. */
+  contextTurns: number;
 }
 
 function scopeNote(c: Consulted, ws: ReadOnlyWorkspace): string {
@@ -73,6 +77,8 @@ export async function runAsk(opts: {
   onProgress?: (p: AskProgress) => void;
   /** For tests: a lower retrieval-first issue cap. */
   limits?: { retrievalIssueCap?: number };
+  /** Earlier answered turns of this conversation, oldest first (bounded by contextBlock). */
+  history?: PriorTurn[];
 }): Promise<AskResult> {
   const { workspace, question, profile } = opts;
   const caps = profile.capabilities;
@@ -87,18 +93,29 @@ export async function runAsk(opts: {
   const base = { baseUrl: profile.baseUrl, model: profile.model, key: opts.key, signal, onRetry: (w: string) => opts.onProgress?.({ step: 0, activity: w }) };
   let fixture = false;
   const rejected: string[] = [];
+  const context = contextBlock(opts.history ?? []);
   const finish = (raw: unknown, steps: number, plainReplyIgnored = false): AskResult => ({
     answer: validateAnswer(raw, handles, issueCoverage(consulted)), mode, model: profile.model, profileName: profile.name, receivingHost: opts.receivingHost,
-    fixture, steps, rejectedToolCalls: rejected, consulted, scopeNote: scopeNote(consulted, workspace), plainReplyIgnored,
+    fixture, steps, rejectedToolCalls: rejected, consulted, scopeNote: scopeNote(consulted, workspace), plainReplyIgnored, contextTurns: context?.turns ?? 0,
   });
   const wrap = (data: unknown) => JSON.stringify({ notice: DATA_NOTICE, data });
 
   try {
     if (mode === "retrieval-first") {
       opts.onProgress?.({ step: 1, activity: "Searching notes and issues" });
-      const found = await tools.search_notes({ query: question.slice(0, 200), limit: 6 });
-      const qWords = new Set(question.toLowerCase().match(/[a-z]{4,}/g) ?? []);
-      const pick = found.results.filter((r, i) => i < 4 || r.headingPath.some((h) => [...qWords].some((w) => h.toLowerCase().includes(w.replace(/s$/, "")))));
+      // A follow-up such as "Which of those is tracked?" names little by itself, so the
+      // earlier questions in the context are searched too. The evidence is retrieved afresh.
+      const earlier = (opts.history ?? []).slice(-(context?.turns ?? 0)).reverse().map((t) => t.question);
+      const seenSection = new Set<string>();
+      const found: Awaited<ReturnType<typeof tools.search_notes>>["results"] = [];
+      for (const q of [question, ...(context ? earlier : [])]) {
+        for (const r of (await tools.search_notes({ query: q.slice(0, 200), limit: 6 })).results) {
+          const k = `${r.path}#${r.headingSlug}`;
+          if (!seenSection.has(k)) { seenSection.add(k); found.push(r); }
+        }
+      }
+      const qWords = new Set([question, ...(context ? earlier : [])].join(" ").toLowerCase().match(/[a-z]{4,}/g) ?? []);
+      const pick = found.filter((r, i) => i < 4 || r.headingPath.some((h) => [...qWords].some((w) => h.toLowerCase().includes(w.replace(/s$/, "")))));
       const sections = [];
       for (const r of pick) {
         const s = await tools.read_note_section({ path: r.path, headingSlug: r.headingSlug });
@@ -119,7 +136,10 @@ export async function runAsk(opts: {
       const issueNote = coverage.complete
         ? `All ${coverage.total} issue records are included. Status and due values are accepted; proposedPendingReview values are awaiting review and not yet true.`
         : `Only ${coverage.read} of ${coverage.total} issue records are included. Do not state that no issue matches something: say that it could not be confirmed.`;
-      const data = { question, sections, issues, issueCoverage: { read: coverage.read, total: coverage.total }, issueNote, projectsInWorkspace: page.projectsInWorkspace };
+      const data = {
+        question, ...(context ? { conversationContext: context.text } : {}),
+        sections, issues, issueCoverage: { read: coverage.read, total: coverage.total }, issueNote, projectsInWorkspace: page.projectsInWorkspace,
+      };
       opts.onProgress?.({ step: 2, activity: `Asking ${profile.model}` });
       const r = await chat({
         ...base,
@@ -137,6 +157,7 @@ export async function runAsk(opts: {
 
     const messages: ChatMessage[] = [
       { role: "system", content: SYSTEM },
+      ...(context ? [{ role: "user" as const, content: context.text }] : []),
       { role: "user", content: question },
     ];
     let nudged = false;

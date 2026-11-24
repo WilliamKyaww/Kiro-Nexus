@@ -513,6 +513,11 @@ with a "Proposed" marker. Accepting a date change triggers rescheduling.
   provider retries with backoff that honours `Retry-After`, a 60 s
   per-request timeout and a 3-minute run budget. The model is pinned at run
   start and recorded in the run.
+- **History** (bounded): the last 3 answered turns of the same
+  conversation, as plain text with citation labels and no handles, cut to
+  4,000 characters, in both Ask modes. Each run retrieves its evidence
+  again and validates its own citations
+  (`.kiro/specs/ask-readonly/design.md`, "Conversation context").
 - **Capability probe** (Settings → Test): a minimal tool-call request and a
   minimal JSON-schema request. Results are stored per profile as
   `{ toolCalling, structuredOutput, testedAt }`. Edit mode requires
