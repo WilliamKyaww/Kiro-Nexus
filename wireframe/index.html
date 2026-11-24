@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nexus wireframe (fictional data)</title>
+  <link rel="stylesheet" href="wireframe.css">
+  <script src="wireframe.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="proto-banner" role="note">Wireframe prototype. Fictional data, fixed demo changes, no AI.</div>
+  <div class="shell">
+    <nav class="rail" aria-label="Sections">
+      <p class="brand">Nexus</p>
+      <ul>
+        <li><a href="#/home" data-nav="home">Home</a></li>
+        <li><a href="#/note" data-nav="note">Notes</a></li>
+        <li><a href="#/issue" data-nav="issue">Projects</a></li>
+        <li><a href="#/calendar" data-nav="calendar">Calendar</a></li>
+        <li><a href="#/notifications" data-nav="notifications">Notifications</a></li>
+        <li><a href="#/settings" data-nav="settings">Settings</a></li>
+      </ul>
+      <p class="workspace">Workspace: <strong>Kickoff sample</strong></p>
+    </nav>
+
+    <main id="main" tabindex="-1">
+      <section data-view="home" aria-labelledby="home-h">
+        <h1 id="home-h">What do you need?</h1>
+        <form class="composer" onsubmit="return false">
+          <label for="ask">Message</label>
+          <textarea id="ask" rows="3" placeholder="What did we agree, what is on the board, what is missing?"></textarea>
+          <div class="composer-row">
+            <span class="chip">Context: Kickoff sample</span>
+            <span class="chip chip-off">AI is off</span>
+            <a href="#/settings">Set up a provider</a>
+          </div>
+        </form>
+        <p class="hint">Notes, Projects and Calendar work without AI. To try the review flow, use the fixed demo changes below.</p>
+        <button type="button" id="run-demo">Apply fixed demo changes (not AI)</button>
+        <h2>Recent conversations</h2>
+        <ul class="plain"><li>Outstanding actions from the kickoff (fictional)</li></ul>
+      </section>
+
+      <section data-view="note" aria-labelledby="note-h" hidden>
+        <div class="page-grid">
+          <article class="doc">
+            <p class="path">meetings / 2026-11-24 kickoff.md</p>
+            <h1 id="note-h">Kickoff, 24 November</h1>
+            <h2 id="decisions">Decisions</h2>
+            <p>We build one local workspace for notes and issues.</p>
+            <h2 id="actions" tabindex="-1">Actions</h2>
+            <ul class="checklist">
+              <li data-target="chg-note">
+                <span class="check" data-checked="false" aria-hidden="true"></span>
+                <span class="text">Hein builds the calendar view</span>
+              </li>
+              <li>
+                <span class="check" data-checked="false" aria-hidden="true"></span>
+                <span class="text">Will writes the judge instructions</span>
+              </li>
+            </ul>
+          </article>
+          <aside class="side" aria-label="Linked issues">
+            <h2>Linked issues</h2>
+            <ul class="plain">
+              <li><a href="#/issue">NEX-1 Build calendar view</a> <span class="muted">to Actions</span></li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <section data-view="issue" aria-labelledby="issue-h" hidden>
+        <p class="path">Projects / NEX</p>
+        <h1 id="issue-h">NEX-1 Build calendar view</h1>
+        <dl class="fields">
+          <dt>Status</dt><dd>In progress</dd>
+          <dt>Priority</dt><dd>High</dd>
+          <dt>Due date</dt><dd data-target="chg-issue"><span class="value">5 Dec 2026</span></dd>
+          <dt>Linked note</dt><dd><a href="#/note" data-anchor="actions">Kickoff, 24 November › Actions</a></dd>
+        </dl>
+      </section>
+
+      <section data-view="calendar" aria-labelledby="cal-h" hidden>
+        <h1 id="cal-h">Calendar</h1><p>Hein owns this view (B3). Not part of this wireframe.</p>
+      </section>
+      <section data-view="notifications" aria-labelledby="not-h" hidden>
+        <h1 id="not-h">Notifications</h1><p>Reminders arrive in B4. Pending dates never trigger a reminder.</p>
+      </section>
+      <section data-view="settings" aria-labelledby="set-h" hidden>
+        <h1 id="set-h">Settings</h1><p>Provider profiles arrive in slice C. No key is needed for notes or projects.</p>
+      </section>
+    </main>
+  </div>
+
+  <div class="review-bar" role="region" aria-label="Changes awaiting review" hidden>
+    <p class="review-status" aria-live="polite"></p>
+    <div class="review-actions">
+      <button type="button" data-act="prev">Previous</button>
+      <button type="button" data-act="next">Next</button>
+      <button type="button" data-act="accept" class="primary">Accept</button>
+      <button type="button" data-act="reject">Reject</button>
+    </div>
+    <form class="feedback" hidden onsubmit="return false">
+      <label for="why">Rejected. What was wrong, or what should be kept?</label>
+      <input id="why" type="text">
+      <button type="button" data-act="send">Send correction</button>
+      <button type="button" data-act="skip">Skip</button>
+    </form>
+  </div>
+</body>
+</html>

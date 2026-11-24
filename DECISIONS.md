@@ -78,7 +78,7 @@ changes the policy.
 
 ## DEC-005: One local service as the single writer, shared by browser and Electron
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`). Session details amended by DEC-011.
 
 **Context.** The same UI must run in a browser and in Electron (R-S1), with
 a single writer for each workspace (R-S2).
@@ -102,7 +102,7 @@ loopback API needs hardening: a token, a host-header check and no CORS.
 
 ## DEC-006: Workspace data layout and anchoring
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`)
 
 **Decision.**
 - Structured data lives in `.nexus/*.json`. Each file has a
@@ -124,7 +124,7 @@ loopback API needs hardening: a token, a host-header check and no CORS.
 
 ## DEC-007: Write-ahead review journal with region-level reversal
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`). Recovery data amended by DEC-012.
 
 **Decision.**
 - Validate the operations, then journal them as `prepared`, then write each
@@ -154,7 +154,7 @@ region.
 
 ## DEC-008: Authority comes from an explicit Ask/Edit mode
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`)
 
 **Context.** R-A2: a question authorises reading, and an explicit edit
 request authorises tentative changes.
@@ -170,7 +170,7 @@ and the classification could be steered by injected note text.
 
 ## DEC-009: Reminders are delivered at most once, using a delivery log
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`)
 
 **Decision.**
 - Each reminder has a dedup key made of the target, the rule and the
@@ -186,7 +186,7 @@ after a crash, which breaks R-R3 and R-V5.
 
 ## DEC-010: Slice B is split, and the first spec is B1 workspace core
 
-- **Status:** Proposed in the PRD (2026-11-24), awaiting Will's approval
+- **Status:** Accepted (Will, 2026-11-24, PRD approval at `7b775cd`)
 
 **Decision.** Slice B becomes five specs:
 
@@ -203,3 +203,93 @@ R-D-B asks for persistence early.
 
 **Alternatives.** One large spec for B. Its tasks would be too big to run as
 bounded steps, and Hein could not work in parallel.
+
+## DEC-011: Browser session through a launch code in the fragment and a bearer token
+
+- **Status:** Accepted (Will's amendment 1, 2026-11-24). Kiro designed the
+  details.
+
+**Context.** The browser must load the app shell and start a session.
+Workspace data, mutations and event streams must be protected, the service
+must stay on loopback, and tokens must stay out of logs and query strings.
+
+**Decision.** See `architecture.md` section 4.1 for the full design.
+
+- The static shell is served without authentication and holds no workspace
+  data.
+- Only the launching process can mint a single-use launch code, using a
+  control secret kept in the profile directory. The code travels in the URL
+  fragment and is exchanged through a POST body for a session token. The UI
+  keeps that token in `sessionStorage`.
+- Every API route requires `Authorization: Bearer`. Live updates use a
+  `fetch` stream so that the header is kept.
+- The service checks the `Host` header and sends no CORS headers.
+
+**Alternatives.**
+- *A token in the fragment for the whole session (the original PRD).* It
+  stays in browser history.
+- *An HttpOnly cookie.* Cookies do not separate localhost ports, so another
+  local web app could make requests that carry the cookie.
+- *A token in the query string.* It leaks into logs.
+
+**Revisit when** Nexus needs access from another device.
+
+## DEC-012: The journal stores per-file hashes and stable operation IDs for recovery
+
+- **Status:** Accepted (Will's amendment 2, 2026-11-24). Kiro designed the
+  details.
+
+**Context.** Recovery must be possible from the saved data alone. Each file
+write is atomic, but a run that touches several files can stop with only
+some of them written.
+
+**Decision.** See `architecture.md` sections 7.2 to 7.5.
+
+- Before any write, the journal stores, for every file, the hash before the
+  run and the hash expected after it, with stable `opId` and `changeId`
+  values.
+- JSON is serialised deterministically, so the expected hash can be
+  recomputed.
+- A rejection persists `reversal.{beforeHash, afterHash}` before it writes.
+- Recovery compares each file's current hash with the saved hashes. It then
+  rolls the change forward, marks it done, or marks it `conflicted`.
+- A note span is reversed by splicing only its own region, which is found
+  through its exact text and its neighbouring lines. If the span is
+  repeated or has been deleted, the result is a conflict and nothing is
+  guessed.
+
+**Alternatives.**
+- *Storing the full before and after content of every file.* This is
+  simple, but large for JSON collections, and it still needs hashes to
+  detect external edits.
+- *Rolling back the whole run on any failure.* This throws away changes the
+  user can still usefully review.
+
+**Revisit when** property tests find a sequence of changes that the span
+model cannot reverse.
+
+## DEC-013: Keep Node 24.14.0 and record what actually runs
+
+- **Status:** Accepted (Will's amendment 3, 2026-11-24)
+
+**Decision.**
+- Develop on the installed Node 24.14.0, which meets every requirement of
+  the selected toolchain (techstack section 1).
+- Pin it in `.nvmrc` and `engines`.
+- Check Electron's bundled Node separately and record both versions in
+  `docs/toolchain.md`.
+- System-wide upgrades are a human decision.
+
+**Revisit when** a dependency drops Node 24, or Will decides to upgrade.
+
+## DEC-014: The live provider route stays open, and a team route is a release requirement
+
+- **Status:** Accepted (Will's amendment 4, 2026-11-24)
+
+**Decision.**
+- Slice C tests the free candidate providers live.
+- A judge supplying their own key is one option.
+- A team-provided evaluation route that bundles no private key is a release
+  requirement (PRD-091, Q5).
+- A scripted replay may demonstrate the interface, but is never evidence of
+  live AI behaviour.

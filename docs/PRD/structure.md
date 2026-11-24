@@ -1,6 +1,7 @@
 # Nexus PRD: product structure
 
-- **Status:** Complete draft for Will's review
+- **Status:** Approved by Will at `7b775cd` on 24 November 2026, with
+  amendments 1 to 4 (DEC-011 to DEC-014) applied the same day
 - **Owners:** Will (product, persistence, review, providers, agent), Hein
   (navigation, board and calendar presentation, sample data, accessibility,
   demo)
@@ -258,6 +259,8 @@ the schedule forces it.
 | PRD-076 | Keys are held in OS-protected storage on desktop, or for the session only. They never reach the workspace, renderer storage, logs, the repository or the build | Must | R-S7, R-S8 | Secret-scan test over the workspace, logs and package |
 | PRD-080 | Keyboard operation, visible focus and reduced-motion support throughout, including review | Must | R-D-A, R-V6 | Keyboard-only review run; axe checks |
 | PRD-090 | A free judge route, the sample workspace, reproducible instructions, and labels on any fixture or replay | Must | R-D-E, R-E3 | Clean-setup rehearsal |
+| PRD-091 | **To be resolved before release:** a team-provided evaluation route lets judges try the live AI workflow free of charge. It must not bundle a private key in the distributable. A judge's own key is a second option. A replay does not satisfy this requirement | Must | R-D-E, DEC-014 | A recorded live run through the chosen route, made from a clean setup |
+| PRD-092 | The browser launches from a fresh session through a single-use launch code. An unauthenticated client cannot read workspace data, mutate it or open the event stream. Tokens never appear in query strings or logs | Must | R-S1, R-S7, DEC-011 | Automated tests for a fresh launch, a reused code, a missing token, a wrong `Host` header, and a scan of the logs |
 
 ## 8. Demonstration workspace
 
@@ -317,7 +320,8 @@ most one active implementation slice at a time (R-T2).
 
 | # | Question | Proposed answer | Owner | Decide by |
 | --- | --- | --- | --- | --- |
-| Q1 | Which free model route is actually usable with tool calling? | Test the candidates listed in `techstack.md` during slice C, and record the results | Will | 30 Nov |
+| Q1 | Which free model route is actually usable with tool calling? | Keep the question open during slice C. Test the candidates listed in `techstack.md` live and record the results | Will | 30 Nov |
+| Q5 | What is the team-provided evaluation route for judges (PRD-091)? Options include a hosted proxy with a team key and a strict quota, or a time-limited free key per judge | Decide in slice C, alongside Q1. It must hold no private key in the distributable | Will | 1 Dec |
 | Q2 | Should we enter any bonus categories? | Decide after the feature freeze | Will and Hein | 3 Dec |
 | Q3 | Is runtime MCP worth building? | No, unless slice D finishes by 1 Dec | Will | 1 Dec |
 | Q4 | Will judges get a signed Windows build? | No. Document the SmartScreen prompt and also offer the run-from-source route | Will | 3 Dec |

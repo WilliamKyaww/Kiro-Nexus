@@ -1,0 +1,14 @@
+# Dependencies and build output
+node_modules/
+dist/
+out/
+*.tsbuildinfo
+
+# Local runtime state and test artefacts
+.tmp/
+.playwright-mcp/
+test-results/
+playwright-report/
+*.log
+
+# Never ignore .kiro/ (Kiroween rule): specs, steering, hooks and skills are committed.

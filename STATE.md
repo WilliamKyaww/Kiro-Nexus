@@ -1,78 +1,112 @@
 # State
 
-- **Date updated:** 2026-11-24
-- **Active phase:** Work item 2, PRD and first Kiro spec
-- **Status:** PRD drafted and committed locally. **Waiting for Will to
-  review** `docs/PRD/` and the proposed decisions DEC-005 to DEC-010.
-- **Previous phase:** Work item 1, workflow (`20e93f2`), plus the
-  milestone-commit policy (`db3d681`)
-- **Active spec:** none yet. The next spec is B1,
-  `.kiro/specs/workspace-core/`.
+- **Date updated:** 2026-11-24 (overnight run in progress)
+- **Active phase:** Overnight autonomous run. Milestones A to D are below.
+- **Active milestone:** A. PRD amendments, B1 spec, W4 tools and wireframe.
+- **Active spec:** `.kiro/specs/workspace-core/` (B1)
+- **PRD:** approved by Will at `7b775cd`, with amendments 1 to 4 (DEC-011
+  to DEC-014). DEC-005 to DEC-010 were accepted by Will on 2026-11-24.
 
-## Authorised scope
+## Temporary authorisation (overnight run, granted by Will on 2026-11-24)
 
-- Local edits inside this checkout.
-- **Git:** local milestone commits are authorised under DEC-004. After each
-  completed and verified major update, commit without asking. Stage only the
-  relevant files by name, review the staged diff, add no AI trailers, and
-  report the short hash. Pushing, creating branches, opening pull requests
-  and publishing need an explicit request.
-- **Not authorised:** installing dependencies, scaffolding the product,
-  configuring MCP, skills or hooks (work item 4), publication and
-  submission.
+This section survives context compaction. It applies until Will returns and
+replaces it.
+
+- **Authorised without further approval:**
+  - Update the PRD and `STATE.md`.
+  - Write and self-review native Kiro specs through requirements, design and
+    tasks. This replaces the requirement to stop at each spec review point,
+    for this scope only.
+  - Configure the named workspace dev tools (Impeccable, Microsoft
+    Playwright MCP) and the focused Kiro hook.
+  - Scaffold the project and install project-local dependencies from their
+    official sources (the npm registry).
+  - Implement milestones A to D, run the app and tests, and make local
+    milestone commits under DEC-004.
+- **Milestones in order:**
+  - **A.** Apply PRD amendments 1 to 4. Write the B1 spec. Inventory, set
+    up and smoke-test the W4 tools. Make a brief navigable wireframe of the
+    note, the linked issue and the review interaction.
+  - **B.** Implement B1 end to end: note and linked issue, links both ways,
+    edit, restart, lock and stale-save protection, browser and Electron
+    smoke tests, morning commands.
+  - **C.** Implement the B5 journal engine and a small review UI driven by
+    fixed, labelled operations. Cover accept and reject, a restart during
+    apply and during rejection, a repeated operation, an ambiguous paragraph,
+    an unrelated manual edit surviving, and a pending date not triggering a
+    reminder. Add the focused Kiro hook and verify that it fires.
+  - **D.** Implement a B2 notes slice: heading-level search, and external
+    file changes that never discard an unsaved buffer.
+- **Not authorised:**
+  - Remote Git actions (push, branches on the remote, pull requests),
+    publication, deployments, account changes and paid services.
+  - System-wide installs or upgrades. Node stays at 24.14.0 unless a human
+    decides otherwise.
+  - Provider credentials. Tonight uses only fictional data and needs no
+    keys.
+- **Working agreement:**
+  - One active slice at a time.
+  - Synthetic data, temporary test workspaces and isolated app profiles.
+  - Verdanta Internal Tools stays out of every read, search and index.
+  - Distinguish Kiro's self-review from human review.
+  - If a check is blocked, record the exact failure, mark it unverified and
+    continue.
+  - Record assumptions for Will or Hein in the "Assumptions to check"
+    section below.
+  - Hein owns the final visual design and the board and calendar
+    presentation.
+
+## Git
+
+Local milestone commits under DEC-004:
+
+- Stage files by name and review the staged diff.
+- Use the configured identity, with no AI trailers.
+- Report the short hash.
+- Stay on `main`.
 
 ## Blockers and risks
 
-- **Blocker:** none. The B1 spec waits on Will's review of the PRD.
-- **Risk:** the free model routes are unverified (PRD Q1). They will be
-  tested in slice C, with a 30 November deadline.
-- **Risk:** the dev machine has Node 24.14.0 and the PRD targets Node 26
-  LTS. Upgrade, or confirm Node 24 as the fallback, when B1 scaffolds the
-  project.
-- **Risk:** Kiro cannot fetch the live Devpost pages (HTTP 403). A final
-  manual recheck is on `docs/submission-checklist.md`.
-- **Dates:** the Kiro credit request deadline is 1 December 2026 at 20:00
-  GMT. The feature freeze is 2 December. Submission closes on 4 December at
+- **Blocker:** none.
+- **Risk:** the free model route is still unverified. It stays open for
+  slice C (DEC-014).
+- **Dates:** Kiro credit requests close on 1 December at 20:00 GMT. The
+  feature freeze is on 2 December. Submission closes on 4 December at
   22:00 GMT.
 
-## Latest verification
+## Milestone log (overnight)
 
-24 November 2026, work item 2:
+| Milestone | Status | Commit | Evidence |
+| --- | --- | --- | --- |
+| A | Done | see `git log` (`docs: amend PRD, add B1 spec, wireframe and dev tooling`) | The B1 spec was self-reviewed by Kiro. Impeccable detect returned `[]` after one fix, and its renders were checked. The Playwright MCP stdio smoke test passed 6 of 6. Registering the server with Kiro is blocked by the permission policy (see `docs/tooling.md`) |
+| B | In progress | | |
+| C | Not started | | |
+| D | Not started | | |
 
-- I wrote `docs/PRD/structure.md`, `architecture.md` and `techstack.md`.
-  Each PRD requirement cites an intake ID, and the intake's open questions
-  are either answered (structure.md section 11) or carried forward as Q1 to
-  Q4.
-- I added foundation steering: `product.md` (auto), and `tech.md` and
-  `structure.md` (fileMatch). In this session, Kiro listed `product.md` as
-  an auto-included resource (`steering::nexus-product`). Whether the
-  `#[[file:...]]` references resolve inside these steering files has not
-  been observed yet.
-- In this session, `workflow.md` showed the content of `STATE.md`, so its
-  reference resolves. This was the check the previous handoff asked for.
-- This is document work only. No code exists and no tests have run.
+## Assumptions to check
+
+| # | Assumption (Kiro's) | For |
+| --- | --- | --- |
+| 1 | A single root package with path aliases replaces npm workspaces (techstack section 1) | Will |
+| 2 | B1 uses a `<textarea>` editor, with CodeMirror deferred to B2 | Will, Hein |
+| 3 | The web UI takes a typed folder path, because browsers have no native picker | Hein |
+| 4 | The wireframe's palette and layout are placeholders, and Hein owns the final identity | Hein |
+| 5 | Impeccable telemetry was left on globally and disabled per call, so a human should decide whether to run `npx impeccable telemetry off` | Will |
+
+## Human actions pending
+
+- Register Playwright MCP in Kiro, following the exact steps in
+  `docs/tooling.md`. Kiro's policy blocks agent writes to `.kiro/settings/`.
 
 ## Next action
 
-Will reviews the PRD. Then create the B1 spec, `.kiro/specs/workspace-core/`,
-starting with `requirements.md`, and stop for review.
+Milestone B, task 1: scaffold the project and toolchain
+(`.kiro/specs/workspace-core/tasks.md`).
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md`, this file and `docs/PRD/` (structure, architecture,
-> techstack). If Will has approved the PRD, set DEC-005 to DEC-010 to
-> Accepted, or apply his changes first. Then create the native Kiro feature
-> spec `.kiro/specs/workspace-core/` for slice B1 (DEC-010), using the
-> requirements-first workflow:
->
-> 1. `requirements.md`: EARS acceptance criteria, each citing a `PRD-xxx`.
->    Cover the service with its loopback token, the lock, atomic writes, the
->    `.nexus` schemas, `docs/data-format.md`, one note and one linked issue
->    persisting across a restart, a minimal UI, and a smoke test in both the
->    browser and Electron.
-> 2. `design.md`.
-> 3. `tasks.md`.
->
-> Stop at each review point. Installing dependencies and scaffolding are
-> authorised only once the B1 tasks have been approved. Commit each
-> completed milestone locally under DEC-004, and do not push.
+> Read `AGENTS.md` and this file, especially "Temporary authorisation". Then
+> read the active spec and `docs/PRD/`. Resume at the first milestone in the
+> log that is not done. Follow the working loop in `AGENTS.md`. Commit each
+> verified milestone locally under DEC-004 and never push. Keep this file
+> current after each milestone.

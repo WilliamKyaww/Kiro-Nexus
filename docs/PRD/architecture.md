@@ -1,9 +1,9 @@
 # Nexus PRD: architecture
 
-- **Status:** Complete draft for Will's review
+- **Status:** Approved by Will at `7b775cd` (2026-11-24); amendments 1-4 applied (DEC-011 to DEC-014)
 - **Last updated:** 2026-11-24
 - **Traces to:** `structure.md` (PRD-xxx); intake R-*/D-*; decisions
-  DEC-005 to DEC-010.
+  DEC-005 to DEC-014.
 
 ## 1. System overview
 
@@ -41,7 +41,11 @@ operations (R-C6, PRD-067). The UI holds no authoritative state.
 
 ## 2. Repository layout
 
-npm workspaces monorepo:
+One root `package.json` with a single lockfile. Shared code in `packages/` is
+imported through TypeScript path aliases (`@nexus/schema`,
+`@nexus/markdown`). esbuild, Vite and Vitest resolve these aliases, so
+packages need no build step or symlinks of their own. npm workspaces can be
+introduced later if a package needs to be published separately.
 
 ```
 apps/web/            React + Vite UI (browser and Electron renderer)
@@ -88,17 +92,49 @@ data; documenting it is part of B1 (`docs/data-format.md`).
 
 ### 4.1 Local HTTP API (`/api/v1`)
 
-- Bound to `127.0.0.1` on a free port. Every request needs
-  `Authorization: Bearer <session token>`; the token is random per service
-  start. The service rejects requests whose `Host` is not the loopback
-  address and port, and serves no CORS headers, so other web pages cannot
-  call it.
-- The service serves the built UI from the same origin. It opens or prints
-  `http://127.0.0.1:<port>/#token=<token>`; the UI moves the token into
-  `sessionStorage` and clears the fragment.
-- All bodies are validated against `packages/schema` (Zod). Errors use
-  `{ error: { code, message, details? } }` with stable codes (e.g.
-  `REVISION_MISMATCH`, `LOCKED`, `PROVIDER_RATE_LIMITED`).
+The session model below implements amendment 1 (DEC-011).
+
+- **Loopback only.** The service listens on `127.0.0.1`, on a free port or
+  one given with `--port`. Every request whose `Host` header is not
+  `127.0.0.1:<port>` or `localhost:<port>` is rejected with `403`, which
+  defeats DNS rebinding. The service sends no CORS headers, so a page on
+  another origin cannot read a response or send the `Authorization` header.
+- **Static app shell, unauthenticated.** `GET /` and `/assets/*` serve the
+  built UI. They contain no workspace data, and every other path below `/`
+  (except `/api/*`) returns `index.html` for client routing. Responses carry
+  a strict CSP (`default-src 'self'`; no inline script; `frame-ancestors
+  'none'`).
+- **Launch codes.** These are single-use, 128-bit and expire after
+  2 minutes. Only the process that started the service can mint one, through
+  `POST /api/v1/launch-codes` authorised by the **control secret**. The
+  service writes that secret to `<profile>/service.json` (with the port and
+  pid), and no HTTP response ever returns it. The service, the
+  `npm run open` helper and Electron main each mint a code and open
+  `http://127.0.0.1:<port>/#launch=<code>`. The code is in the URL
+  fragment, which the browser never sends to the server, so it cannot reach
+  a server log.
+- **Session.** The UI reads the fragment, removes it with
+  `history.replaceState`, and sends `POST /api/v1/session` with the code in
+  the JSON body. The service burns the code and returns a 256-bit session
+  token in the response body. The UI keeps the token in `sessionStorage` and
+  sends it as `Authorization: Bearer <token>` on every API call. Tokens and
+  codes never appear in a query string or a log line. The request logger
+  records only the method, route pattern, status and duration.
+- **Fresh sessions.** A new tab without a valid token shows "Open Nexus
+  from its launcher" and makes no data request. `npm run open` (or
+  relaunching the desktop app) mints a new code for a fresh browser session.
+  All sessions end when the service stops.
+- **Protected surface.** Every `/api/v1/*` route except `POST /session`
+  requires a valid session token. This covers workspace data, mutations and
+  the event stream. A request without one gets `401` with no data.
+- **Live updates.** `GET /api/v1/events` returns a `text/event-stream`
+  body, which the UI reads with `fetch` and a stream reader so that the
+  bearer header is kept. `EventSource` is not used, because it cannot send
+  headers.
+- **Validation and errors.** All bodies are validated against
+  `packages/schema` (Zod). Errors use `{ error: { code, message, details? } }`
+  with stable codes such as `REVISION_MISMATCH`, `LOCKED`, `UNAUTHENTICATED`
+  and `PROVIDER_RATE_LIMITED`.
 
 | Area | Endpoints (indicative) |
 | --- | --- |
@@ -126,7 +162,15 @@ Exposed via `contextBridge`; nothing else is reachable from the renderer.
 - `notificationPermission(): Promise<'granted' | 'denied'>`
 - `appInfo(): { version, platform }`
 
-Main subscribes to the service's SSE `notification` events and shows native
+Startup sequence:
+
+1. Main starts the service as an Electron `utilityProcess`, with the
+   app's isolated profile directory and a control secret that it generates.
+2. Main waits for the service's ready line on stdout. The line carries the
+   port and no secrets.
+3. Main mints a launch code and loads `http://127.0.0.1:<port>/#launch=<code>`.
+
+Main subscribes to the service's `notification` events and shows native
 notifications; a click focuses the window and navigates to the target. Main
 passes keys to the service over the private `utilityProcess` message port at
 run time, never via HTTP.
@@ -234,46 +278,93 @@ creation).
 
 ### 7.2 Operations and journal records
 
+These records implement amendment 2 (DEC-012). Recovery uses only data that
+is saved before any write it governs.
+
 ```json
 {
-  "runId": "run_01J...", "conversationId": "cnv_01J...",
-  "model": { "profileId": "prf_...", "model": "pinned-model-id" },
-  "createdAt": "...", "phase": "prepared | applied",
+  "schemaVersion": 1,
+  "runId": "run_01J...",
+  "source": { "kind": "agent | fixed-demo", "label": "Demo operations (fixed, not AI)",
+              "conversationId": null, "model": null },
+  "createdAt": "...",
+  "phase": "prepared | applying | applied | partial",
+  "files": [
+    { "path": "meetings/kickoff.md", "beforeHash": "sha256:…", "afterHash": "sha256:…",
+      "state": "planned | written | failed | conflicted", "error": null }
+  ],
   "changes": [
     {
       "changeId": "chg_01J...",
-      "kind": "note.replaceBlock | note.insertBlock | note.deleteBlock | note.create | record.create | record.updateField | record.delete | link.add | link.remove",
-      "target": { "file": ".nexus/issues.json", "recordId": "iss_...", "field": "due" },
+      "opId": "op_01J...",
+      "kind": "note.replaceBlock | note.insertBlock | note.deleteBlock | record.updateField | record.create",
+      "file": ".nexus/issues.json",
+      "target": { "recordId": "iss_...", "field": "due" },
       "baseRevision": 3,
-      "before": { "value": { "date": "2026-12-05" } },
-      "after":  { "value": { "date": "2026-12-03" } },
-      "anchor": null,
+      "before": { "date": "2026-12-05" },
+      "after":  { "date": "2026-12-03" },
+      "context": null,
       "dependsOn": [],
       "supersedes": null,
       "state": "prepared",
+      "reversal": null,
       "history": [{ "state": "prepared", "at": "...", "by": "agent" }]
     }
   ]
 }
 ```
 
-For note changes, `target.file` is the note path, `baseRevision` is the file
-hash, `anchor` is `{ headingSlug, blockIndex }`, and `before`/`after` hold the
-exact block text (empty for insertions or deletions respectively).
+- `opId` comes from the proposal. A second proposal that reuses an `opId`
+  already in any journal is returned as a duplicate and not applied again.
+  `changeId` is assigned by the service. Both are stable for the life of the
+  change.
+- `files[]` is computed during validation. Each entry records the file's
+  hash before the run, and the hash expected after **all** of that file's
+  changes in the run have been applied. Hashes are SHA-256 of the file
+  bytes. For JSON, the bytes are those produced by the deterministic
+  serialiser (two-space indentation, a trailing newline, keys in schema
+  order), so the hash of a recomputed result is reproducible.
+- **Note changes** are line-aligned text spans:
+  - `before` and `after` are the exact span text, and either may be empty
+    for an insertion or a deletion.
+  - `context` stores `{ headingSlug, lineBefore, lineAfter }`. These are the
+    nearest non-blank lines on each side of the span at proposal time, used
+    to find the span again.
+- **Record changes:** `before` and `after` hold the field value, and
+  `baseRevision` is the record's `revision`.
+- `reversal` is written just before a rejection's file write. It records the
+  file's `beforeHash` (current at decision time) and the `afterHash`
+  expected once only this change has been reversed. See section 7.4.
 
 ### 7.3 Apply sequence (R-C1, R-C2)
 
-1. **Validate** every operation: schema, path inside the workspace (resolved,
-   no `..`, no symlink escape, `.md` or known `.nexus/*.json` only), target
-   exists (or does not, for creates), base revision equals current, and
-   `before` matches current content. Invalid operations are returned to the
-   model with a reason; the model may retry within the step limit. Nothing is
-   written for an invalid operation.
-2. **Journal**: write `reviews/<runId>.json` with all valid changes in state
-   `prepared` (atomic write, section 7.6).
-3. **Apply per file**: compute each file's new content from all of its
-   changes; write it atomically; then update the journal entries for that
-   file to `pending`. Mark the run `applied` when all files are done.
+1. **Validate** every operation:
+   - its schema;
+   - its path, which must resolve inside the workspace with no `..` and no
+     symlink escape, and must be a `.md` file or a known `.nexus/*.json`;
+   - its target, which must exist (or must not exist, for creates);
+   - its base revision, which must equal the current one;
+   - its `before`, which must match the current content (exactly one match
+     for note spans, see 7.4).
+
+   Group the valid operations by file. Compute each file's new content in
+   memory, then record `beforeHash` and `afterHash`. Invalid operations are
+   returned to the caller with a reason, and nothing is written for them.
+2. **Journal**: write `reviews/<runId>.json` with `phase: prepared`, every
+   file `planned` and every change `prepared`. Write it atomically (section
+   7.6) and `fsync` it **before** any workspace file is touched.
+3. **Apply per file**, in a fixed order:
+   1. Set the run's phase to `applying`.
+   2. For each file, write its new content atomically.
+   3. Mark that file `written` and its changes `pending` in the journal,
+      using a second atomic journal write.
+   4. When every file is `written`, set the phase to `applied`.
+
+   If a file write fails, mark that file `failed`. Its changes stay
+   `prepared`, the run's phase becomes `partial`, and the remaining files
+   are not attempted. Files already written stay `pending` and are reviewed
+   normally. The user can **Retry** the failed files or **Discard** them,
+   which marks them `rejected` with no write needed.
 4. **Refresh**: the service emits `file.changed` and `review.updated`. Open
    editors with no unsaved edits reload in place, keeping scroll position and
    selection; editors with unsaved edits keep their buffer and show the
@@ -288,17 +379,36 @@ starting an Edit run, so agent changes rarely meet unsaved buffers.
 - **Accept** `pending → accepted`. No file write; the content is already
   there. If the change has a `dependsOn` target that is still pending, the UI
   offers "Accept both" instead of accepting alone.
-- **Reject** `pending → rejected` with reversal:
-  1. Locate the change's current region: for a field, the field's current
-     value; for a note block, the unique occurrence of the `after` text within
-     its anchored section (falling back to the whole file); for a created
-     record or note, the whole item.
-  2. If the current region equals `after`, write `before` back atomically
-     (other content in the file, including other changes, is untouched).
-  3. Otherwise mark the change `conflicted` and show before, proposed and
-     current side by side. The default action is **Keep current** (closes as
-     rejected, no write). **Restore original** overwrites only after explicit
-     confirmation and stores the overwritten text in the journal.
+- **Reject** `pending → rejecting → rejected`, with reversal:
+  1. **Locate** the change's region in the current file:
+     - *Field:* the field's current value on the record.
+     - *Note span:* every line-aligned occurrence of the `after` text.
+       1. If there is more than one, keep only those whose nearest
+          non-blank neighbours equal `context.lineBefore` and
+          `context.lineAfter`.
+       2. Exactly one remaining occurrence is the region.
+       3. No occurrence means the span was deleted or edited, and the
+          result is `conflicted` (`reason: missing`).
+       4. Two or more means the span is repeated, and the result is
+          `conflicted` (`reason: ambiguous`).
+     - *Deletion* (`after` is empty): the insertion point is where
+       `lineBefore` and `lineAfter` are adjacent and unique. Otherwise the
+       result is `conflicted` (`reason: ambiguous` or `missing`).
+     - *Created record:* the whole record.
+  2. **Reverse**, when the region is found and equals `after`:
+     1. Compute the new file content by splicing `before` into that region
+        only, so unrelated edits elsewhere in the file are kept.
+     2. Persist `reversal: { beforeHash, afterHash }` and set the state to
+        `rejecting` in the journal.
+     3. Write the file atomically.
+     4. Set the state to `rejected`.
+  3. **Conflict**, in every other case:
+     - Mark the change `conflicted`, record the reason, and write no file.
+     - Show the before, proposed and current text side by side.
+     - The default action is **Keep current**, which closes the change as
+       rejected with no write.
+     - **Restore original** is offered only for `reason: ambiguous`. It
+       asks the user to pick the occurrence, then follows step 2.
   4. Dependents: rejecting a change also rejects every pending change that
      `dependsOn` it, after the UI lists them and the user confirms (D-C1).
      They are marked `rejected` with reason `target-rejected`.
@@ -311,17 +421,33 @@ starting an Edit run, so agent changes rarely meet unsaved buffers.
 
 ### 7.5 Recovery and retries (R-C5)
 
-On service start, before serving writes:
+On service start, the service runs the steps below for every journal whose
+phase is not `applied`, and for every change in `rejecting`. It does this
+before serving any write. Each file write is atomic, so a file always holds
+either its old content or its new content, never a mixture. A multi-file run
+can still stop part-way through, with some files written and others not.
 
-- For each journal with changes in `prepared`: if the file's hash equals the
-  expected post-apply hash, mark `pending`; if it equals the base, re-apply
-  (roll forward, because the user requested the edit); otherwise mark
-  `conflicted`. Each file write is atomic, so the file is in exactly one of
-  these states.
+- **Interrupted apply:** for each file that is `planned`, compare the
+  current hash with the hashes saved in the journal.
+  - If it equals `afterHash`, the write landed but the journal update did
+    not. Mark the file `written` and its changes `pending`.
+  - If it equals `beforeHash`, the write never happened. Recompute the
+    content from the current file and the saved changes, check that the
+    result hashes to `afterHash`, write it, and mark the file `written`.
+    This rolls the run forward, because the user asked for the edit.
+  - Anything else means the file changed outside Nexus in between. Mark the
+    file and its changes `conflicted` with `reason: changed-before-apply`,
+    and write nothing.
+- **Interrupted rejection:** for each change in `rejecting`, compare the
+  current hash with `reversal.afterHash` and `reversal.beforeHash`.
+  - If it equals `afterHash`, mark the change `rejected`.
+  - If it equals `beforeHash`, redo the reversal (section 7.4, step 2).
+  - Anything else is `conflicted`.
 - `pending` and `conflicted` changes are restored to the review bar.
-- Accept, reject and apply are idempotent: repeating an operation that
-  already reached its target state returns success without writing. Each
-  request carries the change ID, so client retries are safe.
+- **Idempotence:** Accept, Reject and apply are all idempotent. A request
+  that finds its change already in the target state returns success without
+  writing, so a client can safely retry by sending the same change ID. A
+  repeated proposal with a known `opId` returns the existing change.
 
 ### 7.6 Atomic writes
 
@@ -406,8 +532,9 @@ with a "Proposed" marker. Accepting a date change triggers rescheduling.
 | Workspace folder missing or unreadable | Welcome screen with "Workspace not found". Choose another folder |
 | Lock held by a live instance | Second instance refuses to open the workspace and links to the running instance. A stale lock (dead pid) is taken over |
 | JSON file fails to parse or validate | That collection opens read-only with an error and a "Restore from .bak" action. Other collections work |
-| Write fails (disk full, permission) | Operation fails with a clear error. Journal state is unchanged, so there is no partial change |
-| Crash during an agent apply | Recovery as in 7.5 |
+| Manual write fails (disk full, permission) | The save fails with a clear error. The file keeps its previous content (atomic write), and the editor keeps the unsaved buffer |
+| A file write fails during a multi-file agent apply | Files already written stay `pending` for review. The failed file is marked `failed` and the run `partial`. The user can Retry or Discard the rest (7.3) |
+| Crash or power loss during apply or rejection | On restart, each file is checked against the journal's saved hashes and rolled forward, or marked `conflicted` (7.5) |
 | External edit overlaps a reversal | `conflicted`, newer work kept (7.4) |
 | External edit while the user has unsaved changes | Banner offering Keep mine, Load disk or Compare. Nothing is discarded silently |
 | Notification permission denied | In-app notifications only, with a Settings hint |
@@ -416,8 +543,10 @@ with a "Proposed" marker. Accepting a date change triggers rescheduling.
 
 ## 11. Security summary
 
-- Loopback-only service with a per-start bearer token, host-header check and
-  no CORS (4.1).
+- The service listens on loopback only and checks the `Host` header. It
+  sends no CORS headers. Single-use launch codes travel in the URL fragment,
+  and session tokens travel only in request bodies and headers, never in
+  query strings or logs (4.1).
 - Sandboxed Electron renderer with a minimal preload API (4.2).
 - Keys are kept only in safeStorage or service memory, are redacted from
   logs and errors, and are excluded from the workspace and the package

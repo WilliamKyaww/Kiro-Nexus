@@ -1,6 +1,6 @@
 # Nexus PRD: technology stack
 
-- **Status:** Complete draft for Will's review
+- **Status:** Approved by Will at `7b775cd` (2026-11-24); amendments 1-4 applied (DEC-011 to DEC-014)
 - **Last updated:** 2026-11-24
 - **Rule:** choose the smallest maintained option that meets a PRD
   requirement. Exact versions are pinned when the project is scaffolded
@@ -12,8 +12,9 @@
 | Choice | Reason | Alternatives considered |
 | --- | --- | --- |
 | **TypeScript** (strict) everywhere | One language for UI, service, Electron and shared schemas | JavaScript (loses the typed contracts with Hein's fixtures) |
-| **Node.js 26 LTS** (Active LTS since 28 October 2026), pinned in `.nvmrc` and `engines` | Current LTS line. The dev machine has 24.14.0, which must be upgraded at scaffold time | Node 24 (older LTS, but works; acceptable fallback if Electron's bundled Node lags) |
-| **npm workspaces** | Already installed (npm 11.9) and enough for five packages | pnpm or Turborepo (an extra tool with no requirement behind it) |
+| **Node.js 24.14.0** for development and for the browser route, pinned in `.nvmrc` with `engines: ^24.14.0 \|\| >=26` (DEC-013) | It is installed on the dev machine and meets every toolchain requirement checked on 24 November 2026. The strictest are chokidar 6 (`>=22.22`), Vitest 5 (`^24` or `>=26`) and Electron 45 (`>=22.12`) | Node 26 LTS. It is current, but upgrading Node system-wide needs a human decision |
+| **Electron's bundled Node** runs the service in the desktop app | Electron ships its own Node. Its version is recorded in `docs/toolchain.md` after installation, and the service must run on both versions | Running the system Node from Electron (two runtimes to support, and it fails on judges' machines that have no Node) |
+| **One root package**, with TypeScript path aliases for `packages/*` | A single lockfile and one set of scripts. The bundlers resolve the aliases directly | npm workspaces (they add symlinks and per-package manifests and solve no current problem); pnpm or Turborepo (extra tools) |
 
 Sources: [Node.js releases](https://nodejs.org/en/blog/release) and
 [endoflife.date](https://endoflife.date/nodejs), checked 24 November 2026.
@@ -80,10 +81,19 @@ against each provider's own page in slice C.
 is synthetic, and the Settings page warns the user before they send real
 notes to a provider.
 
-**Judge route (D-E1):** the default is the packaged build plus the judge's
-own free key from the verified route. A labelled replay mode is used only if
-no free route proves reliable, and it never counts as evidence of AI
-behaviour.
+**Judge route (D-E1, amended by DEC-014).** Slice C keeps the live
+free-provider route open. Two routes are considered:
+
+- A judge supplies their own free API key. This is one option, not the
+  default assumption.
+- A **team-provided evaluation route** lets judges try the AI workflow
+  without creating an account. This is a release requirement still to be
+  resolved (PRD-091). It must not bundle a private key in the
+  distributable, and it must stay free of charge until judging ends.
+
+A scripted replay can demonstrate the interface, and is always labelled as a
+replay. It cannot verify live AI behaviour, and is never evidence for it.
+Tonight's work (24 November) uses fictional data and no provider credentials.
 
 ## 4. Testing and quality
 
