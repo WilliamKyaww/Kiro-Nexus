@@ -10,7 +10,7 @@ export function readOnlyWorkspace(service: WorkspaceService, index: SearchIndex,
     search: (query: string, limit: number) => index.search(query, limit),
     readNote: async (path: string) => {
       const raw = await service.readNoteRaw(path).catch(() => null);
-      return raw ? { path: raw.rel, content: raw.content } : null;
+      return raw ? { path: raw.rel, content: raw.content, revision: raw.revision } : null;
     },
     listNotes: () => service.listNotes(),
     projects: () => service.listProjects(),

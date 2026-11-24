@@ -3,15 +3,15 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  IssuesFile, OPEN_STATES, ProposedOperation, ReviewRun, serialise,
-  type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT, type RunOutcome,
+  ISSUE_REF, Issue, IssuesFile, OPEN_STATES, ProposedOperation, ReviewRun, serialise,
+  type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT, type NoteLink, type RunOutcome,
 } from "@nexus/schema";
 import { parseHeadings } from "@nexus/markdown";
 import { NexusError } from "../errors";
 import { faultPoint } from "../faults";
 import { sha256 } from "../workspace/atomic";
 import { newId, type WorkspaceService } from "../workspace/service";
-import { canonical, sameValue, setField, validFieldValue } from "./records";
+import { addIssue, addLink, applyRecordChange, canonical, createdUnchanged, hasLink, removeIssue, removeLink, sameValue, setField, validFieldValue } from "./records";
 import { applyEdits, locate, normaliseSpan, splice } from "./spans";
 
 type Actor = "agent" | "demo" | "user" | "system";
@@ -108,6 +108,8 @@ export class ReviewEngine {
         fileState: run.files.find((f) => f.path === change.file)?.state ?? "planned",
         fileError: run.files.find((f) => f.path === change.file)?.error ?? null,
         runPhase: run.phase,
+        dependsOn: change.dependsOn,
+        dependents: run.changes.filter((c) => c.dependsOn.includes(change.changeId)).map((c) => c.changeId),
       });
     }
     return out;
@@ -158,11 +160,31 @@ export class ReviewEngine {
       const changes: ChangeRecord[] = [];
       const mkChange = (op: ProposedOperation, extra: Partial<ChangeRecord>): ChangeRecord => ({
         changeId: newId("chg"), opId: op.opId, kind: op.kind, file: op.file,
-        target: { recordId: null, recordKey: null, field: null }, baseRevision: op.baseRevision,
-        before: op.before, after: op.after, context: null, dependsOn: [], supersedes: null,
+        target: { recordId: null, recordKey: null, field: null }, baseRevision: "baseRevision" in op && op.baseRevision !== undefined ? op.baseRevision : 0,
+        before: "before" in op ? op.before : null, after: "after" in op ? op.after : null, context: null, dependsOn: [], supersedes: null,
         state: "prepared", conflictReason: null, reversal: null, feedback: null,
         history: [{ state: "prepared", at: createdAt, by, note: null }], ...extra,
       });
+
+      // New issues get their keys first, so that links and note edits in the same proposal can
+      // refer to them ({{issue:<opId>}} or issueRef). The key comes from the project's counter and
+      // existing keys, as for a manual create; projects.json is not written by a review run.
+      const created = new Map<string, Issue>();
+      const issuesNow = this.service.issuesSnapshot();
+      for (const op of fresh) {
+        if (op.kind !== "record.create") continue;
+        const project = this.service.listProjects().find((p) => p.key === op.projectKey);
+        if (!project) { errors.push({ opId: op.opId, reason: `Project not found: ${op.projectKey}` }); continue; }
+        const used = [...issuesNow.issues, ...created.values()].filter((i) => i.projectId === project.id).map((i) => Number(i.key.split("-")[1]));
+        const n = Math.max(project.nextIssueNumber, ...used.map((u) => u + 1), 1);
+        created.set(op.opId, Issue.parse({
+          id: newId("iss"), key: `${project.key}-${n}`, projectId: project.id, title: op.title, description: op.description ?? "",
+          status: op.status ?? "todo", priority: op.priority ?? "medium", due: op.due ?? null, rank: String(n).padStart(8, "0"),
+          noteLinks: [], createdAt, updatedAt: createdAt, revision: 1,
+        }));
+      }
+      const refsIn = (text: string) => [...text.matchAll(ISSUE_REF)].map((m) => m[1]!);
+      const opDeps = new Map<string, string[]>();
 
       // Notes: group by file, validate base revision and unique, non-overlapping spans.
       const noteOps = new Map<string, Extract<ProposedOperation, { kind: "note.replaceSpan" }>[]>();
@@ -170,7 +192,12 @@ export class ReviewEngine {
         if (op.kind !== "note.replaceSpan") continue;
         let rel: string;
         try { rel = this.service.notePath(op.file).rel; } catch (e) { errors.push({ opId: op.opId, reason: (e as Error).message }); continue; }
-        noteOps.set(rel, [...(noteOps.get(rel) ?? []), { ...op, file: rel }]);
+        const refs = refsIn(op.after);
+        const unknown = refs.filter((r) => !created.has(r));
+        if (unknown.length) { errors.push({ opId: op.opId, reason: `The edit refers to an issue this proposal does not create: ${unknown.join(", ")}` }); continue; }
+        opDeps.set(op.opId, [...new Set([...(op.dependsOn ?? []), ...refs])]);
+        const after = op.after.replace(ISSUE_REF, (_m, ref: string) => created.get(ref)!.key);
+        noteOps.set(rel, [...(noteOps.get(rel) ?? []), { ...op, file: rel, after }]);
       }
       for (const [rel, group] of noteOps) {
         const raw = await this.service.readNoteRaw(rel);
@@ -188,12 +215,19 @@ export class ReviewEngine {
         group.forEach((o, i) => changes.push(mkChange(o, { before: edits[i]!.before, after: edits[i]!.after, context: result.placed[i]!.context })));
       }
 
-      // Records: one issues.json entry for the whole run.
+      // Records: one issues.json entry for the whole run. Order: new issues, field edits, links.
       const recordOps = fresh.filter((o): o is Extract<ProposedOperation, { kind: "record.updateField" }> => o.kind === "record.updateField");
-      if (recordOps.length) {
+      const createOps = fresh.filter((o): o is Extract<ProposedOperation, { kind: "record.create" }> => o.kind === "record.create" && created.has(o.opId));
+      const linkOps = fresh.filter((o): o is Extract<ProposedOperation, { kind: "record.addLink" }> => o.kind === "record.addLink");
+      if (recordOps.length || createOps.length || linkOps.length) {
         const bytes = await this.service.readCollectionBytes("issues");
         let next: IssuesFileT = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
         const pendingRecordChanges: ChangeRecord[] = [];
+        for (const op of createOps) {
+          const issue = created.get(op.opId)!;
+          next = addIssue(next, issue);
+          pendingRecordChanges.push(mkChange(op, { target: { recordId: issue.id, recordKey: issue.key, field: null }, file: ISSUES, baseRevision: 0, before: null, after: issue }));
+        }
         for (const op of recordOps) {
           const issue = next.issues.find((i) => i.key === op.recordKey);
           if (!issue) { errors.push({ opId: op.opId, reason: `Issue not found: ${op.recordKey}` }); continue; }
@@ -204,6 +238,28 @@ export class ReviewEngine {
           next = setField(next, issue.id, op.field, op.after, createdAt);
           pendingRecordChanges.push(mkChange(op, { target: { recordId: issue.id, recordKey: issue.key, field: op.field }, file: ISSUES }));
         }
+        for (const op of linkOps) {
+          const ref = op.issueRef ? created.get(op.issueRef) : undefined;
+          if (op.issueRef && !ref) { errors.push({ opId: op.opId, reason: `The link refers to an issue this proposal does not create: ${op.issueRef}` }); continue; }
+          const issue = ref ?? next.issues.find((i) => i.key === op.recordKey);
+          if (!issue) { errors.push({ opId: op.opId, reason: `Issue not found: ${op.recordKey ?? "(none given)"}` }); continue; }
+          if (!ref && op.baseRevision !== undefined && issuesNow.issues.find((i) => i.id === issue.id)?.revision !== op.baseRevision) {
+            errors.push({ opId: op.opId, reason: `${issue.key} changed after this link was proposed.` }); continue;
+          }
+          let link = op.link;
+          try {
+            const raw = await this.service.readNoteRaw(op.link.notePath);
+            if (!raw) throw new NexusError("NOT_FOUND", `Note not found: ${op.link.notePath}`);
+            const heading = op.link.headingSlug === null ? null : parseHeadings(raw.content).find((h) => h.slug === op.link.headingSlug);
+            if (op.link.headingSlug !== null && !heading) throw new NexusError("VALIDATION", `Heading not found in ${raw.rel}: ${op.link.headingSlug}`);
+            link = { notePath: raw.rel, headingSlug: heading?.slug ?? null, headingText: heading?.text ?? null };
+          } catch (e) { errors.push({ opId: op.opId, reason: (e as Error).message }); continue; }
+          const current = next.issues.find((i) => i.id === issue.id)!;
+          if (hasLink(current, link)) { errors.push({ opId: op.opId, reason: `${issue.key} already links to that note or heading.` }); continue; }
+          next = addLink(next, issue.id, link, createdAt);
+          if (op.issueRef) opDeps.set(op.opId, [op.issueRef]);
+          pendingRecordChanges.push(mkChange(op, { target: { recordId: issue.id, recordKey: issue.key, field: null }, file: ISSUES, baseRevision: current.revision, before: null, after: link }));
+        }
         if (pendingRecordChanges.length) {
           files.push({ path: ISSUES, beforeHash: sha256(bytes), afterHash: sha256(serialise(IssuesFile, next)), state: "planned", error: null });
           changes.push(...pendingRecordChanges);
@@ -211,6 +267,15 @@ export class ReviewEngine {
       }
 
       if (errors.length) throw new NexusError("VALIDATION", "Some proposed changes could not be applied. Nothing was written.", errors);
+
+      // Dependencies between operations become dependencies between changes (architecture 7.1).
+      const changeOf = new Map(changes.map((c) => [c.opId, c.changeId]));
+      for (const c of changes) {
+        const deps = opDeps.get(c.opId) ?? [];
+        const missing = deps.filter((d) => !changeOf.has(d));
+        if (missing.length) throw new NexusError("VALIDATION", "Some proposed changes could not be applied. Nothing was written.", [{ opId: c.opId, reason: `It depends on an operation that is not in this proposal: ${missing.join(", ")}` }]);
+        c.dependsOn = deps.map((d) => changeOf.get(d)!);
+      }
 
       const run: ReviewRun = {
         schemaVersion: 1, runId: newId("run"),
@@ -238,7 +303,11 @@ export class ReviewEngine {
       const bytes = await this.service.readCollectionBytes("issues");
       if (sha256(bytes) !== file.beforeHash) return { kind: "changed" };
       let next = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
-      for (const c of changes) next = setField(next, c.target.recordId!, c.target.field!, c.after, at);
+      for (const c of changes) {
+        const applied = applyRecordChange(next, c, at);
+        if (!applied.ok) throw new NexusError("INTERNAL", `Recomputed issues do not match the journal: ${applied.why}.`);
+        next = applied.file;
+      }
       if (sha256(serialise(IssuesFile, next)) !== file.afterHash) throw new NexusError("INTERNAL", "Recomputed issues do not match the journal.");
       return { kind: "issues", value: next };
     }
@@ -326,12 +395,9 @@ export class ReviewEngine {
       let next = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
       let kept = 0;
       for (const c of prepared) {
-        const issue = next.issues.find((i) => i.id === c.target.recordId);
-        if (!issue || !sameValue(issue[c.target.field!], c.before) || !validFieldValue(issue, c.target.field!, c.after)) {
-          conflict(c, "retry: the field no longer has the value this change expected");
-          continue;
-        }
-        next = setField(next, issue.id, c.target.field!, c.after, at);
+        const applied = applyRecordChange(next, c, at);
+        if (!applied.ok) { conflict(c, `retry: ${applied.why}`); continue; }
+        next = applied.file;
         kept += 1;
       }
       if (kept === 0) return "nothing-left";
@@ -405,11 +471,52 @@ export class ReviewEngine {
   }
   // ---------------- Decisions ----------------
 
-  async accept(changeId: string): Promise<ChangeView> {
+  /** Pending changes this one depends on, transitively (for "Accept both"). */
+  private pendingDependencies(change: ChangeRecord): ChangeRecord[] {
+    const out: ChangeRecord[] = [];
+    const visit = (c: ChangeRecord) => {
+      for (const id of c.dependsOn) {
+        const dep = this.allChanges().find((x) => x.change.changeId === id)?.change;
+        if (dep && dep.state === "pending" && !out.includes(dep)) { out.push(dep); visit(dep); }
+      }
+    };
+    visit(change);
+    return out;
+  }
+
+  /** Open changes that depend on this one, transitively, most dependent first (for rejection). */
+  private openDependents(change: ChangeRecord): ChangeRecord[] {
+    const out: ChangeRecord[] = [];
+    const visit = (c: ChangeRecord) => {
+      for (const { change: d } of this.allChanges()) {
+        if (d.dependsOn.includes(c.changeId) && OPEN_STATES.includes(d.state) && !out.includes(d)) { visit(d); out.push(d); }
+      }
+    };
+    visit(change);
+    return out;
+  }
+
+  /**
+   * Accept a change. When it depends on a change still pending (for example a link to a new
+   * issue), both must be accepted together: without `withDependencies` this is refused with the
+   * list, so the UI can offer "Accept both" (architecture 7.4).
+   */
+  async accept(changeId: string, opts: { withDependencies?: boolean } = {}): Promise<ChangeView> {
     return this.service.exclusive(async () => {
       const { run, change } = this.find(changeId);
       if (change.state === "accepted") return this.viewOf(changeId);
       if (change.state !== "pending") throw new NexusError("CONFLICT", `This change is ${change.state} and cannot be accepted.`);
+      const deps = this.pendingDependencies(change);
+      if (deps.length && !opts.withDependencies) {
+        throw new NexusError("CONFLICT", "This change depends on another change that is still awaiting review. Accept them together.", {
+          reason: "needs-dependencies", changes: deps.map((d) => ({ changeId: d.changeId, summary: summarise(d) })),
+        });
+      }
+      for (const dep of deps.reverse()) {
+        const owner = this.find(dep.changeId).run;
+        this.mark(owner, dep, "accepted", "user", `accepted with ${change.changeId}`);
+        if (owner !== run) await this.persist(owner);
+      }
       this.mark(run, change, "accepted", "user");
       await this.persist(run);
       this.publish({ type: "review.updated" });
@@ -455,16 +562,53 @@ export class ReviewEngine {
     const file = IssuesFile.parse(JSON.parse(bytes.toString("utf8")));
     const issue = file.issues.find((i) => i.id === change.target.recordId);
     if (!issue) return { ok: false, reason: "missing" };
-    if (!sameValue(issue[change.target.field!], change.after)) return { ok: false, reason: "changed" };
-    const next = setField(file, issue.id, change.target.field!, change.before, at);
+    let next: IssuesFileT;
+    if (change.kind === "record.create") {
+      // Undo a new issue only if nobody has worked on it since; newer work is kept.
+      if (!createdUnchanged(issue, Issue.parse(change.after))) return { ok: false, reason: "changed" };
+      next = removeIssue(file, issue.id);
+    } else if (change.kind === "record.addLink") {
+      if (!hasLink(issue, change.after as NoteLink)) return { ok: false, reason: "missing" };
+      next = removeLink(file, issue.id, change.after as NoteLink, at);
+    } else {
+      if (!sameValue(issue[change.target.field!], change.after)) return { ok: false, reason: "changed" };
+      next = setField(file, issue.id, change.target.field!, change.before, at);
+    }
     return { ok: true, beforeHash: sha256(bytes), afterHash: sha256(serialise(IssuesFile, next)), write: async () => { await this.service.writeCollectionUnlocked("issues", IssuesFile, next); } };
   }
 
-  async reject(changeId: string): Promise<ChangeView> {
+  /**
+   * Reject a change, reversing only its own region. Changes that depend on it (for example the
+   * link to and the note mention of a new issue) are rejected first, but only once the user has
+   * confirmed the list: without `withDependents` this is refused with that list (D-C1, PRD-063).
+   */
+  async reject(changeId: string, opts: { withDependents?: boolean } = {}): Promise<ChangeView> {
     return this.service.exclusive(async () => {
-      const { run, change } = this.find(changeId);
+      const { change } = this.find(changeId);
       if (["rejected", "superseded", "conflicted"].includes(change.state)) return this.viewOf(changeId);
       if (change.state !== "pending") throw new NexusError("CONFLICT", `This change is ${change.state} and cannot be rejected.`);
+      const dependents = this.openDependents(change);
+      if (dependents.length && !opts.withDependents) {
+        throw new NexusError("CONFLICT", "Other changes depend on this one. Rejecting it also rejects them.", {
+          reason: "has-dependents", changes: dependents.map((d) => ({ changeId: d.changeId, summary: summarise(d) })),
+        });
+      }
+      for (const d of dependents) {
+        if (d.state === "pending") await this.rejectOne(d.changeId, `rejected because ${change.changeId} was rejected`);
+        else if (d.state === "conflicted") {
+          const owner = this.find(d.changeId).run;
+          this.mark(owner, d, "rejected", "user", "closed: the change it depends on was rejected");
+          await this.persist(owner);
+        }
+      }
+      return this.rejectOne(changeId, null);
+    });
+  }
+
+  /** Reverse one pending change. Callers must hold `exclusive`. */
+  private async rejectOne(changeId: string, note: string | null): Promise<ChangeView> {
+    {
+      const { run, change } = this.find(changeId);
       const at = now();
       const plan = await this.planReversal(change, at);
       if (!plan.ok) {
@@ -480,11 +624,11 @@ export class ReviewEngine {
       faultPoint("review:after-reversal-journal");
       await plan.write();
       faultPoint("review:after-reversal-write");
-      this.mark(run, change, "rejected", "user");
+      this.mark(run, change, "rejected", "user", note);
       await this.persist(run);
       this.publish({ type: "review.updated" });
       return this.viewOf(changeId);
-    });
+    }
   }
 
   private async viewOf(changeId: string): Promise<ChangeView> {
@@ -553,6 +697,11 @@ function firstLine(value: unknown): string {
 
 function summarise(change: ChangeRecord): string {
   if (change.kind === "note.replaceSpan") return `${change.file}: “${firstLine(change.before)}” → “${firstLine(change.after)}”`;
+  if (change.kind === "record.create") return `New issue ${change.target.recordKey}: ${(change.after as { title?: string })?.title ?? ""}`;
+  if (change.kind === "record.addLink") {
+    const l = change.after as NoteLink;
+    return `${change.target.recordKey} link to ${l.notePath.replace(/\.md$/i, "")}${l.headingText ? ` › ${l.headingText}` : ""}`;
+  }
   const show = (v: unknown) => (v && typeof v === "object" && "date" in (v as object) ? String((v as { date: string }).date) : v === null ? "none" : canonical(v).replace(/^"|"$/g, ""));
   return `${change.target.recordKey} ${change.target.field}: ${show(change.before)} → ${show(change.after)}`;
 }

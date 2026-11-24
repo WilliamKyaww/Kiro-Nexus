@@ -13,10 +13,20 @@ export { zonedTimeToUtc };
  * is someone's newer manual work and stands.
  */
 export function effectiveAcceptedIssues(issues: Issue[], unsettled: ChangeRecord[]): Issue[] {
-  return issues.map((issue) => {
+  // A new issue still awaiting review is not accepted data (architecture 7.7), nor is a link
+  // that a pending change added.
+  const proposedIssues = new Set(unsettled.filter((c) => c.kind === "record.create").map((c) => c.target.recordId));
+  return issues.filter((issue) => !proposedIssues.has(issue.id)).map((issue) => {
     let out = issue;
     for (const c of unsettled) {
-      if (c.kind !== "record.updateField" || c.target.recordId !== issue.id || !c.target.field) continue;
+      if (c.target.recordId !== issue.id) continue;
+      if (c.kind === "record.addLink") {
+        const link = c.after as { notePath: string; headingSlug: string | null };
+        const i = out.noteLinks.findIndex((l) => l.notePath === link.notePath && l.headingSlug === link.headingSlug);
+        if (i >= 0) out = { ...out, noteLinks: out.noteLinks.filter((_, n) => n !== i) };
+        continue;
+      }
+      if (c.kind !== "record.updateField" || !c.target.field) continue;
       if (sameValue(out[c.target.field], c.after)) out = { ...out, [c.target.field]: c.before } as Issue;
     }
     return out;

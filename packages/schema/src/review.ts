@@ -7,7 +7,15 @@ const IsoInstant = z.iso.datetime({ offset: false });
 
 export const ChangeState = z.enum(["prepared", "pending", "accepted", "rejecting", "rejected", "conflicted", "superseded"]);
 export const ConflictReason = z.enum(["missing", "ambiguous", "changed", "changed-before-apply"]);
-export const ChangeKind = z.enum(["note.replaceSpan", "record.updateField"]);
+/** record.create adds a new issue; record.addLink adds one noteLinks entry (architecture 7.1). */
+export const ChangeKind = z.enum(["note.replaceSpan", "record.updateField", "record.create", "record.addLink"]);
+
+// Local copies of the issue shapes the operations need (index.ts re-exports this module).
+const LocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const DueValue = z.union([z.null(), z.strictObject({ date: LocalDate }), z.strictObject({ dateTime: IsoInstant, timeZone: z.string().min(1) })]);
+const LinkValue = z.strictObject({ notePath: z.string().min(1).max(512), headingSlug: z.string().max(200).nullable(), headingText: z.string().max(300).nullable() });
+/** `{{issue:<opId>}}` in a note edit stands for the key of the issue that operation creates. */
+export const ISSUE_REF = /\{\{issue:([^{}]{1,120})\}\}/g;
 export const RecordField = z.enum(["title", "description", "status", "priority", "due"]);
 export const Actor = z.enum(["agent", "demo", "user", "system"]);
 
@@ -67,6 +75,29 @@ export const ProposedOperation = z.discriminatedUnion("kind", [
     baseRevision: z.string().min(1),
     before: z.string().min(1).max(20_000),
     after: z.string().max(20_000),
+    /** opIds of operations in the same proposal this edit depends on (implied by {{issue:…}}). */
+    dependsOn: z.array(z.string().min(1).max(120)).max(10).optional(),
+  }),
+  z.strictObject({
+    opId: z.string().min(1).max(120),
+    kind: z.literal("record.create"),
+    file: z.literal(".nexus/issues.json"),
+    projectKey: z.string().regex(/^[A-Z][A-Z0-9]{1,9}$/),
+    title: z.string().trim().min(1).max(200),
+    description: z.string().max(20_000).optional(),
+    status: z.enum(["todo", "in_progress", "done"]).optional(),
+    priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+    due: DueValue.optional(),
+  }),
+  z.strictObject({
+    opId: z.string().min(1).max(120),
+    kind: z.literal("record.addLink"),
+    file: z.literal(".nexus/issues.json"),
+    /** An existing issue, or the opId of a record.create in the same proposal. */
+    recordKey: z.string().min(1).optional(),
+    issueRef: z.string().min(1).max(120).optional(),
+    baseRevision: z.number().int().positive().optional(),
+    link: LinkValue,
   }),
   z.strictObject({
     opId: z.string().min(1).max(120),
@@ -114,6 +145,9 @@ export interface ChangeView {
   fileState: FileEntry["state"];
   fileError: string | null;
   runPhase: ReviewRun["phase"];
+  /** Changes this one needs (for example the issue a link points to), and those that need it. */
+  dependsOn: string[];
+  dependents: string[];
 }
 
 /** What a proposal or retry actually did, file by file. */

@@ -59,8 +59,9 @@ export function reviewRoutes(state: AppState) {
     });
     app.post("/api/v1/review/runs/:id/retry", async (request) => requireEngine(state).retry(id(request)));
     app.post("/api/v1/review/runs/:id/discard", async (request) => requireEngine(state).discard(id(request)));
-    app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request)));
-    app.post("/api/v1/review/changes/:id/reject", async (request) => requireEngine(state).reject(id(request)));
+    const flag = (request: { query: unknown }, name: string) => (request.query as Record<string, string | undefined>)[name] === "1";
+    app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request), { withDependencies: flag(request, "withDependencies") }));
+    app.post("/api/v1/review/changes/:id/reject", async (request) => requireEngine(state).reject(id(request), { withDependents: flag(request, "withDependents") }));
     app.post("/api/v1/review/changes/:id/keep-current", async (request) => requireEngine(state).keepCurrent(id(request)));
     app.post("/api/v1/review/changes/:id/feedback", async (request) => {
       const { text } = ctx.parse(FeedbackRequest, request.body);

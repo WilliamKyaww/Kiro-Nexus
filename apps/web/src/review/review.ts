@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import type { ChangeView, RunOutcome } from "@nexus/schema";
-import { api, notePathParam } from "../api";
+import { ApiError, api, notePathParam } from "../api";
 
 export const openChangesKey = ["review", "open"] as const;
 
@@ -31,15 +31,19 @@ export function describeOutcome(o: RunOutcome): string {
   return `${lead}${written} of ${o.files.length} files were written. Not written: ${failed.map((f) => fileLabel(f.path)).join(", ")}. Use Retry or Discard in the review bar.`;
 }
 
-export function changeUrl(c: ChangeView): string {
+export function changeUrl(c: Pick<ChangeView, "kind" | "file" | "recordKey" | "changeId">): string {
   return c.kind === "note.replaceSpan"
     ? `${notePathParam(c.file)}&change=${encodeURIComponent(c.changeId)}`
     : `/issues/${encodeURIComponent(c.recordKey ?? "")}?change=${encodeURIComponent(c.changeId)}`;
 }
 
-// --- Tiny store: which rejected change is waiting for optional feedback, and the last message. ---
-interface ReviewUiState { feedbackFor: ChangeView | null; message: string | null }
-let uiState: ReviewUiState = { feedbackFor: null, message: null };
+/** Related changes that must be decided together (architecture 7.4), awaiting the user's confirmation. */
+export interface DecisionConfirm { change: ChangeView; action: "accept" | "reject"; others: Array<{ changeId: string; summary: string }> }
+
+// --- Tiny store: which rejected change is waiting for optional feedback, the last message, and
+// a decision waiting for confirmation because related changes would be decided with it. ---
+interface ReviewUiState { feedbackFor: ChangeView | null; message: string | null; confirm: DecisionConfirm | null }
+let uiState: ReviewUiState = { feedbackFor: null, message: null, confirm: null };
 const listeners = new Set<() => void>();
 export function setReviewUi(patch: Partial<ReviewUiState>): void {
   uiState = { ...uiState, ...patch };
@@ -67,27 +71,45 @@ export function useReviewActions() {
     client.invalidateQueries({ queryKey: ["issue"] }),
     client.invalidateQueries({ queryKey: ["issues"] }),
   ]);
-  const goNext = async (afterId: string) => {
-    const remaining = (client.getQueryData<{ changes: ChangeView[] }>(openChangesKey)?.changes ?? []).filter((c) => c.changeId !== afterId);
+  const goNext = async (after: ChangeView, action: string) => {
+    const remaining = (client.getQueryData<{ changes: ChangeView[] }>(openChangesKey)?.changes ?? []).filter((c) => c.changeId !== after.changeId);
     const next = remaining.find((c) => c.state === "pending") ?? remaining[0];
     if (next) navigate(changeUrl(next));
+    // A rejected new issue no longer exists, so leave its page for the project's board.
+    else if (action === "reject" && after.kind === "record.create" && after.recordKey) navigate(`/projects/${encodeURIComponent(after.recordKey.split("-")[0]!)}`);
   };
   const decide = useMutation({
-    mutationFn: ({ change, action }: { change: ChangeView; action: "accept" | "reject" | "keep-current" }) =>
-      api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/${action}`),
-    onSuccess: async (result, { change, action }) => {
-      if (action === "accept") setReviewUi({ message: `Accepted: ${change.summary}`, feedbackFor: null });
-      if (action === "keep-current") setReviewUi({ message: `Kept the current version: ${change.summary}`, feedbackFor: null });
-      if (action === "reject" && result.state === "rejected") setReviewUi({ message: `Rejected and undone: ${change.summary}`, feedbackFor: result });
+    // `together` confirms that related changes are decided with this one: the changes it needs
+    // when accepting, or the changes that need it when rejecting.
+    mutationFn: ({ change, action, together = false }: { change: ChangeView; action: "accept" | "reject" | "keep-current"; together?: boolean }) => {
+      const flag = together ? (action === "accept" ? "?withDependencies=1" : action === "reject" ? "?withDependents=1" : "") : "";
+      return api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/${action}${flag}`);
+    },
+    onSuccess: async (result, { change, action, together }) => {
+      const others = together ? uiState.confirm?.others ?? [] : [];
+      const also = others.length ? `, with ${others.length === 1 ? "the change it is tied to" : `${others.length} related changes`}` : "";
+      if (action === "accept") setReviewUi({ message: `Accepted: ${change.summary}${also}`, feedbackFor: null, confirm: null });
+      if (action === "keep-current") setReviewUi({ message: `Kept the current version: ${change.summary}`, feedbackFor: null, confirm: null });
+      if (action === "reject" && result.state === "rejected") setReviewUi({ message: `Rejected and undone: ${change.summary}${also}`, feedbackFor: result, confirm: null });
       if (action === "reject" && result.state === "conflicted") {
         setReviewUi({ message: result.conflictReason === "ambiguous"
           ? "Nexus could not tell which copy of this text to undo, so it changed nothing. Keep the current version, or edit it by hand."
-          : "This text was edited after the change, so Nexus kept the newer version and changed nothing.", feedbackFor: null });
+          : result.conflictReason === "changed" && result.kind === "record.create"
+            ? "This issue was edited after it was proposed, so Nexus kept it and changed nothing. Keep the current version, or delete it by hand."
+            : "This text was edited after the change, so Nexus kept the newer version and changed nothing.", feedbackFor: null, confirm: null });
       }
       await refresh();
-      if (result.state !== "conflicted") await goNext(change.changeId);
+      if (result.state !== "conflicted") await goNext(change, action);
     },
-    onError: (e) => setReviewUi({ message: (e as Error).message }),
+    onError: (e, { change, action }) => {
+      const details = e instanceof ApiError ? (e.details as { reason?: string; changes?: Array<{ changeId: string; summary: string }> } | undefined) : undefined;
+      if (e instanceof ApiError && e.code === "CONFLICT" && (action === "accept" || action === "reject")
+        && (details?.reason === "needs-dependencies" || details?.reason === "has-dependents") && details.changes?.length) {
+        setReviewUi({ confirm: { change, action, others: details.changes }, message: null });
+        return;
+      }
+      setReviewUi({ message: (e as Error).message, confirm: null });
+    },
   });
   const feedback = useMutation({
     mutationFn: ({ change, text }: { change: ChangeView; text: string }) => api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/feedback`, { text }),

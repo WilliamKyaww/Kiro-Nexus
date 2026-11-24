@@ -98,6 +98,9 @@ human review has happened yet. Task 9 is deliberately left open for slice D.
     restart, then Retry.
   - _Requirements: 1.3, 2.1, 3.5, 5.1; architecture section 7.3_
 
-- [ ] 9. Deferred to slice D (not tonight)
-  - `record.create`, `note.create`, `dependsOn` cascade, correction runs
-    with `supersedes`, and "Restore original" for ambiguous conflicts.
+- [ ] 9. Deferred to slice D (partly done in run 4)
+  - **Done (run 4, milestone 5):** `record.create`, `record.addLink`, and the
+    `dependsOn` cascade with confirmation. They are specified and verified
+    in `.kiro/specs/edit-first-journey/` (tasks 1 and 4).
+  - **Still open:** `note.create`, correction runs with `supersedes`, and
+    "Restore original" for ambiguous conflicts.

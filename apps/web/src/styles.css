@@ -221,6 +221,20 @@ a.button.primary:hover { background: #0b544d; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; border-top-color: var(--line); } }
 .back-link { margin: 0 0 0.5rem; }
 
+/* Edit mode, first journey (run 4). Placeholder styling: Hein owns the final design. */
+.turn.edit-turn.user .question { border-left: 4px solid var(--pending); }
+.edit-card { margin-top: 0.6rem; background: var(--panel); border: 1px solid var(--pending); border-radius: 10px; padding: 0.75rem 1.1rem; }
+.edit-card h3 { font-size: 1rem; margin: 0 0 0.3rem; }
+.edit-card ol { margin: 0.4rem 0 0; padding-left: 1.3rem; display: grid; gap: 0.35rem; }
+.edit-card li { overflow-wrap: anywhere; }
+.state-tag { font-size: 0.78rem; font-weight: 700; color: var(--pending); white-space: nowrap; }
+.state-tag.state-accepted { color: var(--accent); }
+.state-tag.state-rejected, .state-tag.state-conflicted { color: var(--danger); }
+.confirm-related { background: var(--pending-bg); border: 1px solid var(--pending); border-radius: 8px; padding: 0.5rem 0.75rem; }
+.confirm-related p { margin: 0 0 0.3rem; }
+.confirm-related ul { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
+.links .linked li.pending-field { background: var(--pending-bg); outline: 1px solid var(--pending); border-radius: 4px; padding: 0.1rem 0.3rem; }
+
 /* Board and calendar (B3 first slice). Placeholder styling: Hein owns the final design. */
 .board-page { max-width: 72rem; }
 .board-page .segmented { margin-bottom: 0.25rem; }

@@ -1,6 +1,7 @@
 // Ask state shared by Home and the conversation page.
 import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ChangeView } from "@nexus/schema";
 import { api } from "../api";
 
 export interface Citation {
@@ -21,11 +22,19 @@ export interface Message {
   answer: StoredAnswer | null;
   meta: null | { profileName: string; model: string; receivingHost: string; mode: string; fixture: boolean; scopeNote: string; steps: number; rejectedToolCalls: string[]; plainReplyIgnored: boolean };
   error: null | { code: string; message: string };
+  /** The run's authority. Absent in older conversations, whose turns were all Ask turns. */
+  authority?: "ask" | "edit";
+  /** Edit turns only: what the run proposed for review. */
+  edit?: EditOutcome | null;
 }
+export interface EditChange { changeId: string; kind: ChangeView["kind"]; summary: string; recordKey: string | null; file: string; state: string; dependsOn: string[] }
+export interface EditOutcome { reviewRunId: string | null; phase: string | null; changes: EditChange[]; failedFiles: Array<{ path: string; error: string | null }> }
 export interface Conversation { id: string; title: string; createdAt: string; updatedAt: string; messages: Message[]; activeRun: string | null }
 export interface AskStatus {
   available: boolean; reason: string | null; message: string | null;
   profile: null | { id: string; name: string; model: string; receivingHost: string; fixture: boolean };
+  /** Edit needs a model that has shown tool calling. */
+  edit?: { available: boolean; message: string | null };
 }
 
 export const askStatusKey = ["ask", "status"] as const;
@@ -44,13 +53,20 @@ export function setProgress(runId: string, activity: string | null) {
 export const useProgress = (runId: string | null) =>
   useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => (runId ? progress[runId] ?? null : null));
 
+/**
+ * Edit runs started from this tab whose first change has not been opened yet. The conversation
+ * page opens it once when the answer arrives, however quickly the run finishes.
+ */
+export const editRunsToOpen = new Set<string>();
+
 /** Ask a question in an existing conversation, or a new one. Resolves to the conversation ID. */
 export function useAsk() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ question, conversationId }: { question: string; conversationId?: string }) => {
+    mutationFn: async ({ question, conversationId, mode = "ask" }: { question: string; conversationId?: string; mode?: "ask" | "edit" }) => {
       const id = conversationId ?? (await api.post<{ id: string }>("/conversations", {})).id;
-      await api.post(`/conversations/${encodeURIComponent(id)}/ask`, { question });
+      const started = await api.post<{ runId: string }>(`/conversations/${encodeURIComponent(id)}/ask`, { question, mode });
+      if (mode === "edit") editRunsToOpen.add(started.runId);
       return id;
     },
     onSuccess: (id) => {

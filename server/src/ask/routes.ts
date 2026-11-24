@@ -11,11 +11,13 @@ import { requireEngine } from "../review";
 import type { AppState } from "../state";
 import { newId, type WorkspaceService } from "../workspace/service";
 import { priorTurns, type PriorTurn } from "./context";
-import { runAsk } from "./coordinator";
+import type { ProposedOperation } from "@nexus/schema";
+import { editOutcome, runAsk, type EditOutcome } from "./coordinator";
 import { ConversationStore, type Conversation } from "./conversations";
 import { readOnlyWorkspace } from "./workspace";
 
-const AskRequest = z.strictObject({ question: z.string().trim().min(3).max(2000) });
+// `mode` is the run's authority, chosen by the user with the composer's Ask/Edit switch.
+const AskRequest = z.strictObject({ question: z.string().trim().min(3).max(2000), mode: z.enum(["ask", "edit"]).default("ask") });
 const NewConversation = z.strictObject({ title: z.string().trim().max(120).optional() });
 
 interface ActiveRun { controller: AbortController; conversationId: string; activity: string }
@@ -38,7 +40,11 @@ export function askAvailability(state: AppState) {
   if (p.capabilities.toolCalling !== "yes" && p.capabilities.structuredOutput !== "yes") {
     return { available: false as const, reason: "untested", message: `AI is off: test ${p.name} in Settings first.`, profile };
   }
-  return { available: true as const, reason: null, message: null, profile };
+  // Edit mode requires tool calling (architecture section 9).
+  const edit = p.capabilities.toolCalling === "yes"
+    ? { available: true, message: null }
+    : { available: false, message: `Edit needs a model that has shown tool calling. ${p.name} answers in Ask only.` };
+  return { available: true as const, reason: null, message: null, profile, edit };
 }
 
 export function askRoutes(state: AppState) {
@@ -63,14 +69,14 @@ export function askRoutes(state: AppState) {
     });
 
     app.post("/api/v1/conversations/:id/ask", async (request, reply) => {
-      const { question } = rc.parse(AskRequest, request.body);
+      const { question, mode } = rc.parse(AskRequest, request.body);
       const service = state.requireService();
       const conversationId = id(request);
       // Admission: check and take the slot with no await in between (one run per conversation).
       if (busy.has(conversationId)) throw busyError();
       busy.add(conversationId);
       try {
-        return reply.code(202).send(await startRun(state, service, conversationId, question));
+        return reply.code(202).send(await startRun(state, service, conversationId, question, mode));
       } catch (e) {
         busy.delete(conversationId); // nothing was started: release the slot
         throw e;
@@ -84,21 +90,22 @@ export function askRoutes(state: AppState) {
  * the conversation's slot in `busy`; once this returns, the background task owns it and
  * releases it only after the answer has been written.
  */
-async function startRun(state: AppState, service: WorkspaceService, conversationId: string, question: string): Promise<{ runId: string; conversationId: string }> {
+async function startRun(state: AppState, service: WorkspaceService, conversationId: string, question: string, authority: "ask" | "edit"): Promise<{ runId: string; conversationId: string }> {
   const conversations = new ConversationStore(service);
   const availability = askAvailability(state);
   if (!availability.available) throw new NexusError("VALIDATION", availability.message, { reason: availability.reason });
+  if (authority === "edit" && !availability.edit.available) throw new NexusError("VALIDATION", availability.edit.message!, { reason: "edit-needs-tools" });
   const ctx = aiContext(state);
   // Pin the profile and model for this run.
   const profile = structuredClone(ctx.registry.selected()!);
   const key = ctx.keys.reveal(profile.id)!;
   const runId = newId("run");
   const at = new Date().toISOString();
-  const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null };
+  const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null, authority };
   let history: PriorTurn[] = [];
   await conversations.update(conversationId, (c) => {
     history = priorTurns(c.messages); // the answered turns before this question
-    c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null });
+    c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null, authority });
     if (c.messages.filter((m) => m.role === "user").length === 1 && c.title === "New conversation") c.title = question.slice(0, 80);
     c.messages.push(pending);
     c.updatedAt = at;
@@ -108,20 +115,34 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
   const workspace = readOnlyWorkspace(service, searchIndexFor(state), requireEngine(state));
   state.publish({ type: "ask.progress", runId, conversationId, activity: "Starting" });
 
+  // Edit runs write through the review engine only; the coordinator gets this callback and no
+  // engine, so it cannot accept, reject or write anything else. A proposal made before a run
+  // fails is still recorded on the answer, because its changes await review.
+  let proposed: EditOutcome | null = null;
+  const propose = authority === "edit"
+    ? async (operations: ProposedOperation[]) => {
+      const fixtureLabel = profile.capabilities.fixture ? " (test double, not AI)" : "";
+      const outcome = await requireEngine(state).propose({ kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent");
+      proposed = editOutcome(outcome);
+      return outcome;
+    }
+    : undefined;
+
   void (async () => {
     let update: Partial<Conversation["messages"][number]>;
     try {
       const result = await runAsk({
         workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal, history,
+        authority, propose, opPrefix: `op-${runId}`,
         onProgress: (p) => { state.publish({ type: "ask.progress", runId, conversationId, activity: p.activity }); },
       });
       update = {
-        status: "complete", answer: result.answer,
+        status: "complete", answer: result.answer, edit: result.edit,
         meta: { profileName: result.profileName, model: result.model, receivingHost: result.receivingHost, mode: result.mode, fixture: result.fixture, scopeNote: result.scopeNote, steps: result.steps, rejectedToolCalls: result.rejectedToolCalls, plainReplyIgnored: result.plainReplyIgnored, contextTurns: result.contextTurns },
       };
     } catch (e) {
       const err = e instanceof NexusError ? { code: e.code, message: e.message } : describeProviderError(e, ctx);
-      update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err };
+      update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err, edit: proposed };
       state.log(`ask: run ${update.status} (${err.code})`);
     } finally {
       runs.delete(runId);

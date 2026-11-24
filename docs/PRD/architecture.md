@@ -390,9 +390,9 @@ fields follow the same rule. Until saved, a note draft is kept in the tab's
 session storage across navigation and reloads, but not after the tab is
 closed. When an agent change lands on a note that has a draft, the draft is
 kept, and the banner offers "Load the new version (discard mine)" or
-"Compare and choose", which leads to "Overwrite with mine". Edit
-runs do not exist yet; slice D must decide whether to ask the user to save
-open drafts before an Edit run starts. (Corrected on 2026-11-24 in the
+"Compare and choose", which leads to "Overwrite with mine". An Edit
+run does not ask the user to save open drafts first; the same banner keeps
+them (DEC-020, run 4). (Corrected on 2026-11-24 in the
 corrective pass. The earlier text described a debounced autosave that was
 never built.)
 

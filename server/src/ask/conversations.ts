@@ -40,6 +40,14 @@ export const Message = z.object({
     contextTurns: z.number().optional(),
   }).nullable(),
   error: z.object({ code: z.string(), message: z.string() }).nullable(),
+  // Added in run 4 (Edit mode). Older files have neither field: those turns were Ask turns.
+  authority: z.enum(["ask", "edit"]).optional(),
+  edit: z.object({
+    reviewRunId: z.string().nullable(),
+    phase: z.string().nullable(),
+    changes: z.array(z.object({ changeId: z.string(), kind: z.string(), summary: z.string(), recordKey: z.string().nullable(), file: z.string(), state: z.string(), dependsOn: z.array(z.string()) })),
+    failedFiles: z.array(z.object({ path: z.string(), error: z.string().nullable() })),
+  }).nullable().optional(),
 });
 export const Conversation = z.object({
   schemaVersion: z.literal(1),

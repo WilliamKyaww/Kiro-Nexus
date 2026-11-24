@@ -398,3 +398,38 @@ server could not detect the conflict.
 **Revisit when** Hein designs the final board, or touch support is needed.
 Native drag and drop does not work with touch, so touch users use the
 status control.
+
+## DEC-020: Edit proposes typed operations through a callback, and Nexus fills every base value
+
+- **Status:** Accepted (Kiro, 2026-11-24, run 4 milestone 5 under Will's
+  authorisation; awaiting human review)
+
+**Decision.**
+- The user chooses Edit for one message at a time. After sending, the
+  composer returns to Ask.
+- An Edit run gets the Ask tools plus `propose_changes`, with four typed
+  operations: `create_issue`, `link_issue`, `edit_note` and
+  `update_issue`.
+- Nexus maps them to journal operations, and takes base revisions and
+  `before` values from the workspace, never from the model.
+- The coordinator receives a `propose` callback from the route, never the
+  review engine, so it has no accept, reject or other write path.
+- Each run makes one successful proposal, in at most three attempts. An
+  invalid proposal returns its reason to the model, and nothing is
+  written.
+- A new issue's key comes from the project counter and the keys already
+  used. A review run does not write `projects.json`, so a rejected agent
+  issue's key can be reused.
+- Edit does not ask the user to save open drafts first. The existing
+  outside-change banner keeps a draft (architecture 7.3, an open point
+  until now).
+
+**Alternatives.**
+- *Letting the model supply base revisions and `before` values.* A stale
+  or invented value could pass validation.
+- *Passing the engine to the coordinator.* This would give the loop more
+  authority than it needs.
+- *Advancing `nextIssueNumber` for a proposed issue.* Rejection would then
+  have to reverse two files, or leave a gap in the numbering.
+- *Keeping Edit selected after a send.* A follow-up meant as a question
+  could then write.

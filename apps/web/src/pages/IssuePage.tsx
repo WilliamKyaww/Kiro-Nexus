@@ -24,18 +24,26 @@ export function IssuePage() {
   const [conflict, setConflict] = useState<{ current: IssueView; fields: string[] } | null>(null);
   const [params] = useSearchParams();
   const changeParam = params.get("change");
-  const pendingByField = new Map<string, ChangeView>(useOpenChanges().filter((c) => c.recordKey === key && c.field && c.state !== "prepared").map((c) => [c.field as string, c]));
+  const openHere = useOpenChanges().filter((c) => c.recordKey === key && c.state !== "prepared");
+  const pendingByField = new Map<string, ChangeView>(openHere.filter((c) => c.field).map((c) => [c.field as string, c]));
+  const pendingLinks = new Map<string, ChangeView>(openHere.filter((c) => c.kind === "record.addLink").map((c) => {
+    const l = c.after as NoteLink;
+    return [`${l.notePath}#${l.headingSlug ?? ""}`, c];
+  }));
   const pendingClass = (field: string) => (pendingByField.has(field) ? ` pending-field${pendingByField.get(field)!.state === "conflicted" ? " conflicted" : ""}` : "");
   // Reveal each change once when it is reached; later refetches must not steal focus (for example from the feedback box).
+  // A field change shows on its field, a new link on the link itself, and a new issue on its review note.
   const revealed = useRef<string | null>(null);
   useEffect(() => {
-    if (!changeParam || revealed.current === changeParam || !pendingByField.size) return;
-    const el = document.querySelector<HTMLElement>(`label[data-change-id="${CSS.escape(changeParam)}"]`)
-      ?? document.querySelector<HTMLElement>(`[data-change-id="${CSS.escape(changeParam)}"]`);
+    if (!changeParam || revealed.current === changeParam || !openHere.length) return;
+    const id = CSS.escape(changeParam);
+    const el = document.querySelector<HTMLElement>(`label[data-change-id="${id}"]`)
+      ?? document.querySelector<HTMLElement>(`li[data-change-id="${id}"]`)
+      ?? document.querySelector<HTMLElement>(`[data-change-id="${id}"]`);
     if (!el) return;
     revealed.current = changeParam;
     requestAnimationFrame(() => revealAboveBar(el));
-  }, [changeParam, issue.dataUpdatedAt, pendingByField.size]);
+  }, [changeParam, issue.dataUpdatedAt, openHere.length]);
 
   const refreshAfterSave = (saved: IssueView) => {
     client.setQueryData(["issue", key], saved);
@@ -143,13 +151,13 @@ export function IssuePage() {
         </div>
         {update.error && !conflict ? <ErrorNote error={update.error} /> : null}
       </form>
-      <NoteLinks issue={i} busy={updateLinks.isPending}
+      <NoteLinks issue={i} busy={updateLinks.isPending} pendingLinks={pendingLinks}
         onChange={(noteLinks) => updateLinks.mutate({ baseRevision: i.revision, patch: { noteLinks }, baseValues: { noteLinks: i.noteLinks.map((l) => ({ notePath: l.notePath, headingSlug: l.headingSlug, headingText: l.headingText })) } })} />
       {updateLinks.error && !conflict ? <ErrorNote error={updateLinks.error} /> : null}
     </section>
   );
 }
-function NoteLinks({ issue, onChange, busy }: { issue: IssueView; onChange: (links: NoteLink[]) => void; busy: boolean }) {
+function NoteLinks({ issue, onChange, busy, pendingLinks }: { issue: IssueView; onChange: (links: NoteLink[]) => void; busy: boolean; pendingLinks: Map<string, ChangeView> }) {
   const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<{ notes: string[] }>("/notes") });
   const [notePath, setNotePath] = useState("");
   const [headingSlug, setHeadingSlug] = useState("");
@@ -176,8 +184,11 @@ function NoteLinks({ issue, onChange, busy }: { issue: IssueView; onChange: (lin
       <h2 id="links-h">Linked notes</h2>
       {issue.links.length === 0 ? <p className="muted">No notes linked yet.</p> : (
         <ul className="linked">
-          {issue.links.map((l, n) => (
-            <li key={`${l.notePath}#${l.headingSlug}`}>
+          {issue.links.map((l, n) => {
+            const pending = pendingLinks.get(`${l.notePath}#${l.headingSlug ?? ""}`);
+            return (
+            <li key={`${l.notePath}#${l.headingSlug}`} className={pending ? `pending-field${pending.state === "conflicted" ? " conflicted" : ""}` : undefined}
+              data-change-id={pending?.changeId} tabIndex={pending ? -1 : undefined}>
               {l.status === "note-missing" ? (
                 <span className="broken-link">{l.notePath} (note not found)</span>
               ) : (
@@ -186,11 +197,16 @@ function NoteLinks({ issue, onChange, busy }: { issue: IssueView; onChange: (lin
                 </Link>
               )}
               {l.status === "heading-missing" ? <span className="muted"> (heading not found; opens the note)</span> : null}
-              <button type="button" className="link-button" disabled={busy}
-                onClick={() => onChange(issue.noteLinks.filter((_, idx) => idx !== n).map(plain))}
-                aria-label={`Remove link to ${l.notePath}${l.headingText ? ` › ${l.headingText}` : ""}`}>Remove</button>
+              {pending ? <span className="pending-badge">{pending.state === "conflicted" ? "Conflict" : "Pending review"}</span> : null}
+              {/* A proposed link is kept or undone with Accept or Reject above, not removed by hand. */}
+              {pending ? null : (
+                <button type="button" className="link-button" disabled={busy}
+                  onClick={() => onChange(issue.noteLinks.filter((_, idx) => idx !== n).map(plain))}
+                  aria-label={`Remove link to ${l.notePath}${l.headingText ? ` › ${l.headingText}` : ""}`}>Remove</button>
+              )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       <form className="inline-form" onSubmit={add} aria-label="Link a note">

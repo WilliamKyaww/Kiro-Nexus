@@ -14,7 +14,7 @@ const ACTIONS_NOTE = "These are the section's actions. For each one, say in trac
 export interface ReadOnlyWorkspace {
   readonly manifest: Readonly<WorkspaceManifest>;
   search(query: string, limit: number): SearchResult[];
-  readNote(path: string): Promise<{ path: string; content: string } | null>;
+  readNote(path: string): Promise<{ path: string; content: string; revision: string } | null>;
   listNotes(): Promise<string[]>;
   projects(): Project[];
   issues(): Issue[];
@@ -267,9 +267,13 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
     if (truncated) {
       notes.push(`Only issues ${offset + 1} to ${offset + issues.length} of ${matching.length} are listed. Before saying that no issue matches something, call query_issues again with offset ${nextOffset} to read the rest, or look it up with the text filter.`);
     }
+    // New issues still awaiting review are not records yet, but the model should know of them.
+    const proposedIssues = changes.filter((c) => c.kind === "record.create" && (c.state === "pending" || c.state === "conflicted"))
+      .map((c) => ({ key: c.target.recordKey, title: (c.after as { title?: string })?.title ?? "", note: "proposed by an edit awaiting review; not yet an accepted issue" }));
     return {
       projectsInWorkspace: projects.map((p) => p.key),
       filters, ...(text ? { textMatched } : {}), total: matching.length, offset, returned: issues.length, truncated, nextOffset, issues,
+      ...(proposedIssues.length ? { proposedIssues } : {}),
       note: notes.join(" "),
     };
   }

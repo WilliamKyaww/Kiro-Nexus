@@ -16,6 +16,8 @@
 //   nexus-test-double-heading     claims an issue tracks every action under the heading it links to
 //   nexus-test-double-noissues    never reads issues; answers "do not appear on the board" as a fact
 // Every variant uses records Nexus supplies when it answers "not accepted yet" to final_answer.
+// Edit mode (propose_changes offered): for each untracked action, one fixed proposal of a new
+// issue (owner dropped: "Write the judge instructions"), its heading link and the note line.
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -185,7 +187,54 @@ function agentStep(body, variant) {
   const fromPages = pages.flatMap((p) => p?.issues ?? []);
   const issues = [...fromPages, ...supplied].filter((i) => !seen.has(i.key) && seen.add(i.key));
   const answer = buildAnswer({ section: sectionOk, issues, invent: variant === "invent", citeIssues: variant !== "nocite", only, headingLinks: variant === "heading" });
+  if (editMode(body)) {
+    // Edit mode (the user chose Edit): propose the fixed plan once, then report what it did.
+    const proposal = resultOf("propose_changes");
+    const untracked = answer.tracking.filter((t) => t.status === "untracked");
+    if (proposal === undefined && sectionOk && untracked.length) {
+      const project = pages[0]?.projectsInWorkspace?.[0] ?? issues[0]?.key?.split("-")[0] ?? "NEX";
+      return { tool_calls: [toolCall("propose_changes", editPlan(sectionOk, untracked, project), n)] };
+    }
+    return { tool_calls: [toolCall("final_answer", editAnswer(answer, proposal, sectionOk), n)] };
+  }
   return { tool_calls: [toolCall("final_answer", answer, n)] };
+}
+
+const editMode = (body) => Array.isArray(body.tools) && body.tools.some((t) => t.function?.name === "propose_changes");
+
+/** "Will writes the judge instructions" → "Write the judge instructions" (owner dropped, verb as an instruction). */
+export function issueTitle(action) {
+  const w = action.trim().split(/\s+/);
+  if (w.length >= 3 && /^[A-Z][a-z]+$/.test(w[0]) && /^[a-z]+s$/.test(w[1])) {
+    const verb = /(ch|sh|ss|x|z)es$/.test(w[1]) ? w[1].slice(0, -2) : w[1].slice(0, -1);
+    return [verb[0].toUpperCase() + verb.slice(1), ...w.slice(2)].join(" ");
+  }
+  return action.trim()[0].toUpperCase() + action.trim().slice(1);
+}
+
+/** The fixed Edit plan: for each untracked action, a new issue, its heading link and the note line. */
+function editPlan(section, untracked, project) {
+  const lines = section.text.split(/\r?\n/);
+  const operations = [];
+  untracked.forEach((t, i) => {
+    const ref = `new-${i + 1}`;
+    operations.push({ op: "create_issue", ref, project, title: issueTitle(t.action), description: `From ${section.headingPath.join(" › ")}: “${t.action}”.` });
+    operations.push({ op: "link_issue", issue: ref, note: section.path, heading: section.headingSlug });
+    const line = lines.find((l) => /^\s*[-*] \[( |x|X)\] /.test(l) && l.trimEnd().endsWith(t.action));
+    if (line) operations.push({ op: "edit_note", note: section.path, before: line, after: `${line.trimEnd()} ({{issue:${ref}}})` });
+  });
+  return { operations, summary: `Track ${untracked.length} untracked action${untracked.length === 1 ? "" : "s"} from ${section.headingPath.join(" › ")}.` };
+}
+
+/** The answer after proposing: the grounded tracking, plus what was proposed (never "done"). */
+function editAnswer(answer, proposal, section) {
+  const sources = section ? [section.handle] : [];
+  if (proposal?.error) {
+    return { ...answer, suggestions: [], insufficientEvidence: true, insufficientReason: `Nexus refused the proposed changes: ${proposal.error}` };
+  }
+  const proposed = (proposal?.changes ?? []).map((c) => ({ text: `Proposed for your review: ${c.summary}.`, sources }));
+  const none = proposal === undefined ? [{ text: "Nothing to change: every action already has a matching issue.", sources }] : [];
+  return { ...answer, suggestions: [...proposed, ...none] };
 }
 
 /** Retrieval-first: the data arrives in one user message as JSON after a marker. */
