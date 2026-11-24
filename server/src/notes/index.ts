@@ -22,6 +22,12 @@ export function installNotes(state: AppState): void {
   });
 }
 
+export function searchIndexFor(state: AppState): SearchIndex {
+  const index = indexes.get(state);
+  if (!index || !state.service) throw new NexusError("NO_WORKSPACE", "No workspace is open.");
+  return index;
+}
+
 export function notesRoutes(state: AppState) {
   return (app: FastifyInstance) => {
     app.get("/api/v1/search", async (request) => {

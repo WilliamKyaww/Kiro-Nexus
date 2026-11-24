@@ -87,7 +87,11 @@ export class SearchIndex {
   search(query: string, limit = 20): SearchResult[] {
     const q = query.trim();
     if (!q) return [];
-    return this.index.search(q).slice(0, limit).flatMap((hit) => {
+    // All words first (precise). A natural-language question rarely matches every word,
+    // so fall back to any word, still ranked by heading and title boosts.
+    let hits = this.index.search(q);
+    if (hits.length === 0 && /\s/.test(q)) hits = this.index.search(q, { combineWith: "OR" });
+    return hits.slice(0, limit).flatMap((hit) => {
       const doc = this.docs.get(String(hit.id));
       if (!doc) return [];
       return [{

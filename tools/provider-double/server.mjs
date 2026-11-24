@@ -11,7 +11,7 @@
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
 
-const STOP = new Set("a an and are as at be by did do does for from has have how i in is it its of on or still that the their them there this to was we were what which who will with without no not any issue issues kickoff meeting action actions tracked".split(" "));
+const STOP = new Set("a an and are as at be by did do does for from has have how i in is it its of on or still that the their them there this to was we were what which who will with without no not any issue issues tracked yet".split(" "));
 const stem = (w) => w.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/(ing|ed|es|s)$/, "");
 const words = (s) => (s.match(/[A-Za-z0-9']+/g) ?? []).map(stem).filter((w) => w.length > 2 && !STOP.has(w));
 

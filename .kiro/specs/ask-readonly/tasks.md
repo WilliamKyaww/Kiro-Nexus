@@ -27,7 +27,18 @@ acceptance condition has been seen to pass.
        renderer storage.
   - _Requirements: 1, 2, 3_
 
-- [ ] 2. Read-only coordinator, tools, handles and validation (increment C2)
+- [x] 2. Read-only coordinator, tools, handles and validation (increment C2)
+  - **Verified by Kiro, 2026-11-24:** `server/src/ask/ask.test.ts` (11
+    tests, using the double). It covers:
+    - the kickoff answer, and the answer after the missing issue is
+      created;
+    - retrieval-first mode;
+    - invented citations removed and demoted;
+    - `propose_changes` rejected despite an injected instruction;
+    - insufficient evidence, and a plain reply that is not shown as fact;
+    - pending values reported as proposed, and a renamed heading;
+    - a second workspace with different names;
+    - workspace hashes unchanged.
   - **Acceptance:** coordinator tests with the double show that:
     1. Answers cite valid handles. Invented handles are removed and
        counted, and unsupported facts are demoted.
