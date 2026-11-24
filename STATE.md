@@ -1,10 +1,12 @@
 # State
 
-- **Date updated:** 2026-11-24, at the end of the overnight run
-- **Active phase:** waiting for Will's morning review of the overnight run
-  (milestones A to D are complete)
-- **Active spec:** none in progress. The next candidates are B3 (Hein), and
-  B4 or C (Will).
+- **Date updated:** 2026-11-24 (repair and Ask run in progress)
+- **Active phase:** Phase 2, grounded read-only Ask (slice C). Phase 1 is
+  complete: `63cdc5b`, `0b6c98e`, `138f326` and `943465b`. After it, 83
+  unit and integration tests and 21 E2E tests passed.
+- **Active spec:** `.kiro/specs/ask-readonly/` (being written).
+- **Baseline:** `2310608`, reviewed by Will. Will reproduced the Phase 1
+  defects on it independently.
 - **PRD:** approved by Will at `7b775cd`, with amendments 1 to 4 (DEC-011
   to DEC-014).
 
@@ -13,12 +15,39 @@
 - **Standing:** local milestone commits under DEC-004. Stage only the
   relevant files by name, review the staged diff, add no AI trailers, report
   the short hash, and never push.
-- **Overnight authorisation of 2026-11-24:** this covered milestones A to D
-  and is now **spent**. Will's next instruction sets the next scope. Until
-  then, a fresh session may only:
-  - fix a failing check in existing work;
-  - update documentation;
-  - make the human-action steps below easier.
+- **Current run (granted by Will on 2026-11-24; it survives context
+  compaction):**
+  - **Phase 1.** Reproduce, add regression coverage for, fix, verify and
+    commit each of the following:
+    1. partial review runs, with Retry and Discard (architecture section
+       7.3);
+    2. note drafts lost on navigation or during an in-flight save, and
+       Compare showing both texts;
+    3. issue edits overwriting each other, including during link add and
+       remove;
+    4. the review bar covering a 390 px screen, a working action on Home
+       when AI is off, and internal wording on product screens.
+  - **Phase 2.** Slice C, read-only Ask:
+    1. Write the native spec, self-review it and commit it.
+    2. Build provider settings (one OpenAI-compatible adapter and one
+       candidate free route), the read-only coordinator, and the Home and
+       conversation UI.
+    3. Prove the workflow end to end with a deterministic provider double
+       and two fictional workspaces.
+    4. Run a live check only if an explicitly configured free profile
+       exists.
+  - **Allowed:**
+    - self-review of native specs and routine decisions without waiting;
+    - incremental local commits after each verified repair or increment.
+  - **Boundaries:**
+    - Hein owns B3 and the final visual identity. Keep his slice buildable
+      on its own.
+    - Leave Will's `.tmp/try` workspace alone, and use isolated profiles
+      and synthetic data.
+    - Do not search for credentials, and use no paid services.
+    - Agent writes, reminder delivery and remote publication are outside
+      this run.
+- **Previous overnight authorisation:** used up.
 - **Not authorised:**
   - remote Git actions, publication, deployments, account changes and paid
     services;

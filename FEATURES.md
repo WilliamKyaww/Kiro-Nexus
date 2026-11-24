@@ -153,6 +153,59 @@ proposals arrive in slice D and will use the same engine.
     overwritten: Nexus keeps its last good copy and refuses writes.
   - Evidence: `notes.test.ts` and `b2-notes.spec.ts`.
 
+### Phase 1 repairs (verified by Kiro, 2026-11-24; no human review yet)
+
+Will reproduced each of these defects on `2310608`, and Kiro reproduced
+them again before fixing them.
+
+- **Partial review runs are honest** (`63cdc5b`).
+  - Each file's real outcome is shown.
+  - Files that failed or were not attempted are never written silently,
+    even after a restart. A repeated demo reports the failure instead of
+    "already applied".
+  - **Retry** re-plans only the outstanding files against their current
+    contents. It keeps unrelated newer edits and gives a conflict if the
+    same field was edited.
+  - **Discard** writes nothing and leaves written sibling changes
+    reviewable.
+
+  Evidence:
+  - `partial.test.ts` (7 tests, which read the journal and the files);
+  - the real-process test with a failed write, then Retry, in
+    `review-http.test.ts`;
+  - the E2E test in `b5-review.spec.ts`.
+- **Note drafts survive** (`0b6c98e`).
+  - A draft is kept across Projects, an issue link, Back, automatic review
+    jumps and a reload of the tab, scoped to its workspace and note.
+  - A save clears only the text it submitted. Text typed during a slow
+    save stays as "Unsaved changes".
+  - Compare shows the actual disk text and the draft together before
+    anything is written.
+
+  Evidence: `drafts.test.ts` and `b2-drafts.spec.ts` (4 tests, one of which
+  delays the save on purpose).
+- **Issue edits never overwrite each other silently** (`138f326`).
+  - The editing base is captured when the first field changes.
+  - Stale saves are merged field by field. Different fields from two tabs
+    both survive, and the same field gives a conflict showing theirs and
+    yours.
+  - Adding or removing a link keeps an unsaved title and description.
+
+  Evidence: `workspace.test.ts` "merges a stale edit field by field", and
+  `b1-issue-edits.spec.ts` (3 tests, which check the form and the JSON).
+- **Usability** (`943465b`).
+  - At 390 × 844 and 1360 × 900, the selected change and its Accept and
+    Reject are visible together.
+  - An opened note starts above the review bar. Focus and the static
+    outline under reduced motion still work.
+  - Home offers "Open the kickoff meeting note", or "Create your first
+    note", with AI off.
+  - Product screens no longer show internal planning words.
+  - The fixed demo stays labelled.
+
+  Evidence: `usability.spec.ts` (5 tests), and Impeccable detect `[]` on
+  the changed UI files.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
