@@ -3,14 +3,17 @@
 - **Date updated:** 2026-11-24
 - **Active phase:** Work item 2, PRD and first Kiro spec (not started)
 - **Previous phase:** Work item 1, engineering workflow and product intake
-  (complete, uncommitted)
+  (complete, committed as `20e93f2`)
 - **Active spec:** none yet
 
 ## Authorised scope
 
-- Local edits inside this checkout only.
-- **Git:** not authorised. Leave every change uncommitted until Will asks
-  for a specific Git action.
+- Local edits inside this checkout.
+- **Git:** local milestone commits are authorised under DEC-004. After each
+  completed and verified major update, commit without asking. Stage only the
+  relevant files by name, review the staged diff, add no AI trailers, and
+  report the short hash. Pushing, branches, pull requests and publication
+  need an explicit request.
 - **Not authorised:** dependency installation, product scaffolding, MCP,
   skill or hook configuration (work item 4), publication and submission.
 
@@ -31,8 +34,10 @@
 - Before any edits, `git status` showed branch `main` level with
   `origin/main` at `188869a` and a clean tree. The remote matches
   `https://github.com/WilliamKyaww/Kiro-Nexus`.
-- After the edits, only new untracked workflow files were present. No
-  tracked file had changed.
+- After the edits, only the 13 new workflow files were present. They were
+  reviewed, staged by name and committed as `20e93f2`, with no trailers. The
+  milestone-commit policy (DEC-004) was committed separately. Its hash is in
+  `git log`.
 - `AGENTS.md` and both steering files loaded as Kiro workspace rules. The
   `#[[file:STATE.md]]` reference in `workflow.md` was unresolved before this
   file existed. **The next session should confirm** that it now shows this
@@ -55,4 +60,7 @@ for Will's review before creating the first spec.
 > `D-*` ID. Resolve or carry forward the intake's open questions, and record
 > consequential choices in `DECISIONS.md`. Then create the first native Kiro
 > feature spec in `.kiro/specs/<slice-name>/`, stopping at each review point
-> (requirements, design, tasks). Do not install dependencies or commit.
+> (requirements, design, tasks). Do not install dependencies. When the PRD
+> is complete and reviewed, commit it locally under DEC-004 (for example
+> `docs: write Nexus PRD`). Stage only the PRD-related files, add no AI
+> trailers, report the short hash and do not push.

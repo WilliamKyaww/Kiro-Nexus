@@ -48,3 +48,30 @@ November 2026, and recheck the live rules as a submission-checklist item.
 assurance given the Codex check).
 
 **Revisit when** the live rules show an update date after 16 November 2026.
+
+## DEC-004: Automatic local commits at verified milestones
+
+- **Status:** Accepted (Will, 2026-11-24). Replaces the earlier rule that
+  every Git action needs a separate request.
+
+**Context.** A separate approval for every commit slows down handoffs.
+Unreviewed work in the working tree is also easy to lose between sessions.
+
+**Decision.** After each completed and verified major update, the agent
+creates a local Conventional Commit without asking again. A completed PRD,
+feature, substantive fix or workflow change qualifies. The agent stages only
+the relevant files by name, reviews the staged diff, uses the configured
+identity, omits every AI co-author or attribution trailer, and reports the
+short hash. Pushing and any other change to a remote still need an explicit
+request.
+
+**Alternatives.**
+- Ask before every commit. This is the safest option, but it is slower.
+- Commit after every task. This creates noisy history and commits
+  unverified work.
+
+**Consequences.** History records verified milestones. Mistakes stay local
+and can be fixed with a new commit, never by rewriting history.
+
+**Revisit when** a commit includes unrelated or unverified work, or Will
+changes the policy.

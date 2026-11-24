@@ -45,7 +45,9 @@ only. Never open, search, index or copy them.
 6. Hand off. Tick the task in `tasks.md` only when verified, then update
    `STATE.md`. Move behaviour to `FEATURES.md` only with evidence. Add a
    `DECISIONS.md` entry for consequential choices. Add a journal note only for
-   evidence, a meaningful decision, a blocker or an independent finding.
+   evidence, a meaningful decision, a blocker or an independent finding. If
+   the update is a completed major milestone, commit it locally (see Git
+   conventions).
 
 Each task has one authoritative checklist: its spec's `tasks.md`. Do not
 copy task lists into other files; link to them instead.
@@ -60,11 +62,19 @@ tool or person that did not perform it.
 
 ## Git conventions
 
-- Leave all changes local and uncommitted unless Will explicitly requests a
-  Git action. Approval to edit does not include approval to commit, push,
-  create branches, open pull requests or publish.
-- When Git is authorised, use Conventional Commits (`feat:`, `fix:`,
-  `docs:`, `chore:`, `test:`) in British English.
+- **Milestone commits (standing instruction from Will, DEC-004).** After
+  each completed and verified major update, create a local Conventional
+  Commit without asking again. A completed PRD, feature, substantive fix or
+  workflow change qualifies. Do not commit routine edits or work in
+  progress. Stage only the relevant files by name and review the staged diff
+  before committing. Report the short commit hash in the handoff.
+- Pushing, creating branches, opening pull requests and publishing still
+  require an explicit request from Will.
+- Use the configured Git identity. Never add `Co-authored-by:` or any other
+  AI attribution trailer to a commit. After committing, check the message
+  with `git log -1 --format=%B`.
+- Use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`) in
+  British English.
 - Never force-push, reset, rewrite history or reinitialise the repository.
 - Never add `.kiro/` or any of its subfolders to `.gitignore`.
 
