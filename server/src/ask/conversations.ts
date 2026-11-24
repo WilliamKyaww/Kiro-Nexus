@@ -45,11 +45,36 @@ export const Conversation = z.object({
 export type Conversation = z.infer<typeof Conversation>;
 export type Message = z.infer<typeof Message>;
 
+/** Read-modify-write of one conversation file runs one at a time, per workspace. */
+const queues = new WeakMap<WorkspaceService, Map<string, Promise<unknown>>>();
+
 export class ConversationStore {
   constructor(private readonly service: WorkspaceService) {}
 
   async save(c: Conversation): Promise<void> {
     await this.service.writeConversation(c.id, JSON.stringify(Conversation.parse(c), null, 2) + "\n");
+  }
+
+  /**
+   * Read the conversation, apply `mutate` and write it back, after any earlier update of the
+   * same conversation has finished, so that concurrent updates never overwrite each other.
+   */
+  async update<T>(id: string, mutate: (c: Conversation) => T | Promise<T>): Promise<T> {
+    let byId = queues.get(this.service);
+    if (!byId) { byId = new Map(); queues.set(this.service, byId); }
+    const previous = byId.get(id) ?? Promise.resolve();
+    const run = previous.catch(() => undefined).then(async () => {
+      const c = await this.get(id);
+      const result = await mutate(c);
+      await this.save(c);
+      return result;
+    });
+    byId.set(id, run);
+    try {
+      return await run;
+    } finally {
+      if (byId.get(id) === run) byId.delete(id);
+    }
   }
 
   async get(id: string): Promise<Conversation> {

@@ -35,6 +35,13 @@ if (throwFault && !injector) {
   };
 }
 
+// NEXUS_FAULT_DELAY ("point:ms") pauses every hit of one point, to widen a race window in a test.
+const delayFault = process.env.NEXUS_FAULT_DELAY?.match(/^(.*):(\d+)$/) ?? null;
+
+export async function faultDelay(point: string): Promise<void> {
+  if (delayFault && delayFault[1] === point) await new Promise((r) => setTimeout(r, Number(delayFault[2])));
+}
+
 export function setFaultInjector(fn: Injector | null): void {
   injector = fn;
 }

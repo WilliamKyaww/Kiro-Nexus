@@ -3,12 +3,13 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { RouteContext } from "../app";
 import { NexusError } from "../errors";
+import { faultDelay } from "../faults";
 import { searchIndexFor } from "../notes";
 import { aiContext, describeProviderError } from "../providers";
 import { receivingHost } from "../providers/profiles";
 import { requireEngine } from "../review";
 import type { AppState } from "../state";
-import { newId } from "../workspace/service";
+import { newId, type WorkspaceService } from "../workspace/service";
 import { runAsk } from "./coordinator";
 import { ConversationStore, type Conversation } from "./conversations";
 import { readOnlyWorkspace } from "./workspace";
@@ -18,6 +19,14 @@ const NewConversation = z.strictObject({ title: z.string().trim().max(120).optio
 
 interface ActiveRun { controller: AbortController; conversationId: string; activity: string }
 const runs = new Map<string, ActiveRun>();
+/**
+ * Conversations with a question in flight, from admission until its answer is durably saved.
+ * The slot is taken synchronously, before the first await, so two simultaneous sends cannot
+ * both be admitted.
+ */
+const busy = new Set<string>();
+
+const busyError = () => new NexusError("CONFLICT", "This conversation is already answering a question. Wait for the answer, or cancel it, then send again.", { reason: "busy" });
 
 export function askAvailability(state: AppState) {
   const ctx = aiContext(state);
@@ -55,64 +64,84 @@ export function askRoutes(state: AppState) {
     app.post("/api/v1/conversations/:id/ask", async (request, reply) => {
       const { question } = rc.parse(AskRequest, request.body);
       const service = state.requireService();
-      const conversations = new ConversationStore(service);
-      const conversation = await conversations.get(id(request));
-      if ([...runs.values()].some((r) => r.conversationId === conversation.id)) throw new NexusError("CONFLICT", "This conversation is already answering a question.");
-      const availability = askAvailability(state);
-      if (!availability.available) throw new NexusError("VALIDATION", availability.message, { reason: availability.reason });
-      const ctx = aiContext(state);
-      // Pin the profile and model for this run.
-      const profile = structuredClone(ctx.registry.selected()!);
-      const key = ctx.keys.reveal(profile.id)!;
-      const runId = newId("run");
-      const at = new Date().toISOString();
-      conversation.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null });
-      if (conversation.messages.filter((m) => m.role === "user").length === 1 && conversation.title === "New conversation") conversation.title = question.slice(0, 80);
-      const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null };
-      conversation.messages.push(pending);
-      conversation.updatedAt = at;
-      await conversations.save(conversation);
-      const controller = new AbortController();
-      runs.set(runId, { controller, conversationId: conversation.id, activity: "Starting" });
-      const workspace = readOnlyWorkspace(service, searchIndexFor(state), requireEngine(state));
-      state.publish({ type: "ask.progress", runId, conversationId: conversation.id, activity: "Starting" });
-
-      void (async () => {
-        let update: Partial<Conversation["messages"][number]>;
-        try {
-          const result = await runAsk({
-            workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal,
-            onProgress: (p) => { state.publish({ type: "ask.progress", runId, conversationId: conversation.id, activity: p.activity }); },
-          });
-          update = {
-            status: "complete", answer: result.answer,
-            meta: { profileName: result.profileName, model: result.model, receivingHost: result.receivingHost, mode: result.mode, fixture: result.fixture, scopeNote: result.scopeNote, steps: result.steps, rejectedToolCalls: result.rejectedToolCalls, plainReplyIgnored: result.plainReplyIgnored },
-          };
-        } catch (e) {
-          const err = e instanceof NexusError ? { code: e.code, message: e.message } : describeProviderError(e, ctx);
-          update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err };
-          state.log(`ask: run ${update.status} (${err.code})`);
-        } finally {
-          runs.delete(runId);
-        }
-        try {
-          const latest = await conversations.get(conversation.id);
-          const msg = latest.messages.find((m) => m.id === pending.id);
-          if (msg) Object.assign(msg, update);
-          latest.updatedAt = new Date().toISOString();
-          await conversations.save(latest);
-        } catch (e) {
-          state.log(`ask: could not save the answer: ${(e as Error).message.slice(0, 120)}`);
-        }
-        state.publish({ type: "ask.done", runId, conversationId: conversation.id });
-      })();
-      return reply.code(202).send({ runId, conversationId: conversation.id });
+      const conversationId = id(request);
+      // Admission: check and take the slot with no await in between (one run per conversation).
+      if (busy.has(conversationId)) throw busyError();
+      busy.add(conversationId);
+      try {
+        return reply.code(202).send(await startRun(state, service, conversationId, question));
+      } catch (e) {
+        busy.delete(conversationId); // nothing was started: release the slot
+        throw e;
+      }
     });
   };
 }
 
+/**
+ * Store the question and a running answer, then answer in the background. The caller holds
+ * the conversation's slot in `busy`; once this returns, the background task owns it and
+ * releases it only after the answer has been written.
+ */
+async function startRun(state: AppState, service: WorkspaceService, conversationId: string, question: string): Promise<{ runId: string; conversationId: string }> {
+  const conversations = new ConversationStore(service);
+  const availability = askAvailability(state);
+  if (!availability.available) throw new NexusError("VALIDATION", availability.message, { reason: availability.reason });
+  const ctx = aiContext(state);
+  // Pin the profile and model for this run.
+  const profile = structuredClone(ctx.registry.selected()!);
+  const key = ctx.keys.reveal(profile.id)!;
+  const runId = newId("run");
+  const at = new Date().toISOString();
+  const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null };
+  await conversations.update(conversationId, (c) => {
+    c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null });
+    if (c.messages.filter((m) => m.role === "user").length === 1 && c.title === "New conversation") c.title = question.slice(0, 80);
+    c.messages.push(pending);
+    c.updatedAt = at;
+  });
+  const controller = new AbortController();
+  runs.set(runId, { controller, conversationId, activity: "Starting" });
+  const workspace = readOnlyWorkspace(service, searchIndexFor(state), requireEngine(state));
+  state.publish({ type: "ask.progress", runId, conversationId, activity: "Starting" });
+
+  void (async () => {
+    let update: Partial<Conversation["messages"][number]>;
+    try {
+      const result = await runAsk({
+        workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal,
+        onProgress: (p) => { state.publish({ type: "ask.progress", runId, conversationId, activity: p.activity }); },
+      });
+      update = {
+        status: "complete", answer: result.answer,
+        meta: { profileName: result.profileName, model: result.model, receivingHost: result.receivingHost, mode: result.mode, fixture: result.fixture, scopeNote: result.scopeNote, steps: result.steps, rejectedToolCalls: result.rejectedToolCalls, plainReplyIgnored: result.plainReplyIgnored },
+      };
+    } catch (e) {
+      const err = e instanceof NexusError ? { code: e.code, message: e.message } : describeProviderError(e, ctx);
+      update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err };
+      state.log(`ask: run ${update.status} (${err.code})`);
+    } finally {
+      runs.delete(runId);
+    }
+    try {
+      await conversations.update(conversationId, async (latest) => {
+        const msg = latest.messages.find((m) => m.id === pending.id);
+        if (msg) Object.assign(msg, update);
+        latest.updatedAt = new Date().toISOString();
+        await faultDelay("ask:before-answer-save");
+      });
+    } catch (e) {
+      state.log(`ask: could not save the answer: ${(e as Error).message.slice(0, 120)}`);
+    } finally {
+      busy.delete(conversationId); // the answer is durable (or could not be saved): admit the next question
+    }
+    state.publish({ type: "ask.done", runId, conversationId });
+  })();
+  return { runId, conversationId };
+}
+
 /** Mark answers left "running" by a crash or restart as failed, so Retry is offered. */
-export async function settleInterruptedRuns(service: import("../workspace/service").WorkspaceService): Promise<void> {
+export async function settleInterruptedRuns(service: WorkspaceService): Promise<void> {
   const store = new ConversationStore(service);
   for (const id of await service.listConversationIds()) {
     try {

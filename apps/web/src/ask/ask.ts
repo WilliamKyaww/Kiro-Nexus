@@ -56,6 +56,11 @@ export function useAsk() {
       void client.invalidateQueries({ queryKey: ["conversation", id] });
       void client.invalidateQueries({ queryKey: ["conversations"] });
     },
+    // A busy reply (409) means another window's question is running here: show it. The typed
+    // question stays in the composer, so it can be sent once that answer arrives.
+    onError: (_error, { conversationId }) => {
+      if (conversationId) void client.invalidateQueries({ queryKey: ["conversation", conversationId] });
+    },
   });
 }
 

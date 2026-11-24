@@ -40,8 +40,8 @@ async function hashes(dir: string, skip: RegExp): Promise<Record<string, string>
   return out;
 }
 
-async function setup(model = "nexus-test-double") {
-  const svc = await startService({ profile: join(base, "profile"), workspace: ws });
+async function setup(model = "nexus-test-double", env?: Record<string, string>) {
+  const svc = await startService({ profile: join(base, "profile"), workspace: ws, env });
   running.push(svc);
   const api = client(svc, await openSession(svc));
   const off = (await api.get("/ask/status")).body;
@@ -82,6 +82,64 @@ describe("Ask over HTTP", () => {
     const stored = await readFile(join(ws, ".nexus", "conversations", `${conv.id}.json`), "utf8");
     expect(stored).not.toContain(KEY);
     expect((await api.get("/conversations")).body.conversations).toMatchObject([{ id: conv.id, messages: 2 }]);
+  });
+
+  // Reproduced on e61a3d4: two clients sending at once both got 202, and only one question
+  // was stored in the conversation file.
+  it("admits one of two simultaneous sends, tells the other it is busy, and stores a consistent transcript", async () => {
+    let { svc, api } = await setup();
+    const other = client(svc, await openSession(svc)); // a second client with its own session
+    const conv = (await api.post("/conversations", {})).body;
+    const sends = await Promise.all([
+      api.post(`/conversations/${conv.id}/ask`, { question: "Which action from the kickoff still has no issue?" }),
+      other.post(`/conversations/${conv.id}/ask`, { question: "Which action from the kickoff is already tracked?" }),
+    ]);
+    expect(sends.map((s) => s.status).sort()).toEqual([202, 409]);
+    const busy = sends.find((s) => s.status === 409)!;
+    expect(busy.body.error).toMatchObject({ code: "CONFLICT", message: expect.stringMatching(/already answering a question/), details: { reason: "busy" } });
+    const admitted = sends.indexOf(sends.find((s) => s.status === 202)!);
+    await waitForAnswer(api, conv.id, 1);
+
+    // A burst of six simultaneous sends to another conversation admits exactly one.
+    const conv2 = (await api.post("/conversations", {})).body;
+    const burst = await Promise.all(Array.from({ length: 6 }, (_, n) => (n % 2 ? other : api).post(`/conversations/${conv2.id}/ask`, { question: `Burst question ${n}?` })));
+    expect(burst.filter((s) => s.status === 202)).toHaveLength(1);
+    expect(burst.filter((s) => s.status === 409)).toHaveLength(5);
+    await waitForAnswer(api, conv2.id, 1);
+
+    // After a restart, each file holds exactly the admitted question and its answer.
+    await svc.stop();
+    running.splice(0);
+    svc = await startService({ profile: join(base, "profile"), workspace: ws });
+    running.push(svc);
+    api = client(svc, await openSession(svc));
+    for (const [id, question] of [[conv.id, admitted === 0 ? "Which action from the kickoff still has no issue?" : "Which action from the kickoff is already tracked?"], [conv2.id, null]] as const) {
+      const file = JSON.parse(await readFile(join(ws, ".nexus", "conversations", `${id}.json`), "utf8"));
+      expect(file.messages.map((m: { role: string; status: string }) => `${m.role}:${m.status}`)).toEqual(["user:complete", "assistant:complete"]);
+      expect(file.messages[0].runId).toBe(file.messages[1].runId);
+      if (question) expect(file.messages[0].text).toBe(question);
+      expect((await api.get(`/conversations/${id}`)).body.messages).toHaveLength(2);
+    }
+  });
+
+  it("keeps the one-run rule until the answer is saved, then admits the next question", async () => {
+    // Widen the window between the run finishing and its answer being written.
+    const { api } = await setup("nexus-test-double", { NEXUS_FAULT_DELAY: "ask:before-answer-save:1500" });
+    const conv = (await api.post("/conversations", {})).body;
+    expect((await api.post(`/conversations/${conv.id}/ask`, { question: "Which action from the kickoff still has no issue?" })).status).toBe(202);
+    let c = (await api.get(`/conversations/${conv.id}`)).body;
+    for (let i = 0; i < 50 && c.activeRun !== null; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      c = (await api.get(`/conversations/${conv.id}`)).body;
+    }
+    expect(c.activeRun).toBeNull(); // the model has finished ...
+    expect(c.messages[1].status).toBe("running"); // ... but the answer is not saved yet
+    const during = await api.post(`/conversations/${conv.id}/ask`, { question: "Which of those is already tracked?" });
+    expect(during.status).toBe(409);
+    c = await waitForAnswer(api, conv.id, 1);
+    expect((await api.post(`/conversations/${conv.id}/ask`, { question: "Which of those is already tracked?" })).status).toBe(202);
+    c = await waitForAnswer(api, conv.id, 2);
+    expect(c.messages.map((m: { role: string; status: string }) => `${m.role}:${m.status}`)).toEqual(["user:complete", "assistant:complete", "user:complete", "assistant:complete"]);
   });
 
   it("cancels a slow run, reports a rejected key distinctly, and survives a restart mid-run", async () => {

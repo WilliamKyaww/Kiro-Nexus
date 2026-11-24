@@ -187,3 +187,25 @@ acceptance condition has been seen to pass.
       reported as proposed in the data sent to the model, and snippet and
       section agreement. `c4-ask-proof.spec.ts` shows the "Not confirmed"
       section and its qualifier in the browser.
+  - [x] 6.4 One question at a time per conversation, held until the answer is saved
+    - **Defect, reproduced by Kiro on `e61a3d4`:** two clients sending to
+      one conversation at once both got 202 (`[202, 202]`), and only one
+      question was stored. With the window between the run finishing and
+      its answer being written widened (`NEXUS_FAULT_DELAY`), a second send
+      was admitted (202) before the first answer was saved.
+    - **Fix:** the route takes the conversation's slot with no `await`
+      between the check and the claim. The slot is released only after the
+      answer has been written, or at once if nothing started. Every
+      transcript change goes through `ConversationStore.update`, which runs
+      read-modify-write one at a time per conversation. A refused send gets
+      409 `CONFLICT` with `details.reason: "busy"` and the message "This
+      conversation is already answering a question. Wait for the answer, or
+      cancel it, then send again." The composer keeps the typed question
+      and refreshes the conversation.
+    - **Verified by Kiro:** `ask-http.test.ts` sends from two sessions at
+      once (one 202, one 409), then a burst of six (one 202, five 409).
+      After a restart, each conversation file holds exactly the admitted
+      question and its answer, with matching run IDs. A send during the
+      delayed save gets 409, and the next send after the save is admitted.
+      There were 33 repeat runs of the file. One run failed after 51 s; its
+      output was not captured, and it did not recur in the other 32.
