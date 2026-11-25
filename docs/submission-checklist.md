@@ -20,9 +20,9 @@ Markers: `[ ]` not done, `[~]` partly done (say what remains), `[x]` done.
   `main` was pushed to <https://github.com/WilliamKyaww/Kiro-Nexus> on
   25 November 2026 at Will's request, with its full history. Remaining:
   push the final commit before submission.
-- [~] Open-source licence file, shown in the repository's About section.
-  MIT, in `LICENSE` (DEC-032). Remaining: check that GitHub shows it in
-  the About section.
+- [x] Open-source licence file, shown in the repository's About section.
+  MIT, in `LICENSE` (DEC-032). GitHub detects it: its licence API reported
+  `"spdx_id": "MIT"` for the repository on 25 November 2026.
 - [ ] Root `.kiro/` present with specs, steering and hooks; not ignored.
 - [ ] `docs/licences.md` lists third-party and pre-existing work.
 - [ ] Reproducible setup instructions checked on a clean machine.

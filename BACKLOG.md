@@ -1,5 +1,9 @@
 # Backlog
 
+**From 25 November 2026, Hein implements the remaining work, with Will
+guiding** (`PROJECT-HANDOVER.md`). The owners below are the original slice
+owners.
+
 This file lists incomplete work at milestone level only. Each milestone's
 tasks live in its spec's `tasks.md`; do not copy them here. Move behaviour
 to `FEATURES.md` once it has been verified. Requirement IDs refer to

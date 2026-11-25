@@ -2,6 +2,7 @@
 
 | Question | Authoritative file |
 | --- | --- |
+| I am new here: what exists, how do I run it, and what is left? | `PROJECT-HANDOVER.md` (25 November 2026) |
 | How should an agent work here? | `AGENTS.md` |
 | What is active, authorised or blocked now? | `STATE.md` |
 | What remains at milestone level? | `BACKLOG.md` |

@@ -1,11 +1,17 @@
 # State
 
 - **Date updated:** 2026-11-25 (R6-1 to R6-17 repaired and recorded; relay
-  for the re-review written; MIT licence added and `main` pushed to GitHub)
+  for the re-review written; MIT licence added and `main` pushed to GitHub;
+  handover to Hein written in `PROJECT-HANDOVER.md`)
 - **Active phase:** none authorised. The R6 repairs are done (the R6
   repairs milestone log below) and wait for Astra 6.2's re-review, through
   `docs/reviews/relays/2026-11-25-run6-repairs.md`. Slice C's live check
   (task 5) is still waiting for Will's free key.
+- **Handover (2026-11-25):** Hein implements the remaining work from now
+  on, with Will guiding. `PROJECT-HANDOVER.md` is the starting point: what
+  works, setup, working with Kiro, Will's proposed plan, what is left, and
+  a wireframe feedback template. The plan is Will's proposal and Hein has
+  not agreed it yet.
 - **Last spec:** `.kiro/specs/backlinks-completion/` tasks 1 to 5 are done.
   Also in run 6: `.kiro/specs/appearance/` (tasks 1 to 7) and
   `.kiro/specs/edit-first-journey/` task 5a.
@@ -30,8 +36,9 @@
 - **Push to GitHub (granted by Will on 2026-11-25: "please push to main,
   update the repo"): used up.** One fast-forward push of `main` to
   `origin/main` (<https://github.com/WilliamKyaww/Kiro-Nexus>), with the
-  full history and the MIT licence added first (DEC-032). Each later push
-  still needs Will's request.
+  full history and the MIT licence added first (DEC-032). A second push
+  published `PROJECT-HANDOVER.md`, as step 1 of Will's handover plan ("We
+  push to main"). Each later push still needs Will's request.
 
 - **R6 repairs (granted by Will on 2026-11-25: "Fix all 17 please"): used
   up.** All seventeen are repaired and committed, and the relay is written.
@@ -568,7 +575,10 @@ Will ran. Its eleven findings were repaired in run 5
   - Run `npm run live:check` with a free Groq key, and record the exit
     status and report in `docs/judge-ai-route.md` and here. Close Q1 only
     on exit 0.
-- **Hein:** task 4 of `.kiro/specs/board-calendar/tasks.md`:
+  - Add Hein as a collaborator on the GitHub repository, so he can push.
+- **Hein:** first, `PROJECT-HANDOVER.md`: clone, run and test (section 2),
+  then review the wireframe with the template in section 7. Then, among the
+  remaining work, task 4 of `.kiro/specs/board-calendar/tasks.md`:
   - calendar events in `calendar.json` (4.1);
   - the agenda view (4.2);
   - ordering within a column (4.3);
