@@ -36,6 +36,7 @@ export async function backlinksTo(service: WorkspaceService, path: string): Prom
         heading: l.heading, headingStatus: heading === null ? "none" : heading.status === "ok" ? "ok" : "missing", headingSlug: heading?.slug ?? null,
         alias: l.alias,
         candidates: r.status === "ambiguous" ? r.candidates : [],
+        raw: l.raw,
       });
     }
   }

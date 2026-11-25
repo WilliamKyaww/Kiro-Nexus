@@ -6,7 +6,11 @@ import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useQuery } from "@tanstack/react-query";
 import type { NoteView } from "@nexus/schema";
 import { api } from "../api";
-import { completion, headingNoteProblem, headingSuggestions, linkAt, noteSuggestions, type Suggestion } from "./wikilinks";
+import { reviewBarHeight } from "../review/reveal";
+import { completableLinkAt, completion, headingNoteProblem, headingSuggestions, linkAt, noteSuggestions, type Suggestion } from "./wikilinks";
+
+/** Space between the caret's line and the list. */
+const GAP = 4;
 
 /** Where the caret is drawn inside a textarea, measured with a mirror element. */
 function caretPoint(el: HTMLTextAreaElement, pos: number): { top: number; left: number; lineHeight: number } {
@@ -36,13 +40,15 @@ export function WikilinkEditor({ id, value, onChange, notes, path, describedBy }
   describedBy?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const popup = useRef<HTMLDivElement>(null);
   const listId = useId();
   const [caret, setCaret] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState(0);
-  const [point, setPoint] = useState<{ top: number; left: number } | null>(null);
+  const [point, setPoint] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
 
-  const token = caret === null ? null : linkAt(value, caret);
+  // Not in code: the preview would not make a link there either (R6-16).
+  const token = useMemo(() => (caret === null ? null : completableLinkAt(value, caret)), [value, caret]);
   const wanted = token && token.part !== "alias" && dismissed !== token.start ? token : null;
   const headingNote = wanted?.part === "heading" ? headingNoteProblem(wanted, notes, path) : null;
   const headingPath = headingNote && "path" in headingNote ? headingNote.path : null;
@@ -59,20 +65,53 @@ export function WikilinkEditor({ id, value, onChange, notes, path, describedBy }
     }
     if (headingNote && "message" in headingNote) return { options: [], status: headingNote.message };
     if (!target.data) return { options: [], status: target.isError ? "Nexus could not read that note's headings." : "Reading the headings…" };
-    const found = headingSuggestions(wanted.query, target.data.headings);
+    const found = headingSuggestions(wanted.query, target.data.headings, target.data.content);
     return { options: found, status: found.length ? null : target.data.headings.length ? `“${wanted.target}” has no heading matching “${wanted.query.trim()}”.` : `“${wanted.target}” has no headings.` };
   }, [wanted?.part, wanted?.query, wanted?.target, notes, headingNote && "message" in headingNote ? headingNote.message : headingPath, target.data, target.isError]);
   const open = !!wanted && (options.length > 0 || status !== null);
   const current = options.length ? Math.min(active, options.length - 1) : -1;
 
-  // Keep the list at the caret, inside the editor.
+  // Keep the list at the caret and inside the part of the editor on screen (R6-15): below the
+  // caret's line when it fits there, otherwise above it, otherwise on the roomier side, shortened.
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!open || !el || caret === null) { setPoint(null); return; }
+    const box = popup.current;
+    if (!open || !el || !box || caret === null) { setPoint(null); return; }
     const p = caretPoint(el, caret);
-    const width = Math.min(352, el.clientWidth);
-    setPoint({ top: Math.min(p.top + p.lineHeight + 4, el.clientHeight - 24), left: Math.max(0, Math.min(p.left, el.clientWidth - width)) });
-  }, [open, caret, value]);
+    const left = Math.max(0, Math.min(p.left, el.clientWidth - box.offsetWidth));
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const full = Math.min(box.scrollHeight + (box.offsetHeight - box.clientHeight), 16 * rem);
+    const r = el.getBoundingClientRect();
+    const lineTop = Math.max(0, Math.min(p.top, el.clientHeight - p.lineHeight));
+    const lineBottom = lineTop + p.lineHeight;
+    const shownTop = Math.max(0, -r.top);
+    const shownBottom = Math.min(el.offsetHeight, window.innerHeight - reviewBarHeight() - r.top);
+    const below = shownBottom - lineBottom - GAP;
+    const above = lineTop - GAP - shownTop;
+    const least = Math.min(full, 4 * rem);
+    if (below >= full || (below >= above && below >= least)) {
+      const maxHeight = Math.min(full, below);
+      setPoint({ top: lineBottom + GAP, left, maxHeight });
+    } else {
+      const maxHeight = Math.max(Math.min(full, above), least);
+      setPoint({ top: lineTop - GAP - maxHeight, left, maxHeight });
+    }
+  }, [open, caret, value, options.length, status]);
+
+  // Keep the current option inside the list's visible part on every move (R6-15).
+  useLayoutEffect(() => {
+    const box = popup.current;
+    if (!open || !box || !point || current < 0) return;
+    const row = document.getElementById(`${listId}-${current}`);
+    if (!row) return;
+    const b = box.getBoundingClientRect();
+    const o = row.getBoundingClientRect();
+    const top = b.top + box.clientTop;
+    const bottom = top + box.clientHeight;
+    const pad = parseFloat(getComputedStyle(box).paddingTop) || 0;
+    if (o.top < top + pad) box.scrollTop -= top + pad - o.top;
+    else if (o.bottom > bottom - pad) box.scrollTop += o.bottom - (bottom - pad);
+  }, [open, current, point, listId]);
 
   const track = () => {
     const el = ref.current;
@@ -124,8 +163,9 @@ export function WikilinkEditor({ id, value, onChange, notes, path, describedBy }
         onKeyDown={onKeyDown}
         onBlur={() => setCaret(null)}
       />
-      {open && point ? (
-        <div className="link-suggest" style={{ top: point.top, left: point.left }}>
+      {open ? (
+        // Rendered unplaced first, so its height can be measured before it is shown.
+        <div ref={popup} className="link-suggest" style={point ? { top: point.top, left: point.left, maxHeight: point.maxHeight } : { top: 0, left: 0, visibility: "hidden" }}>
           {options.length ? (
             <ul id={listId} role="listbox" aria-label={wanted!.part === "heading" ? `Headings in ${wanted!.target}` : "Notes to link"}>
               {options.map((s, i) => (
@@ -139,7 +179,7 @@ export function WikilinkEditor({ id, value, onChange, notes, path, describedBy }
                   onMouseEnter={() => setActive(i)}
                 >
                   <span className="link-suggest-label">{s.label}</span>
-                  {s.detail ? <span className="link-suggest-detail"><span className="visually-hidden">, in </span>{s.detail}</span> : null}
+                  {s.detail ? <span className="link-suggest-detail"><span className="visually-hidden">{s.kind === "note" ? ", in " : ", "}</span>{s.detail}</span> : null}
                 </li>
               ))}
             </ul>

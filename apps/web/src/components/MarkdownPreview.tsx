@@ -4,10 +4,12 @@ import remarkGfm from "remark-gfm";
 import { findAndReplace } from "mdast-util-find-and-replace";
 import type { Root } from "mdast";
 import { Link } from "react-router";
-import { parseHeadings, resolveNoteTarget, slugOf } from "@nexus/markdown";
+import { parseHeadings, resolveNoteTarget, slugOf, wikilinkIgnore, wikilinkRegExp } from "@nexus/markdown";
 import { notePathParam } from "../api";
 
-const wikilink = /\[\[([^[\]|#\n]+)(?:#([^[\]|\n]+))?(?:\|([^[\]\n]+))?\]\]/g;
+// The same pattern and the same skipped nodes as linksIn, so the backlinks find the links the
+// preview shows and no others (backlinks-completion 1.3, R6-16).
+const wikilink = wikilinkRegExp();
 const issueKey = /\b([A-Z][A-Z0-9]{1,9}-[1-9][0-9]*)\b/g;
 
 /** Turn [[wikilinks]] and known issue keys into nexus: links. Raw HTML is never rendered. */
@@ -22,7 +24,7 @@ function remarkNexusLinks(options: { issueKeys: ReadonlySet<string> }) {
       [issueKey, (all: string, key: string) => (options.issueKeys.has(key)
         ? { type: "link" as const, url: `nexus-issue:${key}`, children: [{ type: "text" as const, value: all }] }
         : false)],
-    ], { ignore: ["link", "linkReference", "inlineCode", "code"] });
+    ], { ignore: [...wikilinkIgnore] });
   };
 }
 

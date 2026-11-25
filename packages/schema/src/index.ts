@@ -157,6 +157,8 @@ export interface BacklinkView {
   alias: string | null;
   /** For an ambiguous name: every note the link could mean (this one included); otherwise empty. */
   candidates: string[];
+  /** The link as written, so the passage can be found again in an unsaved draft (R6-13). */
+  raw: string;
 }
 
 export interface WorkspaceView {

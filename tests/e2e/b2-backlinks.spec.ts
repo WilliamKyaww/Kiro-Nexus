@@ -156,6 +156,150 @@ test("evidence: the panel and the suggestions in both themes, at desktop and 390
   }
 });
 
+// R6-13: the backlink names a line of the saved file, and the preview shows the unsaved draft.
+test("a backlink marks its passage in an unsaved draft, or says it cannot and offers the saved version", async ({ page }) => {
+  const { ws } = await start();
+  await page.goto(await launchUrl(svc!));
+  await put(ws, SCRIPT, SCRIPT_TEXT);
+  const lines = SCRIPT_TEXT.split("\n");
+  await openNote(page, SCRIPT);
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await editor(page).fill([...lines.slice(0, 4), "Wrong draft paragraph.", "", ...lines.slice(4)].join("\n"));
+  await expect(page.getByRole("status").filter({ hasText: "Unsaved changes" })).toBeVisible();
+
+  await openNote(page, KICKOFF);
+  await panel(page).getByRole("listitem").nth(0).getByRole("link").click();
+  await expect(page).toHaveURL(/line=4/);
+  const passage = page.locator(".line-target");
+  await expect(page.locator(".preview")).toContainText("Wrong draft paragraph.");
+  await expect(passage).toHaveCount(1);
+  await expect(passage).toContainText("the kickoff actions");
+  await expect(passage).toContainText("Linked passage");
+  await expect(passage).toBeFocused();
+
+  // The draft changes the link itself: nothing is marked, and the saved version is one choice away.
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await editor(page).fill(SCRIPT_TEXT.replace("the kickoff actions", "the actions we agreed"));
+  await openNote(page, KICKOFF);
+  await panel(page).getByRole("listitem").nth(0).getByRole("link").click();
+  await expect(page.getByTestId("passage-uncertain")).toContainText("Your unsaved draft of this note differs from the saved version");
+  await expect(page.locator(".preview")).toContainText("the actions we agreed");
+  await expect(passage).toHaveCount(0);
+  await page.getByRole("button", { name: "Show the saved version" }).click();
+  await expect(passage).toHaveCount(1);
+  await expect(passage).toContainText("the kickoff actions");
+  await expect(passage).toBeFocused();
+  await expect(page.getByTestId("passage-saved")).toContainText("This is the saved version");
+  await page.getByRole("button", { name: "Back to my draft" }).click();
+  await expect(page.locator(".preview")).toContainText("the actions we agreed");
+  await expect(passage).toHaveCount(0);
+  expect(await readFile(join(ws, ...SCRIPT.split("/")), "utf8")).toBe(SCRIPT_TEXT);
+  await expect(page.getByRole("status").filter({ hasText: "Unsaved changes" })).toBeVisible();
+});
+
+// R6-14: two headings with the same text.
+test("completion tells repeated headings apart, and the link it writes opens the one chosen", async ({ page }) => {
+  const { ws } = await start();
+  await page.goto(await launchUrl(svc!));
+  await put(ws, "Target.md", ["# Target", "", "## Tasks", "", "Order lunch for the team.", "", "## Tasks", "", "Deliver the parcels.", ""].join("\n"));
+  await put(ws, "Source.md", "# Source\n\n");
+  await openNote(page, "Source.md");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await editor(page).press("Control+End");
+  await page.keyboard.type("See [[Target#Tas");
+  const options = page.getByRole("listbox", { name: "Headings in Target" }).getByRole("option");
+  await expect(options).toHaveCount(2);
+  await page.keyboard.press("ArrowDown");
+  await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(editor(page)).toHaveValue(/See \[\[Target#tasks-1\]\]$/);
+
+  // The two are told apart on screen by their first lines.
+  await page.keyboard.type("\nAnd [[Target#Tas");
+  await expect(options.nth(0)).toContainText("Order lunch for the team.");
+  await expect(options.nth(1)).toContainText("Deliver the parcels.");
+  await page.keyboard.press("Escape");
+  await editor(page).fill("# Source\n\nSee [[Target#tasks-1]]\n");
+  await page.keyboard.press("Control+S");
+  await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "Preview", exact: true }).click();
+  await page.locator(".preview").getByRole("link", { name: "Target › tasks-1" }).click();
+  await expect(page).toHaveURL(/path=Target\.md&heading=tasks-1/);
+  await expect(page.locator("#h-tasks-1")).toHaveClass(/heading-target/);
+  await expect(page.locator("#h-tasks-1")).toBeFocused();
+  await expect(page.locator("#h-tasks")).not.toHaveClass(/heading-target/);
+  const item = panel(page).getByRole("listitem");
+  await expect(item).toHaveCount(1);
+  await expect(item).toContainText("Source");
+  await expect(item).not.toContainText("does not have");
+});
+
+// R6-15: eight suggestions on a 390 × 844 screen.
+test("at 390 px the chosen suggestion stays in view, and near the bottom the list opens above the caret", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { ws } = await start();
+  await page.goto(await launchUrl(svc!));
+  for (let i = 1; i <= 8; i++) await put(ws, `demos/Demo0${i}.md`, `# Demo 0${i}\n`);
+  await put(ws, "Short.md", "# Short\n\n");
+  await put(ws, "Long.md", ["# Long", "", ...Array.from({ length: 60 }, (_, i) => `Line ${i + 1} of the long note.`), ""].join("\n"));
+  const list = page.locator(".link-suggest");
+  const options = suggestions(page).getByRole("option");
+  const inView = async (i: number) => {
+    const box = editor(page);
+    await expect(options.nth(i)).toHaveAttribute("aria-selected", "true");
+    await expect(box).toHaveAttribute("aria-activedescendant", (await options.nth(i).getAttribute("id"))!);
+    const [o, l, b] = [await options.nth(i).boundingBox(), await list.boundingBox(), await box.boundingBox()];
+    const bottom = Math.min(b!.y + b!.height, 844);
+    expect(o!.y, `option ${i} starts inside the list`).toBeGreaterThanOrEqual(l!.y - 0.5);
+    expect(o!.y + o!.height, `option ${i} ends inside the list`).toBeLessThanOrEqual(l!.y + l!.height + 0.5);
+    expect(l!.y + l!.height, "the list ends inside the editor and the screen").toBeLessThanOrEqual(bottom + 0.5);
+    expect(l!.y, "the list starts inside the editor and the screen").toBeGreaterThanOrEqual(Math.max(b!.y, 0) - 0.5);
+  };
+
+  for (const note of ["Short.md", "Long.md"]) {
+    await openNote(page, note);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await editor(page).press("Control+End");
+    await page.keyboard.type("[[Demo");
+    await expect(options).toHaveCount(8);
+    await inView(0);
+    for (let i = 1; i < 8; i++) { await page.keyboard.press("ArrowDown"); await inView(i); }
+    await page.keyboard.press("ArrowDown");
+    await inView(0);
+    await page.keyboard.press("ArrowUp");
+    await inView(7);
+    if (process.env.NEXUS_B2_SHOTS) await page.screenshot({ path: join(process.env.NEXUS_B2_SHOTS, `mobile-suggest-${note.replace(".md", "").toLowerCase()}.png`) });
+    await page.keyboard.press("Enter");
+    await expect(editor(page)).toHaveValue(/\[\[Demo08\]\]$/);
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+  }
+});
+
+// R6-16: a four-space-indented literal is code in the preview, so it is not a link.
+test("a link written in indented code is not a backlink, as the preview shows it as code", async ({ page }) => {
+  const { ws } = await start();
+  await page.goto(await launchUrl(svc!));
+  await put(ws, "Target.md", "# Target\n");
+  await put(ws, "Source.md", ["# Source", "", "See [[Target]] for the plan.", "", "    [[Target]] is how a link is written.", ""].join("\n"));
+  await openNote(page, "Source.md");
+  await expect(page.locator(".preview pre code")).toContainText("[[Target]] is how a link is written.");
+  await expect(page.locator(".preview").getByRole("link", { name: "Target" })).toHaveCount(1);
+  await openNote(page, "Target.md");
+  const items = panel(page).getByRole("listitem");
+  await expect(items).toHaveCount(1);
+  await expect(items).toContainText("See Target for the plan.");
+
+  // Completion is not offered inside code either.
+  await openNote(page, "Source.md");
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await editor(page).press("Control+End");
+  await page.keyboard.type("\n    [[Tar");
+  await expect(page.locator(".link-suggest")).toHaveCount(0);
+  await page.keyboard.type("\n\nOutside code [[Tar");
+  await expect(suggestions(page).getByRole("option").first()).toContainText("Target");
+});
+
 test("completion by keyboard: notes, headings, an alias kept, Escape, Undo, and the draft stays unsaved", async ({ page }) => {
   const { ws } = await start();
   await page.goto(await launchUrl(svc!));

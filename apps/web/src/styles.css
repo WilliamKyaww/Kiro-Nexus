@@ -140,7 +140,8 @@ main:focus { outline: none; }
 .link-suggest li { display: flex; gap: 0.5rem; align-items: baseline; justify-content: space-between; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; }
 .link-suggest li[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
 .link-suggest-label { font-weight: 600; overflow-wrap: anywhere; }
-.link-suggest-detail { flex: none; font-size: 0.8rem; color: var(--ink-2); }
+/* A folder, or what tells a repeated heading apart: it may shrink and wrap beside the label (R6-14). */
+.link-suggest-detail { flex: 0 1 auto; min-width: 0; text-align: right; overflow-wrap: anywhere; font-size: 0.8rem; color: var(--ink-2); }
 .link-suggest li[aria-selected="true"] .link-suggest-detail { color: var(--accent-ink); }
 .link-suggest-status { margin: 0; padding: 0.35rem 0.5rem; font-size: 0.875rem; color: var(--ink-2); }
 .preview { max-width: 72ch; }

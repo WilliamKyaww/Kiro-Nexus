@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEv
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { BacklinkView, Issue, NoteView, WorkspaceView } from "@nexus/schema";
+import { lineInDraft } from "@nexus/markdown";
 import { ApiError, api, notePathParam } from "../api";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { ErrorNote } from "../components/ErrorNote";
@@ -111,8 +112,11 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
   const stored = useSyncExternalStore(drafts.subscribe, () => drafts.get(wsId, path));
   const draft = stored?.text ?? null;
   const changeParam = params.get("change");
-  // A backlink opens its source at the line of the link (backlinks-completion 2.2).
+  // A backlink opens its source at the line of the link (backlinks-completion 2.2), and names
+  // the link so the line can be found again in an unsaved draft (R6-13).
   const lineParam = /^\d{1,6}$/.test(params.get("line") ?? "") ? Number(params.get("line")) : null;
+  const linkParam = params.get("link");
+  const [showSaved, setShowSaved] = useState(false);
   const [mode, setMode] = useState<"preview" | "edit">(
     (params.get("edit") === "1" || stored !== null) && !heading && !changeParam && lineParam === null ? "edit" : "preview",
   );
@@ -184,17 +188,30 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
     el.classList.add("flash");
   }, [targetSlug, mode, note.dataUpdatedAt]);
 
-  // Reaching a linked passage: the same, once per line asked for.
+  // Reaching a linked passage: the same, once per line asked for. The line is of the saved file;
+  // when an unsaved draft is shown, it is followed into the draft, and when that cannot be done
+  // with certainty nothing is marked and the saved version is offered instead (R6-13).
   useEffect(() => { if (lineParam !== null) setMode("preview"); }, [lineParam]);
+  useEffect(() => { setShowSaved(false); }, [lineParam, linkParam]);
+  const draftShown = draft !== null && !!note.data && draft !== note.data.content && !showSaved;
+  const passageLine = useMemo(() => {
+    if (lineParam === null || !note.data) return null;
+    return draftShown ? lineInDraft(note.data.content, draft!, lineParam, linkParam) : lineParam;
+  }, [lineParam, linkParam, note.data, draft, draftShown]);
+  const passageUncertain = lineParam !== null && draftShown && passageLine === null;
+  // "Back to my draft" removes the button that had focus: give it to the other choice.
+  const showSavedButton = useRef<HTMLButtonElement>(null);
+  const backToDraft = useRef(false);
+  useEffect(() => { if (backToDraft.current && !showSaved) { backToDraft.current = false; showSavedButton.current?.focus(); } }, [showSaved]);
   const revealedLine = useRef<string | null>(null);
   useEffect(() => {
-    const key = lineParam === null ? null : `${path}:${lineParam}`;
+    const key = passageLine === null ? null : `${path}:${lineParam}:${showSaved ? "saved" : passageLine}`;
     if (mode !== "preview" || key === null || revealedLine.current === key) return;
     const el = previewRef.current?.querySelector<HTMLElement>(".line-target");
     if (!el) return;
     revealedLine.current = key;
     requestAnimationFrame(() => revealAboveBar(el));
-  }, [lineParam, path, mode, note.dataUpdatedAt]);
+  }, [lineParam, passageLine, showSaved, path, mode, note.dataUpdatedAt]);
 
   // Reaching a change: switch to preview, scroll to and briefly highlight the exact block.
   useEffect(() => { if (changeParam) setMode("preview"); }, [changeParam]);
@@ -243,7 +260,7 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
           <p className="path" id="note-title">{n.path}</p>
           <div className="segmented" role="group" aria-label="View">
             <button type="button" aria-pressed={mode === "preview"} onClick={() => setMode("preview")}>Preview</button>
-            <button type="button" aria-pressed={mode === "edit"} onClick={() => { setMode("edit"); if (heading) setParams({ path }); }}>Edit</button>
+            <button type="button" aria-pressed={mode === "edit"} onClick={() => { setMode("edit"); setShowSaved(false); if (heading) setParams({ path }); }}>Edit</button>
           </div>
           <button type="button" className="primary" onClick={doSave} disabled={!dirty || save.isPending}>{save.isPending ? "Saving…" : "Save"}</button>
           <span className="save-state" role="status">{status}</span>
@@ -309,6 +326,18 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
             {mode === "edit" ? ". Switch to Preview to see where." : ". Use the review bar to accept or reject."}
           </p>
         ) : null}
+        {mode === "preview" && passageUncertain ? (
+          <div className="notice" role="status" data-testid="passage-uncertain">
+            <p>Your unsaved draft of this note differs from the saved version, and Nexus cannot tell where the link is in the draft, so nothing is marked.</p>
+            <button type="button" className="link-button" ref={showSavedButton} onClick={() => setShowSaved(true)}>Show the saved version</button>
+          </div>
+        ) : null}
+        {mode === "preview" && showSaved && lineParam !== null ? (
+          <div className="notice" role="status" data-testid="passage-saved">
+            <p>This is the saved version, with the linked passage marked. Your unsaved draft is kept.</p>
+            <button type="button" className="link-button" onClick={() => { backToDraft.current = true; setShowSaved(false); }}>Back to my draft</button>
+          </div>
+        ) : null}
         {extraNotes.aboveContent.map((Slot, i) => <Slot key={i} path={n.path} />)}
         {mode === "edit" ? (
           <div className="editor">
@@ -318,7 +347,7 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
           </div>
         ) : (
           <div ref={previewRef}>
-            <MarkdownPreview content={text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} pending={draft === null ? pendingBlocks : []} path={n.path} targetLine={lineParam} />
+            <MarkdownPreview content={showSaved ? n.content : text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} pending={draft === null || showSaved ? pendingBlocks : []} path={n.path} targetLine={passageLine} />
           </div>
         )}
         {save.error && !(save.error instanceof ApiError && save.error.code === "REVISION_MISMATCH") ? <ErrorNote error={save.error} /> : null}
@@ -371,7 +400,7 @@ function Backlinks({ path }: { path: string }) {
             const others = b.candidates.filter((c) => c !== path).map(shortName);
             return (
               <li key={`${b.source}:${b.line}:${b.heading ?? ""}`}>
-                <Link to={`${notePathParam(b.source)}&line=${b.line}`} className="backlink-source">
+                <Link to={`${notePathParam(b.source)}&line=${b.line}&link=${encodeURIComponent(b.raw)}`} className="backlink-source">
                   {shortName(b.source)}{b.sectionText ? <span className="muted"> › {b.sectionText}</span> : null}
                 </Link>
                 <p className="backlink-context">{b.context}</p>

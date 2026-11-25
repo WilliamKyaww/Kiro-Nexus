@@ -65,6 +65,22 @@ describe("backlinks to a note", () => {
     ]);
   });
 
+  it("finds no backlink in indented code, which the preview shows as code (R6-16)", async () => {
+    await put("Target.md", "# Target\n");
+    await put("Source.md", ["# Source", "", "See [[Target]] for the plan.", "", "    [[Target]] is how a link is written.", ""].join("\n"));
+    expect((await backlinksTo(service, "Target.md")).map((l) => [l.source, l.line, l.raw])).toEqual([["Source.md", 2, "[[Target]]"]]);
+  });
+
+  it("resolves a repeated heading's own slug to that heading, and its text to the first (R6-14)", async () => {
+    await put("Target.md", ["# Target", "", "## Tasks", "", "Order lunch.", "", "## Tasks", "", "Deliver parcels.", ""].join("\n"));
+    await put("Source.md", "First [[Target#Tasks]], second [[Target#tasks-1]], none [[Target#tasks-2]].\n");
+    expect((await backlinksTo(service, "Target.md")).map((l) => [l.heading, l.headingStatus, l.headingSlug])).toEqual([
+      ["Tasks", "ok", "tasks"],
+      ["tasks-1", "ok", "tasks-1"],
+      ["tasks-2", "missing", null],
+    ]);
+  });
+
   it("follows the files: an edit outside Nexus and a deleted source are seen at once", async () => {
     await put("planning/demo script.md", "Open [[2026-11-24 kickoff]].\n");
     expect(await backlinksTo(service, KICKOFF)).toHaveLength(1);

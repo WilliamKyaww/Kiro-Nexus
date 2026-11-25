@@ -1,6 +1,6 @@
 // [[ completion logic (backlinks-completion, requirement 3): which part of a link the caret is
 // in, what to suggest, and what to insert. Pure functions, so they are unit-tested.
-import { noteTargetFor, resolveNoteTarget } from "@nexus/markdown";
+import { inCodeAt, noteTargetFor, plainHeadingText, resolveNoteTarget, sections, slugOf } from "@nexus/markdown";
 
 export interface LinkToken {
   /** Index of the opening [[. */
@@ -49,6 +49,12 @@ export function linkAt(text: string, caret: number): LinkToken | null {
   return { start, part: "target", query: body.slice(0, at), target, partStart: bodyStart, partEnd: bodyStart + targetEnd, closed };
 }
 
+/** The link the caret is in, where the preview would render a link: not in code (R6-16). */
+export function completableLinkAt(text: string, caret: number): LinkToken | null {
+  const token = linkAt(text, caret);
+  return token && !inCodeAt(text, token.start) ? token : null;
+}
+
 export interface Suggestion { id: string; kind: "note" | "heading"; label: string; detail: string | null; value: string }
 
 const stem = (p: string) => p.replace(/\.md$/i, "");
@@ -67,14 +73,71 @@ export function noteSuggestions(query: string, notes: readonly string[], limit =
   return ranked.slice(0, limit).map(({ p }) => ({ id: `note:${p}`, kind: "note", label: nameOf(p), detail: folderOf(p) || null, value: noteTargetFor(p, notes) }));
 }
 
-/** Headings of the named note whose text holds the query, those starting with it first. */
-export function headingSuggestions(query: string, headings: ReadonlyArray<{ text: string; slug: string; depth: number }>, limit = 12): Suggestion[] {
+type HeadingLike = { text: string; slug: string; depth: number };
+
+/**
+ * What to write after # for a heading (R6-14). The preview follows slugOf(written) and the
+ * backlinks try that slug first, so the heading's text is written only when it slugs to this
+ * heading and fits in a link; otherwise its own slug (`tasks-1`), which always does.
+ */
+export function headingTargetFor(h: HeadingLike): string {
+  return !/[[\]|\n]/.test(h.text) && slugOf(h.text) === h.slug ? h.text : h.slug;
+}
+
+/** The first line of each heading's section, as plain words, for telling repeated headings apart. */
+function firstLines(content: string): Map<string, string> {
+  return new Map(sections(content).flatMap((s) => {
+    const line = s.text.split("\n").map((l) => plainHeadingText(l.replace(/^\s*(?:[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s*)/, ""))).find(Boolean);
+    return s.headingSlug && line ? [[s.headingSlug, line] as const] : [];
+  }));
+}
+const clip = (s: string, max = 36) => {
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 0 ? cut.lastIndexOf(" ") : max).trimEnd()}…`;
+};
+
+/**
+ * How each repeated heading is told apart on screen: the heading it is under, when that differs;
+ * otherwise the first line of its section; otherwise its position among them.
+ */
+function repeatedDetails(headings: readonly HeadingLike[], content: string): Map<string, string> {
+  const parents = new Map<string, string | null>();
+  const stack: HeadingLike[] = [];
+  for (const h of headings) {
+    while (stack.length && stack[stack.length - 1]!.depth >= h.depth) stack.pop();
+    parents.set(h.slug, stack[stack.length - 1]?.text ?? null);
+    stack.push(h);
+  }
+  const first = firstLines(content);
+  const out = new Map<string, string>();
+  const groups = new Map<string, HeadingLike[]>();
+  for (const h of headings) groups.set(h.text, [...(groups.get(h.text) ?? []), h]);
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const unique = (value: (h: HeadingLike) => string | null | undefined, h: HeadingLike) => { const v = value(h); return v ? group.filter((g) => value(g) === v).length === 1 : false; };
+    group.forEach((h, i) => {
+      if (unique((x) => parents.get(x.slug), h)) out.set(h.slug, `under ${parents.get(h.slug)!}`);
+      else if (unique((x) => first.get(x.slug), h)) out.set(h.slug, `“${clip(first.get(h.slug)!)}”`);
+      else out.set(h.slug, `${i + 1} of ${group.length}`);
+    });
+  }
+  return out;
+}
+
+/**
+ * Headings of the named note whose text holds the query (or whose slug starts with it), those
+ * starting with it first. Repeated headings say which is which, and each inserts a target that
+ * opens that heading (R6-14).
+ */
+export function headingSuggestions(query: string, headings: ReadonlyArray<HeadingLike>, content = "", limit = 12): Suggestion[] {
   const q = query.trim().toLowerCase();
+  const details = repeatedDetails(headings, content);
   return headings
-    .filter((h) => h.text && h.text.toLowerCase().includes(q))
+    .filter((h) => h.text && (h.text.toLowerCase().includes(q) || (!!q && h.slug.startsWith(q))))
     .sort((a, b) => Number(!a.text.toLowerCase().startsWith(q)) - Number(!b.text.toLowerCase().startsWith(q)))
     .slice(0, limit)
-    .map((h) => ({ id: `heading:${h.slug}`, kind: "heading", label: h.text, detail: null, value: h.text }));
+    .map((h) => ({ id: `heading:${h.slug}`, kind: "heading", label: h.text, detail: details.get(h.slug) ?? null, value: headingTargetFor(h) }));
 }
 
 /** What to say instead of offering a guess (requirement 3.5). */

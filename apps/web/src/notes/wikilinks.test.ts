@@ -1,6 +1,7 @@
 // [[ completion logic (.kiro/specs/backlinks-completion, requirement 3).
 import { describe, expect, it } from "vitest";
-import { completion, headingNoteProblem, headingSuggestions, linkAt, noteSuggestions, type LinkToken } from "./wikilinks";
+import { parseHeadings, resolveHeading, slugOf } from "@nexus/markdown";
+import { completableLinkAt, completion, headingNoteProblem, headingSuggestions, linkAt, noteSuggestions, type LinkToken } from "./wikilinks";
 
 const NOTES = ["meetings/2026-11-24 kickoff.md", "meetings/notes.md", "planning/notes.md", "planning/demo script.md", "Kick-off ideas.md"];
 /** The text with the caret at "|" removed: [text, caret]. */
@@ -46,6 +47,54 @@ describe("suggesting notes and headings", () => {
     expect(headingNoteProblem(token("2026-11-24 kickoff"), NOTES, null)).toEqual({ path: "meetings/2026-11-24 kickoff.md" });
     expect(headingNoteProblem(token("nowhere"), NOTES, null)).toEqual({ message: "No note is called “nowhere”." });
     expect(headingNoteProblem(token("notes"), NOTES, "Kick-off ideas.md")).toMatchObject({ message: expect.stringContaining("Several notes are called “notes”: meetings/notes, planning/notes") });
+  });
+});
+
+// R6-14: two headings with the same text. The link written for the second must open the second
+// in the preview (which follows slugOf of the heading part) and in the backlinks (resolveHeading).
+describe("repeated headings", () => {
+  const opens = (headings: ReturnType<typeof parseHeadings>, value: string) => [slugOf(value), resolveHeading(headings, slugOf(value), value).slug];
+
+  it("writes the chosen heading's own slug when its text would open another, and says which is which", () => {
+    const content = ["# Target", "", "## Monday", "", "### Tasks", "", "Order lunch.", "", "## Tuesday", "", "### Tasks", "", "Deliver parcels.", ""].join("\n");
+    const headings = parseHeadings(content);
+    const s = headingSuggestions("Tas", headings, content);
+    expect(s.map((x) => [x.label, x.detail, x.value])).toEqual([["Tasks", "under Monday", "Tasks"], ["Tasks", "under Tuesday", "tasks-1"]]);
+    expect(s.map((x) => opens(headings, x.value))).toEqual([["tasks", "tasks"], ["tasks-1", "tasks-1"]]);
+    // Typing the slug finds the heading again.
+    expect(headingSuggestions("tasks-1", headings, content).map((x) => x.value)).toEqual(["tasks-1"]);
+  });
+
+  it("uses the section's first line, then the position, when the parents are the same", () => {
+    const content = ["# Target", "", "## Tasks", "", "- [ ] Order lunch for the whole team on Friday.", "", "## Tasks", "", "Deliver parcels.", "", "## Tasks", "", "Deliver parcels.", ""].join("\n");
+    const headings = parseHeadings(content);
+    expect(headingSuggestions("Tasks", headings, content).map((x) => [x.detail, x.value])).toEqual([
+      ["“Order lunch for the whole team on…”", "Tasks"],
+      ["2 of 3", "tasks-1"],
+      ["3 of 3", "tasks-2"],
+    ]);
+  });
+
+  it("never writes text that opens a different heading, or that would break the link", () => {
+    const content = ["# Tasks", "", "# Tasks", "", "# Tasks 1", "", "# Q&A | notes", "", "# Odd ] one", ""].join("\n");
+    const headings = parseHeadings(content);
+    for (const s of headingSuggestions("", headings, content)) {
+      const h = headings.find((x) => `heading:${x.slug}` === s.id)!;
+      expect(opens(headings, s.value)).toEqual([h.slug, h.slug]);
+      expect(s.value).not.toMatch(/[[\]|]/);
+    }
+  });
+});
+
+// R6-16: completion is offered where the preview would render a link, not in code.
+describe("completion outside code only", () => {
+  it("offers nothing for a [[ in fenced, indented or inline code", () => {
+    expect(completableLinkAt(...at("```\n[[kick¦\n```"))).toBeNull();
+    expect(completableLinkAt(...at("```\n[[kick¦"))).toBeNull();
+    expect(completableLinkAt(...at("Text\n\n    [[kick¦"))).toBeNull();
+    expect(completableLinkAt(...at("Use `[[kick¦` here"))).toBeNull();
+    expect(completableLinkAt(...at("- Item\n\n    [[kick¦"))).toMatchObject({ part: "target", query: "kick" });
+    expect(completableLinkAt(...at("Use `code` and [[kick¦"))).toMatchObject({ part: "target", query: "kick" });
   });
 });
 
