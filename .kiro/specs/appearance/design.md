@@ -56,9 +56,12 @@ The tokens are surfaces, text, lines, the accent and state colours:
   `{ schemaVersion: 1, mode, light, dark }` in `packages/schema/src/appearance.ts`. The
   profile is the same for the browser and desktop routes, and it does not depend on the
   port.
-- **API:** `GET` and `PUT /api/v1/appearance`, which need the session like every other route.
-  An unknown palette is refused. A missing or unreadable file gives the default (Match system,
-  Porcelain, Graphite).
+- **API:** `GET` and `PATCH /api/v1/appearance`, which need the session like every other
+  route. `PATCH` takes only the fields that changed (`mode`, `light`, `dark`); the service
+  merges changes one at a time per profile and returns the preference with a `revision`.
+  `PUT` was replaced in the R6 repairs (R6-12, DEC-031). An unknown palette is refused. A
+  missing, unreadable or invalid file gives the default (Match system, Porcelain,
+  Graphite), through the validator `appearanceFromText` that Electron main shares (R6-11).
 - **First paint:** the service fills the stored preference into `index.html` as attributes
   on `<html>` (`data-mode`, `data-light`, `data-dark`). It is a UI preference, not workspace
   data, so the unauthenticated app shell may carry it. A small external script,
@@ -67,7 +70,8 @@ The tokens are surfaces, text, lines, the accent and state colours:
   attributes it uses the defaults.
 - **Single source of truth:** `apps/web/src/theme/appearance.ts` holds the preference. It
   applies the attributes, listens to `prefers-color-scheme` while in Match system, and saves
-  each change with `PUT`. Reads return the in-memory value, so nothing in the React tree
+  each change with `PATCH`, applying only a newer `revision` from a reply or an event.
+  Reads return the in-memory value, so nothing in the React tree
   remounts. Drafts, the conversation and the review position are therefore untouched.
 - **Quick switch:** a `role="switch"` button in the rail named "Dark mode", whose
   `aria-checked` is the effective theme. It shows a moon or sun icon and the words "Dark

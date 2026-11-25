@@ -503,24 +503,47 @@ open).
       the journal);
     - screenshots at 1360 × 900 and 390 × 844.
 
-### Run 6: run-5 repairs, light and dark appearance, the J7 correction loop, and backlinks (verified by Kiro, 2026-11-25; independently reviewed: not ready)
+### Run 6: run-5 repairs, light and dark appearance, the J7 correction loop, and backlinks (verified by Kiro, 2026-11-25; independently reviewed: not ready; R6 findings repaired, not yet re-reviewed)
 
-Astra 6.2 reviewed run 6 and found R6-1 to R6-17, which are open
-(`docs/reviews/2026-11-25-run6-review.md`). The claims below hold for the paths Kiro
-tested, and the reviewer confirmed the main paths. These do not hold yet:
+Astra 6.2 reviewed run 6 and found R6-1 to R6-17
+(`docs/reviews/2026-11-25-run6-review.md`). Kiro repaired all seventeen in `3828752` to
+`26951fc` (DEC-031), each with a test that failed first. The reviewer confirmed the main
+paths before the repairs; nobody has re-reviewed the repairs yet. What now holds, on the
+paths Kiro tested:
 
-- **Edit and review:** a rejection can still rewrite another section, and recovery can
-  record an accepted note change that is gone (R6-1, R6-2).
-- **Ask:** a contradictory fact can pass when one value is right (R6-6).
-- **Corrections:** a failed write can leave a change superseded with nothing to review;
-  the note check is not exact; and the conversation's Retry Edit loses the binding
-  (R6-3 to R6-5, R6-7).
-- **Appearance:** an invalid `appearance.json` stops the desktop app, and two sessions'
-  palette choices can overwrite each other (R6-11, R6-12).
-- **Backlinks and completion:** a draft can shift the linked passage; the second of two
-  same-named headings opens the first; a selected suggestion can be out of view at 390 px;
-  and indented code gives false backlinks (R6-13 to R6-16).
-- The other findings are R6-8 to R6-10 and R6-17.
+- **Edit and review:** Reject finds a note change only in its own section, so a shared
+  neighbouring line elsewhere cannot make it rewrite another section. A change that cannot
+  be found blocks new edits in its own section only. A saved group decision accepts
+  nothing when a member's lines or value are gone, also in recovery (R6-1, R6-2). A single
+  Accept still does not check the note's content.
+- **Edit reads:** a section read returns the exact raw lines an Edit may change, and a
+  line too long for one read is marked as not editable (R6-9).
+- **Ask:** each clause of a recorded fact is checked against the record it names,
+  negation included. A statement Nexus cannot check this way, including some correct
+  wordy ones, is shown as "Not confirmed". A citation of one of two same-named sections
+  with the same first line opens the right one, or says it cannot tell (R6-6, R6-10).
+- **Corrections:** a reason is saved with its request, so a crash before the run starts
+  leaves **Retry correction** after a restart. A rejected change is superseded only once
+  its correction was written. A failed write shows "The corrected change was not written",
+  and Discard offers the correction again. The engine refuses a correction that would
+  change lines outside the rejected change's lines. Retry on a failed correction turn in
+  the conversation retries the same correction (R6-3 to R6-5, R6-7).
+- **Reminders:** a delivery log lost while the clock is set back does not repeat a
+  reminder (R6-8).
+- **Appearance:** an invalid `appearance.json` falls back to the default in the desktop
+  app too. Two sessions choosing palettes at once both keep their choice. The scrollbar
+  thumb passes 3:1 in every palette (R6-11, R6-12, R6-17).
+- **Backlinks and completion:** a backlink opens its passage in an unsaved draft, or says
+  it cannot and offers the saved version. The second of two same-named headings is linked
+  by its own slug and opens itself. At 390 px the chosen suggestion stays in view, and the
+  list opens above the caret near the bottom. A link in indented code is not a backlink
+  (R6-13 to R6-16).
+- **Evidence:** 356 of 356 unit and integration tests (50 files); 70 browser and Electron
+  tests passing, with 2 screenshot runs skipped. The R6 tests are listed per finding in
+  the review record's "Resolutions".
+- **Not verified:** screen readers; Electron for the R6-13 to R6-15 changes; link
+  detection in HTML blocks, table cells, link reference definitions and entities; any
+  live model.
 
 - **Run-5 review repairs** (`e2dd950`, DEC-027). All thirteen findings from Astra 6.2's
   run-5 review are repaired, each with a test that failed first. The record is

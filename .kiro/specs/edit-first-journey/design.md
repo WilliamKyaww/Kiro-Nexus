@@ -142,21 +142,25 @@ fixed demo.
 Reject ─► review bar: "What was wrong, or what should be kept?"  Skip │ Send reason
                                                                        ▼
 POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
-  1. engine.feedback: the reason is saved in the journal
+  1. engine.feedback: the reason is saved in the journal; a correctable one as queued
   2. not correctable (demo, new issue, new link) ─► done: "reason saved"
   3. engine.beginCorrection(changeId, askRunId): correction.state = running   (once only)
   4. startRun(mode edit, correction): the visible question and the correction prompt
-       propose ─► scope check (same target) ─► engine.propose(…, { supersedes })
-                    new run journaled with supersedes ─► old change superseded
+       propose ─► engine.propose(…, { supersedes }): binding checked under the write lock
+                    new run journaled and written ─► old change superseded
+                    write failed ─► correction.state = unwritten (Retry writing or Discard)
   5. no proposal ─► correction.state = no-change; failure ─► failed (reason kept)
 ```
 
 ### Data
 
 - `ChangeRecord.correction` (optional, so older journals load):
-  `{ state: running | proposed | no-change | failed | dropped, askRunId, conversationId, at, message }`.
+  `{ state: queued | running | unwritten | proposed | no-change | failed | dropped, askRunId, conversationId, at, message }`.
   It lives on the rejected change, in its own journal, so the reason and the state survive a
-  restart together.
+  restart together. `queued` and `unwritten` were added in the R6 repairs (R6-7, R6-3,
+  DEC-031).
+- A correction's two conversation turns carry `correctionOf`, the rejected change's ID, so
+  **Retry correction** on a failed turn retries the same bound correction (R6-5).
 - `ChangeView` adds `supersedes`, `supersededBy`, `correctable`, `conversationId` and
   `correction`. `GET /review/changes?state=corrections` lists rejected changes whose
   correction is running, failed or proposed nothing.
@@ -166,21 +170,28 @@ POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
 
 ### Engine
 
-- `feedback` saves the reason. While a correction is running or proposed, it changes nothing,
+- `feedback` saves the reason, and for a correctable change the correction as `queued`, in
+  the same write. While a correction is running, unwritten or proposed, it changes nothing,
   so a second send cannot swap the reason under a running correction.
 - `beginCorrection` starts a correction only for a rejected change with a reason and no
   running or proposed correction. It is the single point that prevents duplicates; the route
   also holds a synchronous per-change admission set, so two simultaneous sends cannot both
   reach it.
 - `propose(…, { supersedes, correctionRunId })` refuses unless that change is still rejected
-  and its running correction is this run. Every new change carries `supersedes`. After the
-  new run's journal is written and applied, the old change becomes `superseded` and its
-  correction `proposed`, in its own journal.
+  and its running correction is this run. It then checks the binding (see "Scope"). Every new
+  change carries `supersedes`.
+- `settleCorrections` runs after a correction's proposal, after Retry writing and Discard,
+  and at start-up. A rejected change becomes `superseded`, and its correction `proposed`,
+  only once a change that supersedes it can be reviewed (it was written). One still waiting
+  to be written makes the correction `unwritten`. If all of them were discarded unwritten,
+  the correction is `failed`, so Retry is offered again (R6-3).
 - `endCorrection` records `no-change` or `failed` with the message, only for the same run.
-  `dropCorrection` ("Keep it rejected") closes a failed or empty correction.
-- **Recovery:** a rejected change that a written change supersedes becomes `superseded` (a
-  crash between the two journal writes). A correction still `running` after a restart becomes
-  `failed`: "Nexus stopped before the correction finished".
+  `dropCorrection` ("Keep it rejected") closes a failed or empty correction, and refuses a
+  queued, running or unwritten one.
+- **Recovery:** the same `settleCorrections` completes a crash between the two journal
+  writes. A correction still `running` after a restart becomes `failed` ("Nexus stopped
+  before the correction finished."), and one still `queued` too ("Nexus stopped before the
+  correction started.", R6-7).
 
 ### The correction run
 
@@ -190,11 +201,15 @@ POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
 - The conversation shows "Correct “<summary>”: <reason>". The model receives the summary,
   the reason as the user's own words, the target, its current value, and a
   `CORRECTION_REQUEST_JSON` block with the same facts.
-- **Scope.** Before anything reaches the engine, every operation must target:
+- **Scope.** The review engine checks this in `propose`, under the write lock (R6-4). The
+  proposal must be one operation of the rejected change's kind:
   - for a field change, the same field of the same issue (`record.updateField`);
-  - for a note change, the same note, on lines that overlap where the rejected change's
-    original lines now are. If those lines cannot be found, the correction is refused.
-  A refusal goes back to the model as a tool error, and nothing is written.
+  - for a note change, the same note, and the lines the edit will actually change, once
+    placed, must lie inside the region where the rejected change's original lines now are
+    (`correctionRegion`, found in its section by the reversal rules). If those lines cannot
+    be found, the correction is refused.
+  A refusal goes back to the model as a tool error with its own reason, and nothing is
+  written.
 - Base values come from the workspace, as for every Edit, so a manual edit or an accepted
   change made since is the correction's `before`.
 - The workspace binding of Edit (R4-6) applies unchanged.
@@ -208,9 +223,13 @@ POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
 - After **Send reason**, the bar says Nexus is preparing a corrected change. When a change
   that supersedes it appears, the tab that sent the reason opens it on its target,
   highlighted, once.
-- The bar lists corrections that are running, failed or empty, with **Retry correction**
+- The bar lists corrections that are queued or running ("Preparing a correction"),
+  unwritten ("The corrected change was not written", with the run's **Retry writing** and
+  **Discard**), failed or empty, with **Retry correction**
   (`POST /review/changes/:id/correction`, using the saved reason) and **Keep it rejected**
   (`POST /review/changes/:id/correction/drop`). After a restart they are listed the same way.
+- In the conversation, a failed correction turn says "The correction did not finish." and
+  offers **Retry correction**, which uses the same route (R6-5).
 - A correction in the bar is labelled "Correction" next to its summary.
 
 ### Provider double (a labelled fixture, not AI)
@@ -220,7 +239,8 @@ POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
 - Correction: the double reads `CORRECTION_REQUEST_JSON`. For a due date it looks the issue
   up, takes the date the reason names, proposes it and answers citing the issue. If the reason
   names no date it proposes nothing and says so. `nexus-test-double-stray` proposes a
-  different field, to prove the scope check.
+  different field, and `nexus-test-double-wide` corrects note lines and also ticks the line
+  above them, to prove the scope check.
 
 ### Testing
 
@@ -234,5 +254,10 @@ POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
 - `tests/e2e/j7-correction.spec.ts` (browser): Ask, then Edit with a date; accept the new
   task, reject the date, send a reason; the corrected date opens on NEX-1; restart; accept;
   the files on disk; one reminder at 09:00 under the test clock, which opens NEX-1. A second
-  test covers Skip, a failed correction after a restart, and **Retry correction**.
+  test covers Skip, a failed correction, **Retry correction** from its conversation turn (the
+  request must go to the correction route), a restart, and **Retry correction** from the bar.
+- R6 repairs: `server/src/review/correction-r6.test.ts` (engine: unwritten, Discard then
+  Retry, the line-range boundary, a field on another issue, queued across a restart, Skip and
+  Keep it rejected kept apart) and `server/src/ask/correction-r6-http.test.ts` (real service:
+  the `wide` double refused, `correctionOf` on both turns).
 - Live Edit, including corrections, still needs its own run against a real free provider.

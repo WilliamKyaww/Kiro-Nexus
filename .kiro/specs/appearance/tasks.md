@@ -1,8 +1,9 @@
 # Implementation plan: light and dark appearance
 
 - [x] 1. Preference schema, profile file, API and first-paint injection
-  - `packages/schema/src/appearance.ts`; `GET` and `PUT /api/v1/appearance`; `index.html`
-    filled with the stored preference; `/theme-boot.js`.
+  - `packages/schema/src/appearance.ts`; `GET` and `PUT /api/v1/appearance` (now `PATCH`
+    with a `revision`, R6-12); `index.html` filled with the stored preference;
+    `/theme-boot.js`.
   - _Requirements: 2.1, 3.1, 3.2, 3.3_
 - [x] 2. Semantic tokens and six palettes in the app stylesheet
   - Replace the placeholder colours and every hard-coded colour with tokens. Keep the

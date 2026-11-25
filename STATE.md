@@ -1,11 +1,11 @@
 # State
 
-- **Date updated:** 2026-11-25 (Astra 6.2's review of run 6 recorded: not
-  ready for sign-off, R6-1 to R6-17)
-- **Active phase:** none authorised. Run 6 is used up, and its review is
-  recorded in `docs/reviews/2026-11-25-run6-review.md`. Repairs of R6-1 to
-  R6-17 wait for Will's authorisation. Slice C's live check (task 5) is still waiting for Will's
-  free key.
+- **Date updated:** 2026-11-25 (R6-1 to R6-17 repaired and recorded; relay
+  for the re-review written)
+- **Active phase:** none authorised. The R6 repairs are done (the R6
+  repairs milestone log below) and wait for Astra 6.2's re-review, through
+  `docs/reviews/relays/2026-11-25-run6-repairs.md`. Slice C's live check
+  (task 5) is still waiting for Will's free key.
 - **Last spec:** `.kiro/specs/backlinks-completion/` tasks 1 to 5 are done.
   Also in run 6: `.kiro/specs/appearance/` (tasks 1 to 7) and
   `.kiro/specs/edit-first-journey/` task 5a.
@@ -26,6 +26,16 @@
   to DEC-014).
 
 ## Authorisation
+
+- **R6 repairs (granted by Will on 2026-11-25: "Fix all 17 please"): used
+  up.** All seventeen are repaired and committed, and the relay is written.
+  Its scope, kept for the record: reproduce each of R6-1 to R6-17 with a
+  test that fails first, repair it, and commit each verified group locally
+  under DEC-004. Record the resolution in the review record, and write a
+  DEC-021 relay when done. The boundaries of run 6 still applied: fictional
+  data, Will's demos and keys left alone, `vitest.config.ts` kept as it is,
+  no push. The Electron close with an unsaved draft is not one of the
+  seventeen.
 
 - **Standing:**
   - Local milestone commits under DEC-004. Stage only the relevant files
@@ -281,7 +291,32 @@ code):**
 Six high, nine medium and two low findings (R6-1 to R6-17). Of the R5 findings,
 R5-4, R5-5, R5-7 and R5-11 to R5-13 are resolved for the reported case, and R5-1 to
 R5-3, R5-6 and R5-8 to R5-10 are partly resolved. The record is
-`docs/reviews/2026-11-25-run6-review.md`. No R6 finding is reproduced or repaired yet.
+`docs/reviews/2026-11-25-run6-review.md`. All seventeen are now repaired (below).
+
+## Milestone log (R6 repairs, DEC-031)
+
+Each finding was reproduced with a failing test first. Streams A to E were Kiro
+sub-agents working in parallel on separate files; Kiro did the corrections group and
+R6-17, then combined, checked and committed everything. Per-finding tests and the saved
+failing output are in the review record's "Resolutions".
+
+| Group | Commit | Evidence |
+| --- | --- | --- |
+| R6-1, R6-2, R6-9: section identity, group decisions check content, exact read lines | `3828752` | `repairs-r6.test.ts` (10), `read-scope-r6.test.ts` (4) |
+| R6-6, R6-10: clause-by-clause evidence, repeated excerpts | `e2770a7` | `evidence-r6.test.ts` (6), `citation-r6.test.ts` (2), `headings.test.ts` (4 new) |
+| R6-11, R6-12: one appearance validator; `PATCH` with `revision` | `692c072` | `appearance.test.ts` (2 new, 1 changed from `PUT`), `appearance.spec.ts` (Electron `null`, two Edge sessions) |
+| R6-13 to R6-16: backlink passages in drafts, repeated headings, suggestions in view, indented code | `4987458` | `links.test.ts`, `wikilinks.test.ts`, `backlinks.test.ts`, `b2-backlinks.spec.ts` (4 new) |
+| R6-8: `passedUpTo` keeps the delivery boundary | `4a4e39a` | `scheduler-r6.test.ts` (6) |
+| R6-3, R6-4, R6-5, R6-7: corrections queued, bound in the engine, superseding only when written | `92ee37c` | `correction-r6.test.ts` (6), `correction-r6-http.test.ts` (2), `j7-correction.spec.ts` (conversation Retry) |
+| R6-17: scrollbar thumb at 3:1 | `26951fc` | `appearance.spec.ts`, `wireframe-appearance.spec.ts` (1 each); screenshots in `.tmp/r617-shots/` |
+| Test helper: poll `appearance.json` before it exists | `fac0151` | The R6-12 test had failed with ENOENT once under load |
+
+**Final checks (Kiro, at `fac0151`):** typecheck clean; 356 of 356 unit and integration
+tests (50 files); 70 browser and Electron tests passed with 2 screenshot runs skipped
+(2.8 minutes); secret scan passed (356 files); `mcp:smoke` 6 of 6. One full unit run had
+a single failure in `notes.test.ts` ("section search…"): the search ran before the new
+note was indexed, because the index updates asynchronously after a change event. It
+passed 5 of 5 alone and in the next full run. Treat it as a test race, not yet fixed.
 
 ## Wireframe overhaul (Will's request, 2026-11-25)
 
@@ -396,6 +431,25 @@ Will ran. Its eleven findings were repaired in run 5
 - **Coverage while records change.** Whether Ask's issue coverage stays
   consistent when records change during a run is not established. The
   reviewer raised this; it is not addressed.
+- **R6 repairs, not yet re-reviewed.** Kiro's own tests only. Known limits
+  (the review record's "Resolutions"):
+  - a single **Accept** does not check a note change's content; only group
+    decisions do;
+  - heading moves are followed only when a later rejection recorded them;
+  - two processes on one profile are not locked against each other for
+    `appearance.json`, and the UI does not fetch the preference again after
+    an event-stream reconnect;
+  - link detection does not handle HTML blocks, `|` in a table cell's link,
+    link reference definitions, `[[…]]` inside a Markdown link or autolink,
+    or entities. No parser dependency was added (Kiro's policy blocked
+    `npm install`); the rule agrees with remark-parse on all but 4 of
+    20,026 generated notes;
+  - screen readers were not tried, and the R6-13 to R6-15 changes ran in
+    Edge only.
+- **Electron close with an unsaved draft.** The reviewer's Electron test
+  timed out when closing with a draft unsaved. It is not one of the R6
+  findings, and Kiro has not investigated it beyond reading the source
+  (`docs/reviews/2026-11-25-run6-review.md`, "Other observations").
 
 ## Human actions pending
 
@@ -421,10 +475,14 @@ Will ran. Its eleven findings were repaired in run 5
    - `npm test` runs only 13 tests;
    - `npm run test:review` and the review hooks find no tests;
    - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
-8. **Will: authorise the R6 repairs, or choose which.** Astra 6.2 reviewed
-   run 6 (`docs/reviews/2026-11-25-run6-review.md`): not ready, R6-1 to
-   R6-17. Kiro reproduces each authorised finding first, then repairs and
-   records it.
+8. **Will: send the R6 repairs relay to Astra 6.2**
+   (`docs/reviews/relays/2026-11-25-run6-repairs.md`), then paste the
+   report back. Also decide:
+   - whether to add `unified` and `remark-parse` for link detection (R6-16);
+   - whether a single **Accept** should check a note change's content, as
+     group decisions now do;
+   - whether Kiro should investigate the Electron close with an unsaved
+     draft.
 9. **Will: look at a real desktop reminder.** Run `npm run desktop`, open
    Notifications and select **Send test reminder**. Check that a Windows
    notification appears, and that clicking it opens NEX-1.
@@ -491,12 +549,11 @@ Will ran. Its eleven findings were repaired in run 5
 ## Next action
 
 - **Will:**
+  - Send the R6 repairs relay to Astra 6.2 (human action 8).
   - Try the run-6 walkthrough: the Dark mode switch and Settings →
     Appearance; the J7 correction with the provider double; backlinks and
     `[[` in a note (`docs/reviews/relays/2026-11-25-run6.md`, "Trying it by
     hand").
-  - Decide the scope of the R6 repairs (R6-1 to R6-17,
-    `docs/reviews/2026-11-25-run6-review.md`).
   - Try reminders (README, "Reminders"), including one in the desktop
     app.
   - Decide about `vitest.config.ts`.
@@ -516,8 +573,8 @@ Will ran. Its eleven findings were repaired in run 5
 ### Continuation instruction for a fresh Kiro session
 
 > Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 6's
-> authorisation is spent, so do not start a new slice until Will or Hein
-> names one. To check that everything still works, run:
+> authorisation and the R6 repairs authorisation are spent, so do not
+> start a new slice until Will or Hein names one. To check that everything still works, run:
 >
 > - `npm run typecheck`;
 > - the unit suite: `npm test` if `vitest.config.ts` has been restored,
@@ -525,8 +582,8 @@ Will ran. Its eleven findings were repaired in run 5
 > - `npm run test:e2e`;
 > - `npm run scan:secrets`.
 >
-> The expected totals are 300 unit and integration tests (43 files) and
-> 62 browser tests passing, with 2 screenshot runs skipped.
+> The expected totals are 356 unit and integration tests (50 files) and
+> 70 browser tests passing, with 2 screenshot runs skipped.
 >
 > If Will supplies a live-check result, record it in slice C task 5 and
 > in `docs/judge-ai-route.md`. Close Q1 only on exit 0 from a real free

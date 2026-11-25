@@ -2,7 +2,7 @@
 
 - **Status:** Approved by Will at `7b775cd` (2026-11-24); amendments 1-4 applied (DEC-011 to DEC-014)
 - **Last updated:** 2026-11-25 (appearance preference in the profile, DEC-028;
-  the correction loop as built, DEC-029)
+  the correction loop as built, DEC-029; the run-6 review repairs, DEC-031)
 - **Traces to:** `structure.md` (PRD-xxx); intake R-*/D-*; decisions
   DEC-005 to DEC-014.
 
@@ -149,7 +149,7 @@ The session model below implements amendment 1 (DEC-011).
 | Agent | `POST /conversations`, `POST /conversations/{id}/messages` (`mode: ask|edit`), `GET /conversations` |
 | Review | `GET /reviews?state=pending`, `POST /changes/{id}/accept`, `POST /changes/{id}/reject`, `POST /changes/{id}/feedback`, `POST /changes/{id}/correction` (retry) and `/correction/drop`, `POST /changes/{id}/resolve-conflict` |
 | Providers | `GET/POST/DELETE /providers`, `POST /providers/{id}/test`, `PUT /providers/{id}/session-key` (browser only) |
-| Appearance | `GET/PUT /appearance` (profile preference; publishes `appearance.changed`) |
+| Appearance | `GET/PATCH /appearance` (profile preference; `PATCH` takes only the changed fields, which the service merges with a `revision`; publishes `appearance.changed`; DEC-031) |
 | Events | `GET /events` (SSE): `file.changed`, `review.updated`, `notification`, `run.progress` |
 
 Writes carry a base revision; a stale write returns `409 REVISION_MISMATCH`
@@ -261,7 +261,9 @@ Hein's fixtures use these exact strings.
   (DEC-030, `packages/markdown/src/links.ts`): a path, or the end of one,
   matches first; "closest" means the most shared leading folders, then the
   fewest folders; equally close notes make the link ambiguous, and Nexus
-  names them instead of choosing. Links in code are ignored. Note backlinks
+  names them instead of choosing. Links in code are ignored, using CommonMark's block rule
+  shared with the preview, so indented code is code too; a repeated heading is linked by
+  its own slug (DEC-031). Note backlinks
   are computed from the files on request (`GET /notes/backlinks?path=`).
 - **Search** uses an in-memory full-text index over note sections (heading
   path + body) and issue titles and descriptions. It is rebuilt at start and
@@ -412,7 +414,11 @@ never built.)
 - **Reject** `pending → rejecting → rejected`, with reversal:
   1. **Locate** the change's region in the current file:
      - *Field:* the field's current value on the record.
-     - *Note span:* every line-aligned occurrence of the `after` text.
+     - *Note span:* every line-aligned occurrence of the `after` text. Since
+       DEC-031, an Edit change is looked for only in the section it was
+       proposed in (following heading moves that later rejections recorded),
+       and repeated text there needs both saved neighbours; changes with no
+       recorded section keep the rule below.
        1. If there is more than one, keep only those whose nearest
           non-blank neighbours equal `context.lineBefore` and
           `context.lineAfter`.
@@ -451,15 +457,23 @@ never built.)
   `.kiro/specs/edit-first-journey/` Requirement 5):
   - The reason is saved as the change's `feedback` before anything else, and
     the run's progress is the change's `correction`
-    (`running | proposed | no-change | failed | dropped`), in the same
-    journal, so both survive a restart.
+    (`queued | running | unwritten | proposed | no-change | failed | dropped`),
+    in the same journal, so both survive a restart. A correctable reason is
+    saved as `queued` in that same write (DEC-031).
   - Only Edit changes to an issue field or to note lines start a run. A
     fixed-demo change, a new issue or a new link keeps the reason only.
   - The run takes the change's conversation, is bound to that change and its
-    target, and is refused any other operation. A change becomes
-    `superseded` only after its correction's journal is written; recovery
-    completes a crash in between, and turns a `running` correction into
-    `failed`, with Retry.
+    target, and is refused any other operation. The review engine checks
+    this under the write lock: one operation of the same kind, on the same
+    field of the same issue or on the same note, and the lines a note edit
+    will actually change must lie inside the rejected change's lines, found
+    in its section. A correction's conversation turns carry `correctionOf`,
+    so a retry from the conversation stays bound (DEC-031).
+  - A change becomes `superseded` only once its correction can be reviewed
+    (it was written). A correction whose write failed is `unwritten` until
+    Retry writing supersedes it or Discard makes it `failed`. At start-up,
+    recovery completes a crash in between, and turns a `queued` or `running`
+    correction into `failed`, with Retry.
 
 ### 7.5 Recovery and retries (R-C5)
 

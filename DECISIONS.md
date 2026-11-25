@@ -604,7 +604,8 @@ status control.
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 1, under Will's overnight
   authorisation; awaiting human review). Refines DEC-012, DEC-022, DEC-024 and DEC-025.
   Record: `docs/reviews/2026-11-25-run5-review.md`. **Reviewed** by Astra 6.2 in run 6's
-  review: partly resolved; open findings R6-1, R6-2, R6-6, R6-8, R6-9 and R6-10.
+  review: partly resolved; findings R6-1, R6-2, R6-6, R6-8, R6-9 and R6-10, repaired
+  under DEC-031.
 **Decision.**
 - **Spans.** A note change's span is its saved text plus at least one of its saved
   neighbouring lines. The same text elsewhere, with both neighbours different, is not the
@@ -639,7 +640,9 @@ status control.
   Will approved the light direction of the wireframe at `5ce82b4` on 25 November 2026 and
   authorised its colours and the theme controls in the working app. Hein keeps the final
   overall identity, the calendar and agenda, and card ordering (DEC-026). **Reviewed** by
-  Astra 6.2 in run 6's review: open findings R6-11, R6-12 and R6-17.
+  Astra 6.2 in run 6's review: findings R6-11, R6-12 and R6-17, repaired under DEC-031.
+  **Amended by DEC-031:** `PUT /appearance` became `PATCH` with only the changed fields,
+  and the preference carries a `revision`.
 **Decision.**
 - **Choices.** Light, Dark or Match system, with Match system for a fresh profile. Each
   theme has three original palettes and remembers its own: Porcelain (the approved look,
@@ -673,7 +676,10 @@ status control.
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 3, under Will's overnight
   authorisation; awaiting human review). Implements PRD-064 and architecture 7.4.
   Spec: `.kiro/specs/edit-first-journey/` Requirement 5 and task 5a. **Reviewed** by Astra
-  6.2 in run 6's review: open findings R6-3, R6-4, R6-5 and R6-7.
+  6.2 in run 6's review: findings R6-3, R6-4, R6-5 and R6-7, repaired under DEC-031.
+  **Amended by DEC-031:** two more correction states, `queued` and `unwritten`; supersede
+  only once the correction can be reviewed; the binding checked in the engine by the
+  lines actually changed; `correctionOf` on the correction's turns.
 **Decision.**
 - **Which changes.** A reason starts a correction run only for an Edit change to an issue
   field or to note lines. A fixed-demo change, a new issue or a new link keeps the reason
@@ -708,7 +714,9 @@ status control.
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 4, under Will's overnight
   authorisation; awaiting human review). Refines architecture 6 and DEC-006.
   Spec: `.kiro/specs/backlinks-completion/`. **Reviewed** by Astra 6.2 in run 6's review:
-  open findings R6-13 to R6-16.
+  findings R6-13 to R6-16, repaired under DEC-031. **Amended by DEC-031:** indented code
+  is code; a repeated heading is linked by its own slug; a backlink carries the link's raw
+  text.
 **Decision.**
 - **Resolution.** A target matches a note's path, or the end of one, case-insensitively,
   with or without `.md`. An exact path wins. Among several notes with the name, the one with
@@ -730,3 +738,52 @@ status control.
   chose one, which hid the problem.
 - *A backlink index kept by the watcher.* More state to keep right, for no measured need.
 - *Setting the textarea's value directly.* It loses the browser's undo history.
+## DEC-031: Changes are identified within their section, and corrections stay bound to them (run-6 review repairs)
+- **Status:** Accepted (Kiro, 2026-11-25, under Will's authorisation "Fix all 17
+  please"; awaiting re-review). Amends DEC-027 to DEC-030. Record:
+  `docs/reviews/2026-11-25-run6-review.md`, "Resolutions". Commits `3828752` to
+  `26951fc`.
+**Decision.**
+- **Section identity (R6-1, R6-9).** A note change is found again only in the section it
+  was proposed in, following heading moves that later rejections recorded. Repeated text
+  there needs both saved neighbours. A change that cannot be found blocks its own section
+  only. An Edit may not write lines that would repeat other lines of its section. A read
+  returns the exact raw lines it registers as editable.
+- **Group decisions check content (R6-2).** Before a saved group decision is carried out,
+  each member's lines, value, issue or link must still be in the files. Otherwise it is a
+  conflict and nothing is accepted. A single Accept is unchanged.
+- **Statements are checked clause by clause (R6-6, R6-10).** Each clause must agree with
+  the record it names, negation included. Tracking statements use a strict word list that
+  fails closed, so some correct statements show as "Not confirmed". A citation's excerpt
+  keeps up to three lines, and a tie between same-named sections is reported as
+  uncertain.
+- **Corrections (R6-3 to R6-5, R6-7).** The correction states are now `queued`,
+  `running`, `unwritten`, `proposed`, `no-change`, `failed` and `dropped`.
+  - A reason saves the request as `queued` in the same write.
+  - The rejected change is superseded only once its correction can be reviewed.
+  - The engine checks the binding under the write lock, by the lines the edit will
+    actually change.
+  - A correction's turns carry `correctionOf`, so a retry from the conversation stays
+    bound.
+- **Reminder boundary (R6-8).** `scheduler.json` keeps `passedUpTo`, which never goes back,
+  and a missing log takes its pruning boundary from it.
+- **Appearance (R6-11, R6-12, R6-17).** One validator for the service and Electron main.
+  `PATCH /appearance` with only the changed fields, merged per profile, with a
+  `revision`. The scrollbar thumb is the control line colour.
+- **Links (R6-13 to R6-16).** A backlink carries the link's raw text and is found in the
+  draft, or the page says it cannot. A repeated heading is linked by its own slug. Links
+  follow CommonMark's block rule, so indented code is code, in the preview and the
+  backlinks alike.
+**Alternatives.**
+- *Find a change anywhere in the note by its neighbours (run 5).* Ordinary neighbouring
+  lines such as "Checklist" occur in many sections; that is R6-1.
+- *Keep the correction check at admission, against any occurrence of the text.* It
+  checked overlap, not what the journal would change, and ran outside the write lock
+  (R6-4).
+- *One stored checkpoint for the scheduler.* It still repeated a delivery when the clock
+  was set back and the log was then lost (R6-8).
+- *A hand-written validator in Electron main.* Smaller, but two checks could disagree
+  again (R6-11).
+- *remark-parse for link detection.* It would match the preview exactly, but adding it
+  needs Will's approval; Kiro's policy blocked the install. The shared rule agrees with it
+  on all but 4 of 20,026 generated notes.
