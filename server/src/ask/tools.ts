@@ -5,7 +5,7 @@ import type { ChangeRecord, Issue, Project, WorkspaceManifest } from "@nexus/sch
 import { parseHeadings, sections as splitSections } from "@nexus/markdown";
 import { effectiveAcceptedIssues } from "../scheduler/reminders";
 import { sameValue } from "../util/json";
-import { locate, splice } from "../review/spans";
+import { locate, sectionParts, splice } from "../review/spans";
 import { SearchIndex, snippet, type SearchResult } from "../notes/search";
 import { alignHeadings } from "../notes/align";
 import { taskItems, type HandleRegistry } from "./handles";
@@ -38,11 +38,19 @@ export interface Consulted {
    * The full accepted text of each section the run read, by path and accepted slug ("" for a
    * whole note). An Edit run may change only lines it read, and only while they are unchanged (R4-1).
    */
-  reads: Map<string, { path: string; headingSlug: string | null; text: string }>;
+  reads: Map<string, ReadPart>;
 }
 
+/**
+ * The exact raw lines one read returned (R5-8): `from` counts from the section's heading line
+ * (0) or from the top of the note, and `text` holds those lines, heading line included.
+ */
+export interface ReadPart { path: string; headingSlug: string | null; from: number; count: number; text: string }
+
 export const newConsulted = (): Consulted => ({ searches: [], sectionsRead: [], issueQueries: [], issueIdsSeen: new Set(), issueTotal: 0, reads: new Map() });
-export const readKey = (path: string, headingSlug: string | null) => `${path}#${headingSlug ?? ""}`;
+export const readKey = (path: string, headingSlug: string | null, from = 0) => `${path}#${headingSlug ?? ""}@${from}`;
+/** Longest part of a section one read returns. */
+export const READ_PART_CHARS = 6000;
 
 /** Whether this run saw every issue record, which an absence claim needs. */
 export function issueCoverage(c: Consulted): { read: number; total: number; complete: boolean } {
@@ -52,7 +60,12 @@ export function issueCoverage(c: Consulted): { read: number; total: number; comp
 export const ISSUE_PAGE = 50;
 
 export const SearchNotesArgs = z.object({ query: z.string().min(1).max(200), limit: z.number().int().min(1).max(10).optional() });
-export const ReadSectionArgs = z.object({ path: z.string().min(1).max(512), headingSlug: z.string().max(200).nullable().optional() });
+export const ReadSectionArgs = z.object({
+  path: z.string().min(1).max(512),
+  headingSlug: z.string().max(200).nullable().optional(),
+  /** Continue a long section: the nextFromLine of the previous part. */
+  fromLine: z.number().int().min(0).max(1_000_000).nullable().optional(),
+});
 export const QueryIssuesArgs = z.object({
   projectKey: z.string().max(20).nullable().optional(),
   status: z.enum(["todo", "in_progress", "done"]).nullable().optional(),
@@ -199,39 +212,71 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
           availableHeadings: parseHeadings(content).map((h) => ({ slug: h.slug, text: h.text })),
         };
       }
+      const part = readPart(content, raw.path, section.headingSlug, args.fromLine ?? 0);
+      if ("error" in part) return part;
       consulted.sectionsRead.push(section.headingPath.join(" › "));
       const sectionPending = pendingFor(section, content, pending);
       const renamed = proposedHeading(sectionPending);
       const resolvedNote = section.headingSlug !== slug
         ? { requestedHeading: slug, resolvedNote: `“${slug}” is a heading proposed by an edit awaiting review. This is the accepted section, “${section.headingText}”.` }
         : {};
-      const text = section.text.slice(0, 6000);
-      consulted.reads.set(readKey(raw.path, section.headingSlug), { path: raw.path, headingSlug: section.headingSlug, text: section.text });
       const handle = handles.note(raw.path, section.headingSlug, section.headingPath);
-      const actions = taskItems(text);
-      handles.saw(handle, { sectionText: text, tasks: actions });
+      const actions = taskItems(part.text);
+      recordEvidence(handle, part, actions);
       return {
         handle, path: raw.path, headingSlug: section.headingSlug, headingPath: section.headingPath, headingText: section.headingText,
         ...resolvedNote,
-        text, truncated: section.text.length > 6000,
+        text: part.text, truncated: part.truncated, ...part.continuation,
         ...(actions.length ? { actions, actionsNote: ACTIONS_NOTE } : {}),
         pendingReview: sectionPending,
         ...(renamed ? { pendingHeading: renamed } : {}),
       };
     }
     const title = parseHeadings(content)[0]?.text;
+    const part = readPart(content, raw.path, null, args.fromLine ?? 0);
+    if ("error" in part) return part;
     consulted.sectionsRead.push(`${title ?? raw.path} (whole note)`);
-    consulted.reads.set(readKey(raw.path, null), { path: raw.path, headingSlug: null, text: content.replace(/\r\n/g, "\n").trim() });
-    const text = content.slice(0, 6000);
     const handle = handles.note(raw.path, null, title ? [title] : []);
-    const actions = taskItems(text);
-    handles.saw(handle, { sectionText: text, tasks: actions });
+    const actions = taskItems(part.text);
+    recordEvidence(handle, part, actions);
     return {
       handle, path: raw.path, headingSlug: null, headingPath: title ? [title] : [], headingText: null,
-      text, truncated: content.length > 6000,
+      text: part.text, truncated: part.truncated, ...part.continuation,
       ...(actions.length ? { actions, actionsNote: ACTIONS_NOTE } : {}),
       pendingReview: pending,
     };
+  }
+
+  /**
+   * One part of a section (or of the whole note) of the accepted text: whole lines up to
+   * READ_PART_CHARS. Exactly these lines are registered as read, so an Edit can change only
+   * lines the model was shown (R5-8). A longer section continues with `fromLine`.
+   */
+  function readPart(content: string, path: string, headingSlug: string | null, fromLine: number) {
+    const parts = sectionParts(content, headingSlug, parseHeadings(content), READ_PART_CHARS) ?? [];
+    const index = parts.findIndex((p) => p.from === fromLine);
+    if (index < 0) {
+      return { error: "no part of the section starts at that line", path, requestedFromLine: fromLine, partsStartAt: parts.map((p) => p.from) };
+    }
+    const p = parts[index]!;
+    consulted.reads.set(readKey(path, headingSlug, p.from), { path, headingSlug, from: p.from, count: p.count, text: p.text });
+    // The text shown leaves out the heading line, which headingText already gives.
+    const lines = p.text.split("\n");
+    const shown = (headingSlug !== null && p.from === 0 ? lines.slice(1) : lines).join("\n").trim();
+    const next = parts[index + 1];
+    return {
+      text: shown,
+      truncated: next !== undefined,
+      continuation: next ? { nextFromLine: next.from, continuationNote: `This section is longer. Read the rest with read_note_section and fromLine ${next.from}. Only the lines shown can be edited.` } : {},
+    };
+  }
+
+  /** Evidence for the answer checks: a long section's parts add up. */
+  function recordEvidence(handle: string, part: { text: string }, actions: Array<{ text: string; done: boolean }>) {
+    const prev = handles.evidenceOf(handle);
+    const sectionText = prev?.sectionText && !prev.sectionText.includes(part.text) ? `${prev.sectionText}\n${part.text}` : part.text;
+    const tasks = [...(prev?.tasks ?? []), ...actions.filter((a) => !(prev?.tasks ?? []).some((t) => t.text === a.text && t.done === a.done))];
+    handles.saw(handle, { sectionText, tasks });
   }
 
   /** `limit` is for Nexus's own reading (the retrieval-first cap); the model's tool has no limit. */
@@ -265,7 +310,7 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
         if (c.kind === "record.updateField" && c.target.recordId === i.id && c.target.field && sameValue(current[c.target.field], c.after)) proposed[c.target.field] = c.after;
       }
       const handle = handles.issue(i.key, i.title);
-      handles.saw(handle, { issue: { key: i.key, title: i.title, description: i.description, status: i.status } });
+      handles.saw(handle, { issue: { key: i.key, title: i.title, description: i.description, status: i.status, due: i.due } });
       return {
         handle,
         key: i.key, project: keyOf.get(i.projectId) ?? null, title: i.title, status: i.status, priority: i.priority,
@@ -304,6 +349,6 @@ export function makeAskTools(ws: ReadOnlyWorkspace, handles: HandleRegistry, con
 const str = { type: "string" };
 export const TOOL_DEFINITIONS = [
   { type: "function" as const, function: { name: "search_notes", description: "Full-text search over note sections. Returns sections with citation handles.", parameters: { type: "object", properties: { query: str, limit: { type: "integer", minimum: 1, maximum: 10 } }, required: ["query"], additionalProperties: false } } },
-  { type: "function" as const, function: { name: "read_note_section", description: "Read one section of a note by heading slug (or the whole note when headingSlug is omitted).", parameters: { type: "object", properties: { path: str, headingSlug: { type: ["string", "null"] } }, required: ["path"], additionalProperties: false } } },
+  { type: "function" as const, function: { name: "read_note_section", description: "Read one section of a note by heading slug (or the whole note when headingSlug is omitted). A long section comes in parts: when truncated, call again with fromLine set to nextFromLine. Only lines you were shown can be edited.", parameters: { type: "object", properties: { path: str, headingSlug: { type: ["string", "null"] }, fromLine: { type: ["integer", "null"], minimum: 0 } }, required: ["path"], additionalProperties: false } } },
   { type: "function" as const, function: { name: "query_issues", description: `Query issue records directly for exact status, priority and due dates. Returns up to ${ISSUE_PAGE} issues; when truncated, call again with offset set to nextOffset. Use text for a targeted lookup by words in the title or description.`, parameters: { type: "object", properties: { projectKey: { type: ["string", "null"] }, status: { type: ["string", "null"], enum: ["todo", "in_progress", "done", null] }, text: { type: ["string", "null"] }, keys: { type: ["array", "null"], items: str }, offset: { type: ["integer", "null"], minimum: 0 } }, additionalProperties: false } } },
 ];

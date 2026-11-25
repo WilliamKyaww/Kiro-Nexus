@@ -14,8 +14,10 @@ async function journeyChecks(ws: string, turn: 1 | 2): Promise<string[]> {
   const [file] = await readdir(dir);
   const conversation = JSON.parse(await readFile(join(dir, file!), "utf8"));
   const answers = conversation.messages.filter((m: { role: string }) => m.role === "assistant");
-  const issues = JSON.parse(await readFile(join(ws, ".nexus", "issues.json"), "utf8")).issues.map((i: { key: string }) => i.key);
-  return evaluateTurn(answers[turn - 1], turn, { actionsHeadingExists: true, existingIssues: new Set(issues) }).filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`);
+  const records = JSON.parse(await readFile(join(ws, ".nexus", "issues.json"), "utf8")).issues as Array<{ key: string; title: string; status: string; due: unknown }>;
+  const issues = records.map((i) => i.key);
+  // The stored records let the check compare what the answer states with them (R5-3).
+  return evaluateTurn(answers[turn - 1], turn, { actionsHeadingExists: true, existingIssues: new Set(issues), records }).filter((c) => !c.ok).map((c) => `${c.name}: ${c.detail}`);
 }
 
 test.use({ trace: "off", screenshot: "off" }); // a fake key is typed in Settings

@@ -2,7 +2,7 @@
 // Tracking claims are structured and checked against the evidence of the run
 // (requirement 8), never against the wording of the claim.
 import { z } from "zod";
-import type { Citation, HandleRegistry } from "./handles";
+import type { Citation, Evidence, HandleRegistry } from "./handles";
 
 const Item = z.object({ text: z.string().min(1).max(2000), sources: z.array(z.string().max(20)).max(20).catch([]).default([]) });
 const Tracking = z.object({
@@ -145,6 +145,63 @@ function asWritten(text: string, stems: string[]): string[] {
   return [...out];
 }
 
+/** A calendar date; `year` is null when the text gives none ("5 December"). */
+export interface DateValue { year: number | null; month: number; day: number }
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const DAY_MONTH = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTH}\\b\\.?(?:,?\\s+(\\d{4})\\b)?`, "gi");
+const MONTH_DAY = new RegExp(`\\b${MONTH}\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4})\\b)?`, "gi");
+
+/** The calendar dates a text states: "2026-12-05", "5 December", "5 Dec 2026", "December 5th, 2026". */
+export function datesIn(text: string): DateValue[] {
+  const out: DateValue[] = [];
+  const push = (year: number | null, month: number, day: number) => { if (month >= 1 && month <= 12 && day >= 1 && day <= 31) out.push({ year, month, day }); };
+  const month = (name: string) => MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) push(Number(m[1]), Number(m[2]), Number(m[3]));
+  for (const m of text.matchAll(DAY_MONTH)) push(m[3] ? Number(m[3]) : null, month(m[2]!), Number(m[1]));
+  for (const m of text.matchAll(MONTH_DAY)) push(m[3] ? Number(m[3]) : null, month(m[1]!), Number(m[2]));
+  return out;
+}
+
+/** An issue status a text states, as Nexus shows it ("to do", "in progress", "done"); "not done" is negated. */
+export interface StatusValue { status: "todo" | "in_progress" | "done"; negated: boolean }
+const STATUS_FORMS: Array<[RegExp, StatusValue["status"]]> = [[/\bto[ -]?do\b/gi, "todo"], [/\bin[ _-]progress\b/gi, "in_progress"], [/\bdone\b/gi, "done"]];
+export function statusesIn(text: string): StatusValue[] {
+  const out: StatusValue[] = [];
+  for (const [form, status] of STATUS_FORMS) {
+    for (const m of text.matchAll(form)) out.push({ status, negated: /(?:\bnot|n['’]t)\s+(?:yet\s+)?$/i.test(text.slice(0, m.index)) });
+  }
+  return out;
+}
+
+const sameDate = (a: DateValue, b: DateValue) => a.month === b.month && a.day === b.day && (a.year === null || b.year === null || a.year === b.year);
+const formatDate = (d: DateValue) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(Date.UTC(d.year ?? 2000, d.month - 1, d.day));
+
+type IssueRecord = NonNullable<Evidence["issue"]>;
+/** The local date of a due value (and, for a timed one, its UTC date, which a model may quote). */
+function dueDates(due: IssueRecord["due"]): DateValue[] {
+  if (!due) return [];
+  if ("date" in due) {
+    const [year, month, day] = due.date.split("-").map(Number);
+    return [{ year: year!, month: month!, day: day! }];
+  }
+  const instant = new Date(due.dateTime);
+  if (Number.isNaN(instant.getTime())) return [];
+  const utc = { year: instant.getUTCFullYear(), month: instant.getUTCMonth() + 1, day: instant.getUTCDate() };
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: due.timeZone, year: "numeric", month: "numeric", day: "numeric" }).formatToParts(instant).map((x) => [x.type, x.value]));
+    return [{ year: Number(p.year), month: Number(p.month), day: Number(p.day) }, utc];
+  } catch {
+    return [utc];
+  }
+}
+/** How the run read a record, for a qualifier: "NEX-1 (Build calendar view) is in progress and due on 5 December 2026". */
+function asRead(r: IssueRecord): string {
+  const date = dueDates(r.due)[0];
+  const due = r.due === undefined ? "" : r.due === null ? " and has no due date" : date ? ` and due on ${formatDate(date)}` : "";
+  return `${r.key} (${r.title}) is ${STATUS_TEXT[r.status] ?? r.status}${due}`;
+}
+
 /** Most of the action's words appear on one line of the section the run read. */
 function actionInSection(action: string, sectionText: string): boolean {
   const want = contentWords(action);
@@ -229,19 +286,68 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
     else unconfirmed.push({ text, sources: itemSources, qualifier: problem });
   }
 
-  // 2. Free-text facts and discrepancies. With issue coverage incomplete, one that rests on
-  // a section of actions but cites no issue record cannot be confirmed (a structural rule).
-  // When the answer gives tracking entries, they are the checked statement about each action:
-  // a free-text fact about one of those actions is not recorded beside them, so unchecked prose
-  // cannot contradict the visible result (R4-4). A discrepancy about one is kept only when it
-  // cites an issue that Nexus confirmed tracks that action (for example a status mismatch).
+  // 2. Free-text facts and discrepancies.
+  // a. One that cites an issue record is checked against the fields the run read (R5-3): each
+  //    date or status it states must agree with a cited source. A date may be the record's due
+  //    date or appear in a cited note section; a status may be the record's, or the checkbox of
+  //    an action it is about in a cited section (the note's side of a discrepancy).
+  // b. When the answer gives tracking entries, they are the checked statement about each action
+  //    (R4-4). A statement about one of those actions is recorded only as an ordinary statement
+  //    about the issue Nexus confirmed tracks it: it cites that issue and states one of its
+  //    values as the record has it (for example its due date, or a status mismatch with the
+  //    note). Anything else would restate or deny the tracking result in unchecked wording.
+  // c. With issue coverage incomplete, one that rests on a section of actions but cites no issue
+  //    record cannot be confirmed (a structural rule).
   const tracked = tracking.map((t) => ({ action: t.action, confirmedIssues: t.confirmed && t.status === "tracked" ? t.issues : [] }));
   const aboutTracked = (item: AnswerItem) => tracked.filter((t) => isAbout(item.text, t.action));
-  const place = (list: AnswerItem[], item: AnswerItem, kind: "fact" | "discrepancy") => {
+  /** Which cited issue records agree with a stated value, and a qualifier if a value agrees with no cited source. */
+  const checkValues = (item: AnswerItem): { agrees: Set<string>; problem: string | null } => {
+    const agrees = new Set<string>();
+    const cited = item.sources.flatMap((h) => { const rec = handles.evidenceOf(h)?.issue; return rec ? [{ h, rec }] : []; });
+    if (cited.length === 0) return { agrees, problem: null };
+    const dates = datesIn(item.text);
+    const statuses = statusesIn(item.text);
+    if (dates.length === 0 && statuses.length === 0) return { agrees, problem: null };
+    // The records a statement is about: those it names by key, else those whose title it
+    // matches strongly, else every record it cites.
+    const named = cited.filter((x) => new RegExp(`\\b${x.rec.key.replace(/[^A-Za-z0-9]/g, "\\$&")}\\b`, "i").test(item.text));
+    const titled = cited.filter((x) => matchStrength(item.text, { title: x.rec.title, description: "" }).level === "strong");
+    const about = named.length ? named : titled.length ? titled : cited;
+    const notes = item.sources.filter((h) => handles.get(h)?.target.kind === "note");
+    const noteDates = notes.flatMap((h) => {
+      const c = handles.get(h)!;
+      return datesIn(`${c.target.kind === "note" ? c.target.path : ""} ${c.label} ${handles.evidenceOf(h)?.sectionText ?? ""}`);
+    });
+    const tasks = notes.flatMap((h) => handles.evidenceOf(h)?.tasks ?? []).filter((t) => isAbout(item.text, t.text));
+    // `agrees` counts only a value that pins a field down: the due date, or the status itself.
+    // "Not done" fits two statuses, and a date in a description is not the due date, so
+    // neither can contradict the record nor show that the statement is about its values.
+    let wrong = false;
+    for (const d of dates) {
+      const due = about.filter((x) => dueDates(x.rec.due).some((a) => sameDate(d, a)));
+      due.forEach((x) => agrees.add(x.h));
+      const elsewhere = about.some((x) => datesIn(`${x.rec.title} ${x.rec.description}`).some((a) => sameDate(d, a))) || noteDates.some((a) => sameDate(d, a));
+      if (due.length === 0 && !elsewhere) wrong = true;
+    }
+    for (const s of statuses) {
+      const hits = about.filter((x) => (x.rec.status === s.status) !== s.negated);
+      if (!s.negated) hits.forEach((x) => agrees.add(x.h));
+      // A ticked checkbox reads as "done"; an unticked one as anything but "done".
+      const inNote = tasks.some((t) => t.done ? (s.status === "done") !== s.negated : !(s.status === "done" && !s.negated));
+      if (hits.length === 0 && !inNote) wrong = true;
+    }
+    if (!wrong) return { agrees, problem: null };
+    const records = about.map((x) => asRead(x.rec)).join("; ");
+    const marks = tasks.map((t) => `“${t.text}” as ${t.done ? "done" : "not done"}`).join(" and ");
+    return { agrees, problem: `Not confirmed: the record${about.length === 1 ? "" : "s"} Nexus read say${about.length === 1 ? "s" : ""} ${records}${marks ? `, and the note marks ${marks}` : ""}.` };
+  };
+  const place = (list: AnswerItem[], item: AnswerItem) => {
+    const values = checkValues(item);
+    if (values.problem) { unconfirmed.push({ ...item, qualifier: values.problem }); return; }
     // Only statements that cite what a tracking claim rests on (a section of actions, or an
     // issue record) can restate one.
     const actions = item.sources.some(hasTasks) || item.sources.some(isIssue) ? aboutTracked(item) : [];
-    if (actions.length && (kind === "fact" || !actions.every((t) => t.confirmedIssues.some((h) => item.sources.includes(h))))) {
+    if (actions.length && !actions.every((t) => t.confirmedIssues.some((h) => item.sources.includes(h) && values.agrees.has(h)))) {
       unconfirmed.push({ ...item, qualifier: "Not confirmed: Nexus checks whether an action is tracked only through its own sentences above, not through the model's wording." });
       return;
     }
@@ -251,12 +357,12 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
   };
   for (const f of a.facts) {
     const s = clean(f.sources);
-    if (s.length) place(facts, { text: f.text, sources: s }, "fact");
+    if (s.length) place(facts, { text: f.text, sources: s });
     else { demoted += 1; suggestions.push({ text: f.text, sources: [], unsupported: true }); }
   }
   for (const d of a.discrepancies) {
     const s = clean(d.sources);
-    if (s.length) place(discrepancies, { text: d.text, sources: s }, "discrepancy");
+    if (s.length) place(discrepancies, { text: d.text, sources: s });
     else { demoted += 1; suggestions.push({ text: d.text, sources: [], unsupported: true }); }
   }
   for (const g of a.suggestions) suggestions.push({ text: g.text, sources: clean(g.sources) });

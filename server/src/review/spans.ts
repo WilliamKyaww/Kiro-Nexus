@@ -40,13 +40,25 @@ export function contextAt(lines: string[], start: number, length: number): SpanC
   return { lineBefore, lineAfter };
 }
 
-/** Find `text` in `content`; neighbouring lines disambiguate repeats. Never guesses. */
+/**
+ * Find `text` in `content`; neighbouring lines disambiguate repeats. Never guesses.
+ *
+ * With a saved `context`, even a sole occurrence must keep at least one of its saved
+ * neighbouring lines: the same text elsewhere in the note, with both neighbours different, is
+ * not the span the change wrote (R5-1). That case is reported as `missing`, so a reversal
+ * becomes a conflict instead of rewriting another paragraph.
+ */
 export function locate(content: string, text: string, context: SpanContext | null): LocateResult {
   const lines = docLines(content);
   const span = spanLines(text);
   const found = occurrences(lines, span);
   if (found.length === 0) return { status: "missing" };
-  if (found.length === 1) return { status: "ok", start: found[0]!, length: span.length };
+  if (found.length === 1) {
+    if (!context) return { status: "ok", start: found[0]!, length: span.length };
+    const c = contextAt(lines, found[0]!, span.length);
+    if (c.lineBefore === context.lineBefore || c.lineAfter === context.lineAfter) return { status: "ok", start: found[0]!, length: span.length };
+    return { status: "missing" };
+  }
   if (context) {
     const matching = found.filter((i) => {
       const c = contextAt(lines, i, span.length);
@@ -74,14 +86,56 @@ export interface SpanEdit { before: string; after: string; range?: LineRange }
  * heading, or the whole note for `null`. `text` is compared with the text a run read.
  */
 export interface Scope { range: LineRange; text: string }
-export function scopeOf(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>): Scope | null {
+/** Part of a section that one read returned: lines counted from the section's first line. */
+export interface ScopeLines { from: number; count: number }
+export function scopeOf(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>, part?: ScopeLines): Scope | null {
   const lines = docLines(content);
+  let start = 0;
+  let end = lines.length;
+  if (headingSlug !== null) {
+    const i = headings.findIndex((h) => h.slug === headingSlug);
+    if (i < 0) return null;
+    start = headings[i]!.line;
+    end = headings[i + 1]?.line ?? lines.length;
+  }
+  if (part) {
+    // The exact raw lines a read returned (R5-8), heading line included when part.from is 0.
+    const from = start + part.from;
+    const to = from + part.count;
+    if (to > end) return null;
+    return { range: { start: from, end: to }, text: lines.slice(from, to).join("\n") };
+  }
   if (headingSlug === null) return { range: { start: 0, end: lines.length }, text: toLf(content).trim() };
-  const i = headings.findIndex((h) => h.slug === headingSlug);
-  if (i < 0) return null;
-  const start = headings[i]!.line;
-  const end = headings[i + 1]?.line ?? lines.length;
   return { range: { start, end }, text: lines.slice(start + 1, end).join("\n").trim() };
+}
+
+/** The raw lines of a section (or the whole note) in parts of at most `maxChars`, whole lines only. */
+export function sectionParts(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>, maxChars: number): Array<ScopeLines & { text: string }> | null {
+  const lines = docLines(content);
+  let start = 0;
+  let end = lines.length;
+  if (headingSlug !== null) {
+    const i = headings.findIndex((h) => h.slug === headingSlug);
+    if (i < 0) return null;
+    start = headings[i]!.line;
+    end = headings[i + 1]?.line ?? lines.length;
+  }
+  // Split at whole lines; trailing blank lines never form a part of their own, and the last
+  // part runs to the end of the section, so a line added anywhere after it changes its hash.
+  let last = end;
+  while (last > start + 1 && (lines[last - 1] ?? "").trim() === "") last--;
+  const parts: Array<ScopeLines & { text: string }> = [];
+  let from = start;
+  while (from < last) {
+    let to = from;
+    let size = 0;
+    while (to < last && (to === from || size + (lines[to]!.length + 1) <= maxChars)) { size += lines[to]!.length + 1; to++; }
+    if (to >= last) to = end;
+    parts.push({ from: from - start, count: to - from, text: lines.slice(from, to).join("\n") });
+    from = to;
+  }
+  if (parts.length === 0) parts.push({ from: 0, count: Math.max(end - start, 1), text: lines.slice(start, Math.max(end, start + 1)).join("\n") });
+  return parts;
 }
 
 /** Find `text` as whole lines, only inside `range` when one is given. */

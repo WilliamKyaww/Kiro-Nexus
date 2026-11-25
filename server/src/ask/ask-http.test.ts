@@ -155,7 +155,7 @@ describe("Ask over HTTP", () => {
     expect(block).toContain("[sources: Kickoff, 24 November 2026 › Actions");
     expect(block).not.toMatch(/\bS\d+\b/);
     expect(Object.values(followUp.answer.citations).map((c) => (c as { target: unknown }).target)).toEqual(expect.arrayContaining([
-      { kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions" },
+      expect.objectContaining({ kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions" }),
       { kind: "issue", key: "NEX-1" },
     ]));
 

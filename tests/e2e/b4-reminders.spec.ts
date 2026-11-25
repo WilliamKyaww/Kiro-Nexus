@@ -131,6 +131,9 @@ test("Electron: the native notification is the same delivery, its click opens th
     const { cp } = await import("node:fs/promises");
     await cp(join(process.cwd(), "samples", "meeting-workspace"), ws, { recursive: true });
     const env = { ...process.env, NEXUS_PROFILE_DIR: join(dir, "profile"), NEXUS_WORKSPACE: ws, NEXUS_TEST_CLOCK: NOW, NEXUS_E2E_NOTIFY_LOG: notifyLog, ...(mode === "denied" ? { NEXUS_NATIVE_NOTIFICATIONS: "denied" } : {}) } as Record<string, string>;
+    // An IDE terminal may set ELECTRON_RUN_AS_NODE, which would start Electron as plain Node
+    // rather than as the application (run-5 review, checks).
+    delete env.ELECTRON_RUN_AS_NODE;
     const app = await electron.launch({ executablePath: electronPath, args: [resolve("apps/desktop/dist/main.cjs")], env, timeout: 60_000 });
     try {
       const win = await app.firstWindow();

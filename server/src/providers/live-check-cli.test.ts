@@ -114,9 +114,16 @@ describe("turn evaluation", () => {
   const entry = (action: string, status: "tracked" | "untracked", issues: string[], confirmed = true) => ({ action, source: "S1", status, issues, reason: "", confirmed, problem: confirmed ? null : "Not confirmed: test" });
   const JUDGE = "Will writes the judge instructions";
   const CAL = "Hein builds the calendar view";
-  const message = (facts: Array<{ text: string; sources: string[] }>, tracking: unknown[]) => ({
+  type Entry = ReturnType<typeof entry>;
+  /** Nexus's sentences for the confirmed entries, as the validator shows them (R5-3: the evaluator checks they are shown). */
+  const rendered = (tracking: Entry[], issueText: Record<string, string>) => tracking.filter((t) => t.confirmed).map((t) => ({
+    text: t.status === "untracked" ? `“${t.action}” has no matching issue.` : `“${t.action}” is tracked by ${t.issues.map((h) => issueText[h]).join(" and ")}.`,
+    sources: [t.source, ...t.issues],
+  }));
+  const shownAs = { S2: "NEX-1 (Build calendar view, in progress)", S3: "NEX-2 (Write the judge instructions, to do)" };
+  const message = (facts: Array<{ text: string; sources: string[] }>, tracking: Entry[]) => ({
     status: "complete",
-    answer: { facts, discrepancies: [], suggestions: [], tracking, insufficientEvidence: false, insufficientReason: null, citations: { S1: actions, S2: nex1, S3: nex2 } },
+    answer: { facts: [...rendered(tracking, shownAs).filter((r) => !facts.some((f) => f.text === r.text)), ...facts], discrepancies: [], suggestions: [], tracking, insufficientEvidence: false, insufficientReason: null, citations: { S1: actions, S2: nex1, S3: nex2 } },
   });
   const issues1 = new Set(["NEX-1"]);
   const issues2 = new Set(["NEX-1", "NEX-2"]);
@@ -132,8 +139,10 @@ describe("turn evaluation", () => {
       "Will's judge instructions are untracked, from the Actions heading, confirmed by the evidence",
       "Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence",
     ]));
-    // A correct entry next to a confirmed entry that says the opposite fails too.
-    expect(failed(message([], [entry(JUDGE, "untracked", []), entry(CAL, "tracked", ["S2"]), entry(CAL, "untracked", [])]), 1)).toEqual(["no confirmed entry contradicts these"]);
+    // A correct entry next to a confirmed entry that says the opposite fails too, and so does
+    // the opposite entry's sentence where it is shown.
+    expect(failed(message([], [entry(JUDGE, "untracked", []), entry(CAL, "tracked", ["S2"]), entry(CAL, "untracked", [])]), 1))
+      .toEqual(["no confirmed entry contradicts these", "the recorded facts and discrepancies say nothing else about these actions"]);
   });
 
   it("passes a correct answer whatever order its NEX-1 citations come in (Codex, evaluator bug 2)", () => {
@@ -151,7 +160,7 @@ describe("turn evaluation", () => {
     expect(failed(secondTurn, 2)).toEqual([]);
     // In the second turn, a confirmed "untracked" entry is wrong and contradicts the expected one.
     expect(failed(message([], [entry(JUDGE, "untracked", []), entry(CAL, "tracked", ["S2"])]), 2))
-      .toEqual(["Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence", "no confirmed entry contradicts these"]);
+      .toEqual(["Will's judge instructions are tracked by NEX-2, from the Actions heading, confirmed by the evidence", "no confirmed entry contradicts these", "the recorded facts and discrepancies say nothing else about these actions"]);
     expect(failed(secondTurn, 2, issues1)).toEqual(["the NEX-2 citation opens"]); // cited, but the issue does not exist
     expect(evaluateTurn(secondTurn, 2, { actionsHeadingExists: false, existingIssues: issues2 }).find((c) => c.name.endsWith("the Actions heading citation opens"))?.ok).toBe(false);
   });
@@ -174,6 +183,28 @@ describe("turn evaluation", () => {
     expect(failed(disc, 1)).toEqual([]);
   });
 
+  // R5-3 (Astra 6.2's review of run 5): a correct sentence in the issue's wording failed, and a
+  // shown discrepancy denying the confirmed match passed every first-turn check.
+  it("compares the structured claims with what is shown (R5-3)", () => {
+    expect(failed(message([], [entry(JUDGE, "untracked", []), entry("Build calendar view", "tracked", ["S2"])]), 1)).toEqual([]);
+    const right = message([], [entry(JUDGE, "untracked", []), entry(CAL, "tracked", ["S2"])]);
+    const denial = { ...right, answer: { ...right.answer, discrepancies: [{ text: "The calendar view has no matching issue.", sources: ["S2"] }] } };
+    expect(failed(denial, 1)).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    // "Not done" does not pin down a value of NEX-1, so it does not carry the denial either.
+    const padded = { ...right, answer: { ...right.answer, discrepancies: [{ text: "The calendar view has no matching issue, and it is not done.", sources: ["S1", "S2"] }] } };
+    expect(failed(padded, 1)).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    // With the records, as the CLI passes them, a stated value must agree with the record.
+    const opts = { actionsHeadingExists: true, existingIssues: issues1, records: [{ key: "NEX-1", title: "Build calendar view", status: "in_progress", due: { date: "2026-12-05" } }] };
+    const withFact = (text: string) => evaluateTurn({ ...right, answer: { ...right.answer, facts: [...right.answer.facts, { text, sources: ["S2"] }] } }, 1, opts).filter((c) => !c.ok).map((c) => c.name.replace(/^Turn \d: /, ""));
+    expect(withFact("The calendar view is due on 5 December.")).toEqual([]);
+    expect(withFact("The calendar view is due on 3 December.")).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    expect(withFact("The calendar view is done.")).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
+    // Nexus's sentence must name the issue as the record has it, and must be shown at all.
+    expect(evaluateTurn(right, 1, opts).filter((c) => !c.ok)).toEqual([]);
+    const hidden = { ...right, answer: { ...right.answer, facts: right.answer.facts.filter((f) => !f.text.includes("NEX-1")) } };
+    expect(failed(hidden, 1)).toEqual(["Hein's calendar work is tracked by NEX-1, from the Actions heading, confirmed by the evidence"]);
+  });
+
   it("uses no kickoff words: the same rules in a second fictional workspace (R4-4)", () => {
     const planning = {
       notePath: "standups/2026-11-20 planning.md", headingSlug: "action-items", heading: "Action items",
@@ -185,13 +216,13 @@ describe("turn evaluation", () => {
       S2: { handle: "S2", label: "OPS-1 Migrate the billing tests", target: { kind: "issue", key: "OPS-1" } },
       S3: { handle: "S3", label: "OPS-2 Draft the onboarding guide", target: { kind: "issue", key: "OPS-2" } },
     };
-    const msg = (facts: Array<{ text: string; sources: string[] }>, tracking: unknown[]) => ({ status: "complete", answer: { facts, discrepancies: [], suggestions: [], tracking, insufficientEvidence: false, insufficientReason: null, citations: cites } });
+    const msg = (facts: Array<{ text: string; sources: string[] }>, tracking: Entry[]) => ({ status: "complete", answer: { facts: [...rendered(tracking, { S2: "OPS-1 (Migrate the billing tests, in progress)", S3: "OPS-2 (Draft the onboarding guide, to do)" }), ...facts], discrepancies: [], suggestions: [], tracking, insufficientEvidence: false, insufficientReason: null, citations: cites } });
     const run = (m: unknown, turn: 1 | 2) => evaluateTurn(m, turn, { actionsHeadingExists: true, existingIssues: new Set(turn === 1 ? ["OPS-1"] : ["OPS-1", "OPS-2"]), scenario: planning }).filter((c) => !c.ok).map((c) => c.name.replace(/^Turn \d: /, ""));
     const turn1 = [entry(planning.missing.action, "untracked", []), entry(planning.tracked.action, "tracked", ["S2"])];
     expect(run(msg([], turn1), 1)).toEqual([]);
     expect(run(msg([{ text: "OPS-1 is unrelated to the billing tests.", sources: ["S1", "S2"] }], turn1), 1)).toEqual(["the recorded facts and discrepancies say nothing else about these actions"]);
     expect(run(msg([], [entry(planning.missing.action, "tracked", ["S3"]), entry(planning.tracked.action, "tracked", ["S2"])]), 2)).toEqual([]);
-    expect(run(msg([], turn1), 2)).toEqual(["Priya's onboarding guide are tracked by OPS-2, from the Action items heading, confirmed by the evidence", "no confirmed entry contradicts these"]);
+    expect(run(msg([], turn1), 2)).toEqual(["Priya's onboarding guide are tracked by OPS-2, from the Action items heading, confirmed by the evidence", "no confirmed entry contradicts these", "the recorded facts and discrepancies say nothing else about these actions"]);
   });
 });
 

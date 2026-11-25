@@ -5,7 +5,20 @@ import { z } from "zod";
 const SCHEMA_VERSION = 1 as const; // local copy: index.ts re-exports this module
 const IsoInstant = z.iso.datetime({ offset: false });
 const LocalDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const Due = z.union([z.null(), z.strictObject({ date: LocalDate }), z.strictObject({ dateTime: IsoInstant, timeZone: z.string().min(1) })]);
+
+const zoneChecks = new Map<string, boolean>();
+/** Whether this runtime knows the IANA time zone (R5-4). A zone it does not know cannot be scheduled. */
+export function isTimeZone(name: string): boolean {
+  let known = zoneChecks.get(name);
+  if (known === undefined) {
+    // Intl also accepts offsets such as "+01:00"; only zone names are stored.
+    try { known = /^[A-Za-z][A-Za-z0-9_+\-/]*$/.test(name) && new Intl.DateTimeFormat("en-GB", { timeZone: name }).resolvedOptions().timeZone.length > 0; } catch { known = false; }
+    zoneChecks.set(name, known);
+  }
+  return known;
+}
+export const TimeZoneName = z.string().min(1).max(64).refine(isTimeZone, "Nexus does not recognise this time zone");
+const Due = z.union([z.null(), z.strictObject({ date: LocalDate }), z.strictObject({ dateTime: IsoInstant, timeZone: TimeZoneName })]);
 const TimeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected HH:MM, 24-hour");
 
 /** `.nexus/reminders.json`: when ordinary reminders fire. */
@@ -37,7 +50,14 @@ export const CalendarEvent = z.object({
   /** false turns this event's reminder off. */
   reminder: z.boolean().optional(),
 });
-export const CalendarFile = z.object({ schemaVersion: z.literal(SCHEMA_VERSION), events: z.array(CalendarEvent) });
+export const CalendarFile = z.object({ schemaVersion: z.literal(SCHEMA_VERSION), events: z.array(CalendarEvent) }).superRefine((file, ctx) => {
+  // An event ID names one event: two rows with one ID would be one reminder key twice (R5-6).
+  const seen = new Set<string>();
+  file.events.forEach((e, i) => {
+    if (seen.has(e.id)) ctx.addIssue({ code: "custom", path: ["events", i, "id"], message: "Another event in the file has the same ID" });
+    seen.add(e.id);
+  });
+});
 export type CalendarEvent = z.infer<typeof CalendarEvent>;
 export type CalendarFile = z.infer<typeof CalendarFile>;
 
@@ -67,12 +87,27 @@ export const DeliveryLog = z.strictObject({
   /** Deliveries up to this instant have been seen in the Notifications list (the badge). */
   seenUpTo: IsoInstant.nullable(),
   deliveries: z.array(Delivery),
+  /**
+   * Occurrences at or before this instant may have been delivered without an entry here: their
+   * entries were pruned, or the log was replaced after damage. They are never delivered or
+   * recorded again, even if the clock goes back (R5-5, R5-6).
+   */
+  prunedUpTo: IsoInstant.optional(),
 });
 export type DeliveryLog = z.infer<typeof DeliveryLog>;
 
 /** `.nexus/state/scheduler.json`: the end of the last period in which Nexus was delivering. */
 export const SchedulerState = z.strictObject({ schemaVersion: z.literal(SCHEMA_VERSION), lastTickAt: IsoInstant.nullable() });
 export type SchedulerState = z.infer<typeof SchedulerState>;
+
+/**
+ * A record the scheduler skipped, so that it has no reminder (R5-4). The others are unaffected.
+ * `record` is an event ID or an issue key; null when the whole file is affected.
+ */
+export interface ReminderProblem { file: string; record: string | null; message: string }
+
+/** The error details when the delivery log is damaged: GET /notifications and the test reminder fail with them (R5-5). */
+export interface DamagedLogDetails { file: ".nexus/state/deliveries.json"; recovery: "replace-delivery-log" }
 
 /** What GET /notifications returns. */
 export interface NotificationsView {
@@ -83,4 +118,6 @@ export interface NotificationsView {
   settings: ReminderSettings;
   native: { available: boolean; reason: string | null } | null;
   workspaceId: string;
+  /** Records skipped by the scheduler, each named with its file. */
+  problems: ReminderProblem[];
 }

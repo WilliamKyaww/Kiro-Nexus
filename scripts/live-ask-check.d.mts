@@ -7,7 +7,8 @@ export interface JourneyScenario {
   tracked: { action: string; label: string; issue: string };
 }
 export const KICKOFF: JourneyScenario;
-export function evaluateTurn(message: unknown, turn: 1 | 2, opts: { actionsHeadingExists: boolean; existingIssues: Set<string>; scenario?: JourneyScenario }): LiveCheck[];
+/** records: the issues as stored, so stated titles, statuses and due dates are compared with them (R5-3). */
+export function evaluateTurn(message: unknown, turn: 1 | 2, opts: { actionsHeadingExists: boolean; existingIssues: Set<string>; scenario?: JourneyScenario; records?: Array<{ key: string; title: string; status: string; due: unknown }> }): LiveCheck[];
 export function workspaceHashes(dir: string): Promise<Record<string, string>>;
 export function sanitiseReport(text: string, keys: string[]): string;
 export function promptHidden(question: string, input?: NodeJS.ReadableStream & { isTTY?: boolean; setRawMode?: (on: boolean) => void }, output?: NodeJS.WritableStream): Promise<string | null>;

@@ -99,16 +99,60 @@ const actionWords = (action) => {
 /** Whether a recorded statement is about an action: it shares a word that identifies the action. */
 const isAbout = (text, action) => { const have = contentWords(text); return [...actionWords(action)].some((w) => have.has(w)); };
 
+// The record values a statement states, read the same way as Nexus (answer.ts datesIn and
+// statusesIn) but written again here, so that the check does not reuse the code it checks.
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const datesIn = (text) => {
+  const out = [];
+  const push = (year, month, day) => { if (month >= 1 && month <= 12 && day >= 1 && day <= 31) out.push({ year, month, day }); };
+  const month = (name) => MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+  const s = String(text);
+  for (const m of s.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) push(Number(m[1]), Number(m[2]), Number(m[3]));
+  for (const m of s.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTH}\\b\\.?(?:,?\\s+(\\d{4})\\b)?`, "gi"))) push(m[3] ? Number(m[3]) : null, month(m[2]), Number(m[1]));
+  for (const m of s.matchAll(new RegExp(`\\b${MONTH}\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4})\\b)?`, "gi"))) push(m[3] ? Number(m[3]) : null, month(m[1]), Number(m[2]));
+  return out;
+};
+const statusesIn = (text) => {
+  const s = String(text);
+  const out = [];
+  for (const [form, status] of [[/\bto[ -]?do\b/gi, "todo"], [/\bin[ _-]progress\b/gi, "in_progress"], [/\bdone\b/gi, "done"]]) {
+    for (const m of s.matchAll(form)) out.push({ status, negated: /(?:\bnot|n['’]t)\s+(?:yet\s+)?$/i.test(s.slice(0, m.index)) });
+  }
+  return out;
+};
+const sameDate = (a, b) => a.month === b.month && a.day === b.day && (a.year === null || b.year === null || a.year === b.year);
+/** The dates a due value can be quoted as: its date, or a timed value's local and UTC dates. */
+const dueDates = (due) => {
+  if (!due) return [];
+  if (typeof due.date === "string") { const [year, month, day] = due.date.split("-").map(Number); return [{ year, month, day }]; }
+  const instant = new Date(due.dateTime);
+  if (Number.isNaN(instant.getTime())) return [];
+  const utc = { year: instant.getUTCFullYear(), month: instant.getUTCMonth() + 1, day: instant.getUTCDate() };
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: due.timeZone, year: "numeric", month: "numeric", day: "numeric" }).formatToParts(instant).map((x) => [x.type, x.value]));
+    return [{ year: Number(p.year), month: Number(p.month), day: Number(p.day) }, utc];
+  } catch { return [utc]; }
+};
+const STATUS_TEXT = { todo: "to do", in_progress: "in progress", done: "done" };
+
 /**
  * Pure evaluation of one stored answer in the two-turn journey (also used by the browser
- * test). It reads the structured tracking entries, which Nexus has already checked against
- * the run's evidence, and then checks everything the answer shows as recorded:
+ * test). It compares the structured tracking entries, which Nexus has checked against the
+ * run's evidence, with what the answer shows as recorded (R5-3):
  *   turn 1: the missing action is untracked, and the tracked action's issue tracks it;
  *   turn 2 (after the new issue is created): the new issue tracks the missing action too.
- * A recorded fact or discrepancy about either action that is not Nexus's own sentence for a
- * correct, confirmed entry fails the turn, whatever its wording (R4-4).
+ * Each expected entry must be confirmed, and Nexus's sentence for it, in the entry's own
+ * wording of the action, must be among the recorded facts. Any other recorded fact or
+ * discrepancy about either action must be an ordinary statement about the issue that tracks
+ * it: it cites that issue and states one of its values (status or due date) as the record has
+ * it. One that states none, such as a denial of the match, fails the turn whatever its wording
+ * (R4-4, R5-3).
+ *
+ * `records` are the issue records from the API. Without them (the browser test passes only
+ * the keys) the values are required but not compared.
  */
-export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssues, scenario = KICKOFF }) {
+export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssues, records = null, scenario = KICKOFF }) {
   const checks = [];
   const add = (name, ok, detail) => checks.push({ name: `Turn ${turn}: ${name}`, ok, detail });
   const a = message?.answer;
@@ -120,34 +164,70 @@ export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssu
   const isSection = (h) => cites[h]?.target?.kind === "note" && cites[h].target.path === scenario.notePath && cites[h].target.headingSlug === scenario.headingSlug;
   const isIssue = (key) => (h) => cites[h]?.target?.kind === "issue" && cites[h].target.key === key;
   const keyOf = (h) => cites[h]?.target?.key ?? h;
+  const isNote = (h) => cites[h]?.target?.kind === "note";
+  const recordOf = (key) => (records ?? []).find((r) => r.key === key) ?? null;
+  const facts = a.facts ?? [];
   const entries = (a.tracking ?? []);
-  const describe = (list) => list.length ? list.map((t) => `${t.status}${t.issues.length ? ` by ${t.issues.map(keyOf).join(", ")}` : ""}${t.confirmed ? "" : ` (not confirmed: ${t.problem})`}`).join("; ") : "no tracking entry for this action";
+  /** Whether a text is Nexus's sentence for an entry, naming the expected issue (as the record has it, when given). */
+  const sentenceFor = (text, t, issueKey) => {
+    if (issueKey === null) return text === `“${t.action}” has no matching issue.`;
+    if (!text.startsWith(`“${t.action}” is tracked by `)) return false;
+    const rec = recordOf(issueKey);
+    return text.includes(rec ? `${issueKey} (${rec.title}, ${STATUS_TEXT[rec.status] ?? rec.status})` : `${issueKey} (`);
+  };
+  const shown = (t, issueKey) => facts.some((f) => sentenceFor(f.text, t, issueKey));
+  const describe = (list, issueKey) => list.length ? list.map((t) => `${t.status}${t.issues.length ? ` by ${t.issues.map(keyOf).join(", ")}` : ""}${t.confirmed ? "" : ` (not confirmed: ${t.problem})`}${t.confirmed && issueKey !== undefined && !shown(t, issueKey) ? " (confirmed, but Nexus's sentence for it is not among the recorded facts)" : ""}`).join("; ") : "no tracking entry for this action";
   const forMissing = entries.filter((t) => refersTo(t.action, missing.action));
   const forTracked = entries.filter((t) => refersTo(t.action, tracked.action));
   const missingIssue = turn === 1 ? null : missing.issueAfter;
-  const missingOk = (t) => t.confirmed && isSection(t.source) && (missingIssue === null ? t.status === "untracked" : t.status === "tracked" && t.issues.some(isIssue(missingIssue)));
-  const trackedOk = (t) => t.confirmed && isSection(t.source) && t.status === "tracked" && t.issues.some(isIssue(tracked.issue));
+  const missingClaim = (t) => t.confirmed && isSection(t.source) && (missingIssue === null ? t.status === "untracked" : t.status === "tracked" && t.issues.some(isIssue(missingIssue)));
+  const trackedClaim = (t) => t.confirmed && isSection(t.source) && t.status === "tracked" && t.issues.some(isIssue(tracked.issue));
+  // The structured claim must be correct and confirmed, and also shown as a recorded fact.
+  const okMissing = forMissing.filter((t) => missingClaim(t) && shown(t, missingIssue));
+  const okTracked = forTracked.filter((t) => trackedClaim(t) && shown(t, tracked.issue));
   add(missingIssue === null
     ? `${missing.label} are untracked, from the ${heading} heading, confirmed by the evidence`
-    : `${missing.label} are tracked by ${missingIssue}, from the ${heading} heading, confirmed by the evidence`, forMissing.some(missingOk), describe(forMissing));
-  add(`${tracked.label} is tracked by ${tracked.issue}, from the ${heading} heading, confirmed by the evidence`, forTracked.some(trackedOk), describe(forTracked));
+    : `${missing.label} are tracked by ${missingIssue}, from the ${heading} heading, confirmed by the evidence`, okMissing.length > 0, describe(forMissing, missingIssue));
+  add(`${tracked.label} is tracked by ${tracked.issue}, from the ${heading} heading, confirmed by the evidence`, okTracked.length > 0, describe(forTracked, tracked.issue));
   // A correct entry must not sit beside a confirmed entry that says the opposite.
-  const contradictions = [...forMissing.filter((t) => t.confirmed && !missingOk(t)), ...forTracked.filter((t) => t.confirmed && !trackedOk(t))];
+  const contradictions = [...forMissing.filter((t) => t.confirmed && !missingClaim(t)), ...forTracked.filter((t) => t.confirmed && !trackedClaim(t))];
   add("no confirmed entry contradicts these", contradictions.length === 0, contradictions.length ? describe(contradictions) : "none");
-  // Everything shown as recorded about these actions must be Nexus's sentence for a correct
-  // entry, or a discrepancy that cites the issue that tracks the action.
-  const correctSentence = (text, action, issueKey) => issueKey === null
-    ? text === `“${action}” has no matching issue.`
-    : text.startsWith(`“${action}” is tracked by ${issueKey} (`);
+  /**
+   * Why a recorded statement about an action is not an ordinary statement about the issue
+   * that tracks it, or null when it is. It must cite that issue and state at least one of its
+   * values as the record has it; a recorded fact must also contradict none of them (a date
+   * may instead be one in a cited note's name). A discrepancy may state the note's value too.
+   */
+  const notOrdinary = (item, kind, issueKey) => {
+    if (issueKey === null) return "only Nexus's own sentence may say whether this action has an issue";
+    const sources = item.sources ?? [];
+    if (!sources.some(isIssue(issueKey))) return `it does not cite ${issueKey}`;
+    const dates = datesIn(item.text);
+    const statuses = statusesIn(item.text);
+    // "Not done" fits two statuses, so it does not pin down a value of the record.
+    if (dates.length + statuses.filter((s) => !s.negated).length === 0) return `it states none of ${issueKey}'s values, so it can only restate or deny the tracking result`;
+    if (!records) return null;
+    const rec = recordOf(issueKey);
+    if (!rec) return `${issueKey} is not among the issue records`;
+    const dateOk = dates.map((d) => dueDates(rec.due).some((x) => sameDate(d, x)));
+    const statusOk = statuses.map((s) => (rec.status === s.status) !== s.negated);
+    const asRecorded = `${issueKey} is ${STATUS_TEXT[rec.status] ?? rec.status}, ${rec.due ? `due ${rec.due.date ?? rec.due.dateTime}` : "with no due date"}`;
+    const pinned = [...dateOk, ...statuses.map((s, i) => statusOk[i] && !s.negated)];
+    if (!pinned.some(Boolean)) return `it states none of ${issueKey}'s values as the record has them (${asRecorded})`;
+    if (kind === "fact") {
+      const noteDates = sources.filter(isNote).flatMap((h) => datesIn(`${cites[h].target.path ?? ""} ${cites[h].label ?? ""}`));
+      if (dates.some((d, i) => !dateOk[i] && !noteDates.some((x) => sameDate(d, x))) || statusOk.includes(false)) return `it contradicts the record (${asRecorded})`;
+    }
+    return null;
+  };
   const stray = [];
-  for (const [kind, list] of [["fact", a.facts ?? []], ["discrepancy", a.discrepancies ?? []]]) {
+  for (const [kind, list] of [["fact", facts], ["discrepancy", a.discrepancies ?? []]]) {
     for (const item of list) {
-      for (const [action, issueKey] of [[missing.action, missingIssue], [tracked.action, tracked.issue]]) {
+      for (const [action, issueKey, ok] of [[missing.action, missingIssue, okMissing], [tracked.action, tracked.issue, okTracked]]) {
         if (!isAbout(item.text, action)) continue;
-        const ok = kind === "fact"
-          ? correctSentence(item.text, action, issueKey)
-          : issueKey !== null && (item.sources ?? []).some(isIssue(issueKey));
-        if (!ok) stray.push(`${kind}: ${item.text}`);
+        if (kind === "fact" && ok.some((t) => sentenceFor(item.text, t, issueKey))) continue;
+        const why = notOrdinary(item, kind, issueKey);
+        if (why) stray.push(`${kind}: ${item.text} (${why})`);
       }
     }
   }
@@ -350,7 +430,7 @@ async function main() {
         await new Promise((r) => setTimeout(r, POLL_MS));
       }
     };
-    const issueKeys = async () => new Set(((await api("GET", "/issues"))?.issues ?? []).map((i) => i.key));
+    const issueRecords = async () => (await api("GET", "/issues"))?.issues ?? [];
     const note = await api("GET", `/notes/content?path=${encodeURIComponent(NOTE_PATH)}`);
     const actionsHeadingExists = (note?.headings ?? []).some((h) => h.slug === "actions");
     report.turns = [];
@@ -375,8 +455,10 @@ async function main() {
         const code = message.error?.code ?? "UNKNOWN";
         throw new CheckError(providerExit(code), `Turn ${turn} was not answered (${code}): ${message.error?.message ?? ""}`);
       }
+      // The records let the check compare what the answer states about an issue with the issue.
+      const records = await issueRecords();
       const checks = [
-        ...evaluateTurn(message, turn, { actionsHeadingExists, existingIssues: await issueKeys() }),
+        ...evaluateTurn(message, turn, { actionsHeadingExists, existingIssues: new Set(records.map((i) => i.key)), records }),
         { name: `Turn ${turn}: Ask left the notes and issues unchanged`, ok: changed.length === 0, detail: changed.length ? `changed: ${changed.join(", ")}` : "byte-for-byte unchanged" },
       ];
       report.checks.push(...checks);

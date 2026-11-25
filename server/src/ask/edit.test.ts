@@ -128,7 +128,7 @@ describe("Edit mode", () => {
     ], ws, "op-x", consulted.reads);
     expect("operations" in mapped && mapped.operations).toEqual([
       expect.objectContaining({ kind: "record.updateField", recordKey: "NEX-1", baseRevision: 1, before: "high", after: "urgent" }),
-      expect.objectContaining({ kind: "note.replaceSpan", file: NOTE, baseRevision: raw!.revision, scope: { headingSlug: "actions", sectionHash: expect.any(String) } }),
+      expect.objectContaining({ kind: "note.replaceSpan", file: NOTE, baseRevision: raw!.revision, scope: { headingSlug: "actions", sectionHash: expect.any(String), lines: { from: 0, count: expect.any(Number) } } }),
     ]);
     // A note edit needs a section this run read.
     expect(await toProposedOperations([{ op: "edit_note", note: NOTE, heading: "decisions", before: "x", after: "y" }], ws, "op-z", consulted.reads))

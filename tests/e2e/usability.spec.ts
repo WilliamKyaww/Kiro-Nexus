@@ -87,7 +87,9 @@ test("product screens contain no internal planning words", async ({ page }) => {
   for (const path of ["/", "/notes", "/projects", "/projects/NEX", "/issues/NEX-1", "/calendar", "/notifications", "/settings", "/workspace"]) {
     await page.goto(`http://127.0.0.1:${svc!.port}${path}`);
     await expect(page.locator("main")).not.toBeEmpty();
-    const text = await page.locator("body").innerText();
+    // The workspace and profile paths are the user's own folders, shown as they are (a checkout
+    // called Kiro-Nexus, for example). Only Nexus's fixed copy is checked (R5 portability).
+    const text = (await page.locator("body").innerText()).split(join(base, "ws")).join("<workspace>").split(base).join("<temp>");
     expect(text, path).not.toMatch(/\bslice\b|Hein's board|\bB[1-5]\b|Kiro/i);
   }
 });

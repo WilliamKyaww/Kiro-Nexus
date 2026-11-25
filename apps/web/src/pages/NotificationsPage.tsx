@@ -1,10 +1,49 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, useSearchParams } from "react-router";
-import type { Delivery, WorkspaceView } from "@nexus/schema";
+import type { DamagedLogDetails, Delivery, ReminderProblem, WorkspaceView } from "@nexus/schema";
 import { ApiError, api } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
 import { notificationsKey, openPath, targetPath, useNotifications, when } from "../notifications/notifications";
+
+/** The delivery log is damaged (R5-5): say which file, what Nexus did not do, and the two ways out. */
+function DamagedLog({ details }: { details: DamagedLogDetails }) {
+  const client = useQueryClient();
+  const replace = useMutation({
+    mutationFn: () => api.post<{ keptAs: string }>("/reminders/delivery-log/replace"),
+    onSuccess: () => void client.invalidateQueries({ queryKey: notificationsKey }),
+  });
+  return (
+    <section className="notice" role="alert" aria-labelledby="damaged-h" data-testid="damaged-log">
+      <h2 id="damaged-h">Reminders are paused</h2>
+      <p>
+        Nexus cannot read its reminder delivery log, <code>{details.file}</code>, so it is not delivering reminders.
+        Nexus has not changed the file.
+      </p>
+      <p>
+        Repair the file and reload this page, or start a new delivery log. Nexus keeps a copy of the damaged file
+        beside it. Reminders that came due before now are not delivered or listed again.
+      </p>
+      <div className="row">
+        <button type="button" onClick={() => replace.mutate()} disabled={replace.isPending}>Start a new delivery log</button>
+      </div>
+      {replace.error ? <ErrorNote error={replace.error} /> : null}
+    </section>
+  );
+}
+
+/** Records the scheduler skipped (R5-4), each named with its file. The other reminders still work. */
+function Problems({ problems }: { problems: ReminderProblem[] }) {
+  return (
+    <section className="notice" aria-labelledby="problems-h" data-testid="reminder-problems">
+      <h2 id="problems-h">Some items have no reminder</h2>
+      <p className="muted">Nexus skipped these records. Other reminders are not affected. Correct the record, and Nexus picks it up at its next check.</p>
+      <ul>
+        {problems.map((p) => <li key={`${p.file}:${p.record ?? ""}`}><code>{p.file}</code>{p.record ? <>, <code>{p.record}</code></> : null}: {p.message}</li>)}
+      </ul>
+    </section>
+  );
+}
 
 function Item({ d }: { d: Delivery }) {
   return (
@@ -30,6 +69,8 @@ export function NotificationsPage() {
 
   const v = view.data;
   const others = (v?.deliveries ?? []).filter((d) => !v?.away.some((a) => a.id === d.id));
+  const details = view.error instanceof ApiError ? (view.error.details as Partial<DamagedLogDetails> | undefined) : undefined;
+  const damaged = details?.recovery === "replace-delivery-log" && details.file ? (details as DamagedLogDetails) : null;
   return (
     <section className="page notifications" aria-labelledby="notifications-h">
       <h1 id="notifications-h">Notifications</h1>
@@ -40,11 +81,14 @@ export function NotificationsPage() {
       </p>
       {v?.native && !v.native.available ? <p className="notice" role="note">Desktop notifications are off: {v.native.reason ?? "they are not available."} Reminders still appear here and inside Nexus.</p> : null}
       {v && !v.settings.enabled ? <p className="notice" role="note">Reminders are turned off in Settings. The test reminder still works.</p> : null}
+      {damaged ? <DamagedLog details={damaged} /> : null}
       <div className="row">
-        <button type="button" onClick={() => test.mutate()} disabled={test.isPending}>Send test reminder</button>
+        <button type="button" onClick={() => test.mutate()} disabled={test.isPending || !!damaged}>Send test reminder</button>
         {test.isSuccess ? <span className="muted" role="status">Sent a test reminder.</span> : null}
       </div>
-      {view.error ? <ErrorNote error={view.error} /> : null}
+      {test.error && !damaged ? <ErrorNote error={test.error} /> : null}
+      {view.error && !damaged ? <ErrorNote error={view.error} /> : null}
+      {v?.problems?.length ? <Problems problems={v.problems} /> : null}
       {v?.away.length ? (
         <section className="away" aria-labelledby="away-h">
           <h2 id="away-h">While you were away</h2>

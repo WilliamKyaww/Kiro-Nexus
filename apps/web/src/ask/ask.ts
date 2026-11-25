@@ -7,7 +7,7 @@ import { api } from "../api";
 export interface Citation {
   handle: string;
   label: string;
-  target: { kind: "note"; path: string; headingSlug: string | null; headingText: string | null } | { kind: "issue"; key: string };
+  target: { kind: "note"; path: string; headingSlug: string | null; headingText: string | null; excerpt?: string | null } | { kind: "issue"; key: string };
 }
 export interface AnswerItem { text: string; sources: string[]; unsupported?: boolean; qualifier?: string }
 export interface TrackingEntry { action: string; source: string; status: "tracked" | "untracked"; issues: string[]; reason: string; confirmed: boolean; problem: string | null }
@@ -94,7 +94,7 @@ export function citationHref(c: Citation, conversationId: string, answeredAt?: s
   const from = `&from=${encodeURIComponent(`/c/${conversationId}`)}`;
   if (c.target.kind === "issue") return `/issues/${encodeURIComponent(c.target.key)}?from=${encodeURIComponent(`/c/${conversationId}`)}`;
   const heading = c.target.headingSlug
-    ? `&heading=${encodeURIComponent(c.target.headingSlug)}&ref=accepted${answeredAt ? `&at=${encodeURIComponent(answeredAt)}` : ""}`
+    ? `&heading=${encodeURIComponent(c.target.headingSlug)}&ref=accepted${answeredAt ? `&at=${encodeURIComponent(answeredAt)}` : ""}${c.target.excerpt ? `&excerpt=${encodeURIComponent(c.target.excerpt)}` : ""}`
     : "";
   return `/notes?path=${encodeURIComponent(c.target.path)}${heading}${from}`;
 }

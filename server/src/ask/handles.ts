@@ -1,7 +1,19 @@
 // Run-scoped citation handles (PRD-052): every source returned to the model gets S1, S2, …
+import type { Due } from "@nexus/schema";
+
 export type CitationTarget =
-  | { kind: "note"; path: string; headingSlug: string | null; headingText: string | null }
+  /**
+   * `excerpt` (since run 6) is the first line of text the run read in that section, so a link
+   * can find its section again when another heading of the same name is added (R5-10).
+   */
+  | { kind: "note"; path: string; headingSlug: string | null; headingText: string | null; excerpt?: string | null }
   | { kind: "issue"; key: string };
+
+/** The first line of a section's text that is not blank or a heading, at most 120 characters. */
+export function excerptOf(text: string): string | null {
+  const line = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l !== "" && !/^#{1,6}(\s|$)/.test(l));
+  return line ? line.slice(0, 120) : null;
+}
 
 export interface Citation { handle: string; label: string; target: CitationTarget }
 
@@ -14,8 +26,8 @@ export interface Evidence {
   sectionText?: string;
   /** Task-list items of that section. */
   tasks?: Array<{ text: string; done: boolean }>;
-  /** An issue record's fields as returned to the model. */
-  issue?: { key: string; title: string; description: string; status: string };
+  /** An issue record's fields as returned to the model (accepted values, architecture 7.7). */
+  issue?: { key: string; title: string; description: string; status: string; due?: Due };
 }
 
 export class HandleRegistry {
@@ -45,6 +57,8 @@ export class HandleRegistry {
   /** Record what was read behind a handle (merged with anything already recorded). */
   saw(handle: string, evidence: Evidence): void {
     this.evidence.set(handle, { ...this.evidence.get(handle), ...evidence });
+    const c = this.byHandle.get(handle);
+    if (c?.target.kind === "note" && !c.target.excerpt && evidence.sectionText) c.target.excerpt = excerptOf(evidence.sectionText);
   }
 
   evidenceOf(handle: string): Evidence | undefined { return this.evidence.get(handle); }

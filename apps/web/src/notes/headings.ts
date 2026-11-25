@@ -5,7 +5,8 @@ export interface HeadingAlias {
   slug: string;
   to: string;
   toText: string;
-  reason: "pending-rename" | "renamed" | "rename-rejected";
+  /** uncertain: another heading was renamed to this name, and it is not known how links moved (R5-10). */
+  reason: "pending-rename" | "renamed" | "rename-rejected" | "uncertain";
   /** The text the slug belongs to: "accepted" (Ask citations) or "disk". Absent from older services. */
   ref?: "accepted" | "disk";
   /** When the move was decided; null while it exists only because an edit is pending. */
@@ -46,17 +47,41 @@ export function resolveHeadingParam(heading: string, onDisk: string[], aliases: 
         if (m) { slug = m.to; via = m; }
       }
     }
+    // A later rename gave another heading this name, and how the slugs moved is not known.
+    const uncertain = ref.at ? aliases.find((a) => a.reason === "uncertain" && a.slug === slug && !!a.at && a.at > ref.at!) : undefined;
+    if (uncertain) via = uncertain;
     const pending = aliases.find((a) => a.ref === "accepted" && a.reason === "pending-rename" && a.slug === slug);
     if (pending) { slug = pending.to; via = pending; }
     if (has(slug)) return { slug, via };
   }
   if (has(slug)) return { slug, via };
   for (let i = 0; i < 5; i++) {
-    const next = aliases.find((a) => a.slug === slug && a.reason !== "pending-rename") ?? aliases.find((a) => a.slug === slug);
+    const next = aliases.find((a) => a.slug === slug && a.reason !== "pending-rename" && a.reason !== "uncertain") ?? aliases.find((a) => a.slug === slug && a.reason !== "uncertain");
     if (!next) return null;
     via = next;
     if (has(next.to)) return { slug: next.to, via };
     slug = next.to;
   }
   return null;
+}
+
+/**
+ * Check a cited section against the line of text the citation read (`excerpt`, R5-10). When
+ * the section no longer holds it but exactly one other heading of the same name does (a
+ * heading of that name was added above it, say), that one is the cited section. When none
+ * does, the link is uncertain. Without an excerpt (citations from before run 6), nothing is
+ * checked.
+ */
+export function checkCitedSection(content: string, headings: Array<{ slug: string; text: string; line: number }>, slug: string, excerpt: string | null):
+  { slug: string; moved: boolean; uncertain: boolean } {
+  if (!excerpt) return { slug, moved: false, uncertain: false };
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const body = (i: number) => lines.slice(headings[i]!.line + 1, headings[i + 1]?.line ?? lines.length).map((l) => l.trim().slice(0, 120));
+  const holds = (i: number) => body(i).some((l) => l === excerpt || l.startsWith(excerpt));
+  const at = headings.findIndex((h) => h.slug === slug);
+  if (at < 0) return { slug, moved: false, uncertain: false };
+  if (holds(at)) return { slug, moved: false, uncertain: false };
+  const others = headings.map((h, i) => ({ h, i })).filter(({ h, i }) => i !== at && h.text === headings[at]!.text && holds(i));
+  if (others.length === 1) return { slug: others[0]!.h.slug, moved: true, uncertain: false };
+  return { slug, moved: false, uncertain: true };
 }

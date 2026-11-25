@@ -21,7 +21,8 @@ const mentions = (text: string, key: string) => (text.match(new RegExp(`(?<![A-Z
 type Actor = "agent" | "demo" | "user" | "system";
 export interface HeadingAlias {
   slug: string; to: string; toText: string;
-  reason: "pending-rename" | "renamed" | "rename-rejected";
+  /** uncertain: a heading of that name may be a different section than a link made earlier meant (R5-10). */
+  reason: "pending-rename" | "renamed" | "rename-rejected" | "uncertain";
   /** Which text the slug belongs to: the accepted text (Ask citations) or the text on disk. */
   ref: "accepted" | "disk";
   /** When the move happened (a decision); null for moves that exist only while edits are pending. */
@@ -103,11 +104,21 @@ export class ReviewEngine {
       const from = parseHeadings(String(change.before));
       const to = parseHeadings(String(change.after));
       if (!from.length || from.length !== to.length) continue;
+      const onDisk = disk !== null ? parseHeadings(disk) : [];
       from.forEach((f, i) => {
         const t = to[i]!;
         if (f.slug === t.slug) return;
-        if (change.state === "accepted") out.push({ slug: f.slug, to: t.slug, toText: t.text, reason: "renamed", ref: "accepted", at: decidedAt });
-        else out.push({ slug: t.slug, to: f.slug, toText: f.text, reason: "rename-rejected", ref: "disk", at: decidedAt });
+        const ref = change.state === "accepted" ? "accepted" as const : "disk" as const;
+        const [oldText, newText] = change.state === "accepted" ? [f.text, t.text] : [t.text, f.text];
+        if (change.state === "accepted") out.push({ slug: f.slug, to: t.slug, toText: t.text, reason: "renamed", ref, at: decidedAt });
+        else out.push({ slug: t.slug, to: f.slug, toText: f.text, reason: "rename-rejected", ref, at: decidedAt });
+        // The rename gave the heading the name of another one, which shifted the other's slug,
+        // and a run-4 journal does not say how. Links to that name are reported as uncertain
+        // rather than resolved to a guess (R5-10).
+        const sameName = onDisk.filter((h) => h.text === newText);
+        if (sameName.length > 1 && oldText !== newText) {
+          for (const h of sameName) out.push({ slug: h.slug, to: h.slug, toText: h.text, reason: "uncertain", ref, at: decidedAt });
+        }
       });
     }
     return out;
@@ -117,11 +128,15 @@ export class ReviewEngine {
    * What happened to a new issue that a review run proposed with this key, if one did: an old
    * link to a rejected proposal can then say so, rather than show nothing (R4-7).
    */
-  proposedIssue(key: string): { key: string; title: string; state: ChangeRecord["state"]; at: string; source: string } | null {
+  proposedIssue(key: string): { key: string; title: string; state: ChangeRecord["state"]; at: string; source: string; reusedBy: string | null } | null {
     const found = [...this.allChanges()].reverse().find(({ change }) => change.kind === "record.create" && change.target.recordKey === key);
     if (!found) return null;
     const { run, change } = found;
-    return { key, title: (change.after as { title?: string })?.title ?? "", state: change.state, at: change.history[change.history.length - 1]?.at ?? run.createdAt, source: run.source.label };
+    // A workspace from before run 5 may already have given this key to a different issue (R5-7):
+    // links made for the proposal then lead to that issue, so the issue page says so.
+    const holder = this.service.listIssues().find((i) => i.key === key);
+    const reusedBy = holder && holder.id !== change.target.recordId ? holder.title : null;
+    return { key, title: (change.after as { title?: string })?.title ?? "", state: change.state, at: change.history[change.history.length - 1]?.at ?? run.createdAt, source: run.source.label, reusedBy };
   }
 
   async views(filter: "open" | "all"): Promise<ChangeView[]> {
@@ -264,7 +279,7 @@ export class ReviewEngine {
         const edits: SpanEdit[] = group.map((o) => {
           const base = { before: normaliseSpan(o.before), after: normaliseSpan(o.after) };
           if (!o.scope) return base;
-          const s = scopeOf(raw.content, o.scope.headingSlug, headings);
+          const s = scopeOf(raw.content, o.scope.headingSlug, headings, o.scope.lines);
           if (!s) { errors.push({ opId: o.opId, reason: "The section to edit is no longer in the note." }); scopeError = true; return base; }
           if (sha256(s.text) !== o.scope.sectionHash) {
             errors.push({ opId: o.opId, reason: "The section has changed since it was read, or has an edit awaiting review. Read it again after any pending changes are decided." });
@@ -279,11 +294,24 @@ export class ReviewEngine {
           errors.push({ opId: group[result.index]!.opId, reason: group[result.index]!.scope ? `${why.replace(/\.$/, "")} in the section that was read.` : why });
           continue;
         }
-        // Lines that another change still awaiting a decision has written, or will write.
+        // Lines that another change still awaiting a decision has written, or will write. A
+        // change whose lines can no longer be found (edited by hand, then a conflict) still owns
+        // the region between its saved neighbouring lines; when even that is unknown, the note
+        // takes no new edit until the change is decided (R5-9).
+        let unlocated: ChangeRecord | null = null;
         const busy = open.filter((c) => c.kind === "note.replaceSpan" && c.file === rel).flatMap((c) => {
           const loc = c.state === "prepared" ? locate(raw.content, String(c.before), null) : locate(raw.content, String(c.after), c.context);
-          return loc.status === "ok" ? [{ start: loc.start, end: loc.start + Math.max(loc.length, 1) }] : [];
+          if (loc.status === "ok") return [{ start: loc.start, end: loc.start + Math.max(loc.length, 1) }];
+          if (c.state === "prepared") return [];
+          const region = regionBetween(raw.content, c.context);
+          if (region) return [region];
+          unlocated = c;
+          return [];
         });
+        if (unlocated) {
+          errors.push({ opId: group[0]!.opId, reason: `A change awaiting a decision in this note (“${summarise(unlocated)}”) can no longer be located, so Nexus cannot tell which lines it covers. Decide it first.` });
+          continue;
+        }
         const clash = group.findIndex((_, i) => {
           const l = result.located[i]!;
           return busy.some((b) => l.start < b.end && b.start < l.start + l.length);
@@ -602,6 +630,15 @@ export class ReviewEngine {
     return false;
   }
 
+  /** Whether a pending change's own target is still in the files: its issue, and its link (R5-2). */
+  private present(change: ChangeRecord): boolean {
+    if (change.kind === "note.replaceSpan") return true;
+    const issue = this.service.listIssues().find((i) => i.id === change.target.recordId);
+    if (!issue) return false;
+    if (change.kind === "record.addLink") return hasLink(issue, change.after as NoteLink);
+    return true;
+  }
+
   /** Open changes that depend on this one, transitively, most dependent first (for rejection). */
   private openDependents(change: ChangeRecord): ChangeRecord[] {
     const out: ChangeRecord[] = [];
@@ -654,6 +691,41 @@ export class ReviewEngine {
     const at = now();
     const group = members.map((m) => m.changeId);
     const owners = () => [...new Set(members.map((m) => this.find(m.changeId).run))];
+    const clearDecision = async () => {
+      for (const m of members) m.decision = null;
+      for (const run of owners()) await this.persist(run);
+    };
+    // Check the decision against the files as they are now, also when recovery finishes one
+    // that was saved before a crash and the files were edited while Nexus was closed (R5-2).
+    if (action === "accept") {
+      // A change whose issue or link is no longer in the files cannot be accepted, and nothing
+      // that needs it is accepted either.
+      const gone = members.filter((m) => m.state === "pending" && !this.present(m));
+      if (gone.length) {
+        for (const m of gone) {
+          m.conflictReason = "missing";
+          this.mark(this.find(m.changeId).run, m, "conflicted", "system", "no longer in the files, so it cannot be accepted");
+        }
+        await clearDecision();
+        this.publish({ type: "review.updated" });
+        throw new NexusError("CONFLICT", `${gone.map((g) => `“${summarise(g)}”`).join(" and ")} ${gone.length === 1 ? "is" : "are"} no longer in the files, so nothing was accepted. Decide ${gone.length === 1 ? "it" : "them"} first.`, {
+          reason: "target-missing", changes: gone.map((g) => ({ changeId: g.changeId, summary: summarise(g) })),
+        });
+      }
+    } else {
+      // A change that others in the group depend on, and that can no longer be undone (someone
+      // has worked on it since), becomes a conflict; the changes that depend on it stay as they
+      // are, as with an ordinary rejection, so the user can still resolve them.
+      for (const m of members) {
+        if (m.state !== "pending") continue;
+        const needsIt = members.filter((d) => d !== m && OPEN_STATES.includes(d.state) && this.dependencies(d).includes(m));
+        if (needsIt.length && !(await this.reversible(m, needsIt))) {
+          await clearDecision();
+          await this.rejectOne(m.changeId, null);
+          return;
+        }
+      }
+    }
     if (members.length > 1) {
       for (const m of members) m.decision = { action, group, at };
       for (const run of owners()) await this.persist(run);
@@ -896,13 +968,43 @@ export class ReviewEngine {
       }
       for (const { action, members } of groups.values()) {
         this.log(`review: completing an interrupted decision to ${action} ${members.length} changes`);
-        await this.decideGroup(action, members, `recovered: completing the confirmed decision to ${action} ${members.length} related changes`);
+        try {
+          await this.decideGroup(action, members, `recovered: completing the confirmed decision to ${action} ${members.length} related changes`);
+        } catch (e) {
+          // The files changed while Nexus was closed: the members are left for the user to decide.
+          this.log(`review: an interrupted decision could not be completed: ${(e as Error).message.slice(0, 160)}`);
+        }
+      }
+      // Keys that a journal ever gave a proposed issue stay used, also in a workspace from before
+      // run 5, which did not reserve them in projects.json (R5-7).
+      const proposed = this.allChanges().filter(({ change }) => change.kind === "record.create").map(({ change }) => Issue.safeParse(change.after)).flatMap((r) => (r.success ? [r.data] : []));
+      if (proposed.length) {
+        try { await this.service.reserveIssueNumbersUnlocked(proposed); } catch (e) { this.log(`review: could not reserve proposed issue keys: ${(e as Error).message.slice(0, 120)}`); }
       }
     });
   }
 }
 
 const uniqueChanges = (list: ChangeRecord[]) => list.filter((c, i) => list.indexOf(c) === i);
+
+/**
+ * The lines between a change's saved neighbouring lines, when each neighbour is found exactly
+ * once and in order (the start or end of the note stands in for a missing neighbour). Used
+ * for a change whose own lines can no longer be found (R5-9).
+ */
+function regionBetween(content: string, context: ChangeRecord["context"]): { start: number; end: number } | null {
+  if (!context) return null;
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const only = (text: string | null, fallback: number) => {
+    if (text === null) return fallback;
+    const at = lines.flatMap((l, i) => (l === text ? [i] : []));
+    return at.length === 1 ? at[0]! : null;
+  };
+  const before = only(context.lineBefore, -1);
+  const after = only(context.lineAfter, lines.length);
+  if (before === null || after === null || after <= before) return null;
+  return { start: before + 1, end: Math.max(after, before + 2) };
+}
 
 /** Note edits with their section ranges; a scope whose text no longer matches is reported by index. */
 function scopedEdits(content: string, changes: ChangeRecord[]): { ok: true; edits: SpanEdit[] } | { ok: false; index: number } {
@@ -911,7 +1013,7 @@ function scopedEdits(content: string, changes: ChangeRecord[]): { ok: true; edit
   for (const [index, c] of changes.entries()) {
     const edit: SpanEdit = { before: String(c.before), after: String(c.after) };
     if (c.scope) {
-      const s = scopeOf(content, c.scope.headingSlug, headings);
+      const s = scopeOf(content, c.scope.headingSlug, headings, c.scope.lines);
       if (!s || sha256(s.text) !== c.scope.sectionHash) return { ok: false, index };
       edit.range = s.range;
     }

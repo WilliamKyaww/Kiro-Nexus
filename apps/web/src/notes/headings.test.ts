@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { resolveHeadingParam, type HeadingAlias } from "./headings";
+import { checkCitedSection, resolveHeadingParam, type HeadingAlias } from "./headings";
+
+// Run 6, R5-10 (independent run-5 review): a citation opens the section it read, not a newer
+// heading of the same name, and says so when that cannot be told.
+describe("R5-10: a cited section is checked against the text it read", () => {
+  const note = "# Day\n\n## Tasks\n\nOrder lunch.\n\n## Tasks\n\nDeliver parcels.\n";
+  const headings = [{ slug: "day", text: "Day", line: 0 }, { slug: "tasks", text: "Tasks", line: 2 }, { slug: "tasks-1", text: "Tasks", line: 6 }];
+  it("follows the text to the original section after a same-named heading was inserted above it (the reviewer's case)", () => {
+    expect(checkCitedSection(note, headings, "tasks", "Deliver parcels.")).toEqual({ slug: "tasks-1", moved: true, uncertain: false });
+  });
+  it("keeps a section that still holds the text, and reports a link whose text is nowhere as uncertain", () => {
+    expect(checkCitedSection(note, headings, "tasks", "Order lunch.")).toEqual({ slug: "tasks", moved: false, uncertain: false });
+    expect(checkCitedSection(note, headings, "tasks", "Book the van.")).toEqual({ slug: "tasks", moved: false, uncertain: true });
+  });
+  it("checks nothing for a citation from before run 6, which has no excerpt", () => {
+    expect(checkCitedSection(note, headings, "tasks", null)).toEqual({ slug: "tasks", moved: false, uncertain: false });
+  });
+  it("marks a citation made before a run-4 rename that duplicated its heading's name as uncertain", () => {
+    const uncertain: HeadingAlias = { slug: "beta", to: "beta", toText: "Beta", reason: "uncertain", ref: "accepted", at: "2026-11-24T12:00:00.000Z" };
+    const before = resolveHeadingParam("beta", ["beta", "beta-1"], [uncertain], { ref: "accepted", at: "2026-11-24T10:00:00.000Z" });
+    expect(before?.via?.reason).toBe("uncertain");
+    const after = resolveHeadingParam("beta", ["beta", "beta-1"], [uncertain], { ref: "accepted", at: "2026-11-24T13:00:00.000Z" });
+    expect(after?.via).toBeNull();
+  });
+});
 
 const pending: HeadingAlias = { slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "pending-rename" };
 

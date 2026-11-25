@@ -597,3 +597,35 @@ status control.
   proof").* Will preferred the familiar standard.
 - *Committing the screenshots.* That would make them public permanently,
   because history is never rewritten here.
+
+## DEC-027: Identity is proved, not assumed, in review and reminders (run-5 review repairs)
+- **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 1, under Will's overnight
+  authorisation; awaiting human review). Refines DEC-012, DEC-022, DEC-024 and DEC-025.
+  Record: `docs/reviews/2026-11-25-run5-review.md`.
+**Decision.**
+- **Spans.** A note change's span is its saved text plus at least one of its saved
+  neighbouring lines. The same text elsewhere, with both neighbours different, is not the
+  span (R5-1).
+- **Edit scope.** An Edit may change only the raw lines a read returned, heading line
+  included. A long section is read in parts with `fromLine` (R5-8).
+- **Unlocated changes.** A change awaiting a decision whose lines cannot be found owns the
+  lines between its neighbours. If even that is unknown, the note takes no new edit (R5-9).
+- **Decisions.** A group decision is checked against the files before it is carried out,
+  also by recovery. A missing target blocks Accept. An irreversible root makes the
+  rejection a conflict and leaves its dependents pending (R5-2).
+- **Keys.** Every key a journal ever proposed stays used, including in workspaces from
+  before run 5 (R5-7).
+- **Citations.** A citation keeps the first line it read. Where heading identity cannot be
+  reconstructed, the link says so rather than guessing (R5-10).
+- **Reminders.**
+  - Only a missing delivery log means first use. A damaged log stops delivery until it is
+    repaired, or replaced on request with a time boundary.
+  - `prunedUpTo` stops a clock change from repeating a pruned delivery.
+  - Records are validated one at a time, and a bad one is reported without stopping the
+    others.
+  - A stopped scheduler delivers nothing (R5-4 to R5-6, R5-13).
+**Alternatives.**
+- *Keep accepting a sole occurrence.* That is how R5-1 rewrote another paragraph.
+- *Require both neighbours to match.* Any edit to an adjacent line would then turn a
+  reversal into a conflict.
+- *Treat an empty log as new.* It risks repeating deliveries, which DEC-009 forbids.

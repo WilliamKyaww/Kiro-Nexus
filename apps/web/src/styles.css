@@ -300,6 +300,13 @@ label.compact select { padding: 0.2rem 0.35rem; font-size: 0.875rem; }
 .cal-popover { display: grid; gap: 0.35rem; margin-top: 0.3rem; padding: 0.6rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
   position: absolute; z-index: 3; top: 100%; left: 0; width: max-content; min-width: 15rem; max-width: 18rem; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); }
 .day[data-weekday="5"] .cal-popover, .day[data-weekday="6"] .cal-popover { left: auto; right: 0; }
+/* Unsaved dates whose issue is not on a day shown (R5-11), and the issue page's date notes (R5-12). */
+.calendar-away { display: grid; gap: 0.5rem; max-width: 26rem; margin: 0.75rem 0; }
+.calendar-away-item { display: grid; gap: 0.35rem; padding: 0.6rem; background: var(--panel); border: 1px solid var(--pending); border-radius: 6px; }
+.calendar-away-item > p { margin: 0; }
+.due-field { display: grid; gap: 0.2rem; align-content: start; max-width: 22rem; }
+.field-row:has(> .due-field) { align-items: flex-start; } /* the date notes must not stretch the other fields */
+.due-field .notice { margin: 0; font-size: 0.85rem; }
 @media (max-width: 760px) {
   .board { grid-template-columns: 1fr; }
 }
@@ -308,6 +315,7 @@ label.compact select { padding: 0.2rem 0.35rem; font-size: 0.875rem; }
   .days { display: block; }
   .day { min-height: 0; margin-bottom: 0.3rem; grid-template-columns: 1fr; }
   .day.outside { display: none; }
+  .day.outside:has(.cal-popover) { display: grid; } /* an open editor stays visible when its issue moves next door */
   .day.empty { padding: 0.15rem 0.4rem; background: transparent; border-style: dashed; }
   .day-number { display: none; }
   .day-title { display: block; font-size: 0.85rem; font-weight: 600; }

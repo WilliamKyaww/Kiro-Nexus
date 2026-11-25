@@ -30,6 +30,31 @@
   - After every major implementation or update, write a reviewer relay
     for Will to send to Astra 6.2 in the Codex extension (DEC-021,
     `AGENTS.md` "Reviews"). Minor changes and tweaks need none.
+- **Overnight run 6 (granted by Will on 2026-11-25, by sending
+  `.tmp/2026-11-25-kiro-overnight.md`): in progress.** Four stages, each
+  committed locally once verified; Kiro continues between milestones
+  without waiting.
+  1. **R5 repairs.** Reproduce, test and fix R5-1 to R5-13 from Astra 6.2's
+     independent run-5 review (`.tmp/review-run5/2026-11-25-independent-review.md`),
+     record it under DEC-021, and make the E2E suite portable to the Kiro
+     IDE environment.
+  2. **Appearance.** Light, dark and Match system, a quick toggle in the
+     shell, and three palettes for each mode in Settings. This applies to
+     both `wireframe/` and the real app in `apps/`. Will approved the light
+     direction at `5ce82b4`. Hein keeps the final overall identity, the
+     calendar, the agenda and card ordering.
+  3. **J7 correction loop.** Reject, then Skip or Send a reason, then a
+     revised proposal on the disputed target (PRD-064, architecture 7.4,
+     `edit-first-journey` task 5), proved with the labelled local double.
+  4. **B2 backlinks and keyboard wikilink completion** (PRD-020 and
+     PRD-021).
+  - **Allowed:** native spec self-review, routine reversible decisions,
+    verified local milestone commits, and the public visual-reference
+    lookup.
+  - **Boundaries:** fictional local workspaces only; leave Will's demos,
+    private data and provider keys alone; keep the `vitest.config.ts`
+    deletion; no push or publication. Q1, live Edit, Q5, the licence and
+    Hein's sign-off stay separate decisions.
 - **Run 5: run-4 repairs, then B4 ordinary reminders (granted by Will on
   2026-11-24, by sending
   `.tmp/review-run4/2026-11-24-consolidated-relay.md`): used up.** Both
@@ -238,6 +263,12 @@ code):**
   cause is unknown.
 
 **No human has reviewed the corrective pass yet.**
+
+## Milestone log (overnight run 6)
+
+| Stage | Commit | Evidence |
+| --- | --- | --- |
+| 1. R5-1 to R5-13 repaired; E2E portable to the Kiro IDE (DEC-027) | (this commit) | `docs/reviews/2026-11-25-run5-review.md`. Every new test failed on the unrepaired code first. 267 of 267 unit tests (37 files), 45 of 45 E2E, and the Electron specs pass 7 of 7 with `ELECTRON_RUN_AS_NODE=1` |
 
 ## Wireframe overhaul (Will's request, 2026-11-25)
 

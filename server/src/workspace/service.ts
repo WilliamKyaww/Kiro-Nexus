@@ -356,9 +356,43 @@ export class WorkspaceService {
     });
   }
 
-  /** `.nexus/state/<name>`: the delivery log and the scheduler's last tick (not user data). */
+  /**
+   * `.nexus/state/<name>`: the delivery log and the scheduler's last tick (not user data).
+   * Null only when the file does not exist. Any other read error is reported, never taken for a
+   * first use, because a fresh delivery log could repeat reminders (R5-5).
+   */
   async readStateFile(name: "deliveries.json" | "scheduler.json"): Promise<string | null> {
-    return readFile(join(this.root, ".nexus", "state", name), "utf8").catch(() => null);
+    try {
+      return await readFile(join(this.root, ".nexus", "state", name), "utf8");
+    } catch (e) {
+      if (isNodeError(e) && e.code === "ENOENT") return null;
+      throw new NexusError("INVALID_DATA", `Nexus could not read .nexus/state/${name} (${isNodeError(e) && e.code ? e.code : "read error"}).`, { file: `.nexus/state/${name}` });
+    }
+  }
+
+  /**
+   * Keeps a copy of a damaged state file beside it, as `<name>.damaged-<instant>.json`, before
+   * it is replaced (R5-5). Creates the copy exclusively, so an earlier copy is never overwritten.
+   * Returns the copy's workspace-relative path.
+   */
+  async keepDamagedStateFile(name: "deliveries.json", at: Date): Promise<string> {
+    return this.exclusive(async () => {
+      const dir = join(this.root, ".nexus", "state");
+      const bytes = await readFile(join(dir, name)).catch((e) => {
+        throw new NexusError("WRITE_FAILED", `Nexus could not copy .nexus/state/${name} (${isNodeError(e) && e.code ? e.code : "read error"}), so it left it as it is.`);
+      });
+      const stamp = at.toISOString().replace(/\.\d{3}Z$/, "Z").replace(/:/g, "-");
+      for (let n = 1; n <= 20; n++) {
+        const copy = `${name.replace(/\.json$/, "")}.damaged-${stamp}${n > 1 ? `-${n}` : ""}.json`;
+        try {
+          await createExclusive(join(dir, copy), bytes);
+          return `.nexus/state/${copy}`;
+        } catch (e) {
+          if (!isNodeError(e) || e.code !== "EEXIST") throw new NexusError("WRITE_FAILED", `Nexus could not keep a copy of .nexus/state/${name}, so it left it as it is.`);
+        }
+      }
+      throw new NexusError("WRITE_FAILED", `Nexus could not keep a copy of .nexus/state/${name}, so it left it as it is.`);
+    });
   }
 
   async writeStateFile(name: "deliveries.json" | "scheduler.json", bytes: string): Promise<void> {

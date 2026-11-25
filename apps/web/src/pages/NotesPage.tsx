@@ -11,7 +11,7 @@ import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
-import { resolveHeadingParam, type HeadingAlias, type HeadingRef } from "../notes/headings";
+import { checkCitedSection, resolveHeadingParam, type HeadingAlias, type HeadingRef } from "../notes/headings";
 
 /** Workspace identity that scopes drafts; "none" before a workspace is known. */
 function useWorkspaceId(): string {
@@ -158,9 +158,16 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
     queryFn: () => api.get<{ aliases: HeadingAlias[] }>(`/review/heading-aliases?path=${encodeURIComponent(path)}`),
   });
   const aliasesReady = !(ref.ref === "accepted" && heading) || aliases.isSuccess || aliases.isError;
-  const resolved = useMemo(() => (heading && note.data && aliasesReady
-    ? resolveHeadingParam(heading, note.data.headings.map((h) => h.slug), aliases.data?.aliases ?? [], ref)
-    : null), [heading, note.data, aliases.data, aliasesReady, ref.ref, ref.at]);
+  const excerpt = ref.ref === "accepted" ? params.get("excerpt") : null;
+  const resolved = useMemo(() => {
+    if (!(heading && note.data && aliasesReady)) return null;
+    const r = resolveHeadingParam(heading, note.data.headings.map((h) => h.slug), aliases.data?.aliases ?? [], ref);
+    if (!r) return null;
+    // A citation also checks the text it read, so a heading of the same name added above the
+    // cited one does not take its place (R5-10).
+    const checked = checkCitedSection(note.data.content, note.data.headings, r.slug, excerpt);
+    return { ...r, slug: checked.slug, moved: checked.moved, uncertain: checked.uncertain || r.via?.reason === "uncertain" };
+  }, [heading, note.data, aliases.data, aliasesReady, ref.ref, ref.at, excerpt]);
   const targetSlug = resolved?.slug ?? null;
   useEffect(() => {
     if (mode !== "preview" || !targetSlug) return;
@@ -232,7 +239,11 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
           </div>
         ) : null}
         {heading && !targetSlug && (!headingMissing || !aliases.isPending) ? <p className="notice">The linked heading was not found in this note. It may have been renamed.</p> : null}
-        {resolved?.via ? (
+        {resolved?.moved ? (
+          <p className="notice" role="status" data-testid="heading-moved">Another heading with the same name was added above this section since the answer was given. This is the section the answer read.</p>
+        ) : resolved?.uncertain ? (
+          <p className="notice" role="status" data-testid="heading-uncertain">This note has more than one heading with this name, and Nexus cannot tell which one the answer read. Check the others with the same name too.</p>
+        ) : resolved?.via ? (
           <p className="notice" role="status" data-testid="heading-alias">
             {resolved.via.reason === "pending-rename"
               ? <>This heading has a rename awaiting review. It now reads “{resolved.via.toText}”.</>

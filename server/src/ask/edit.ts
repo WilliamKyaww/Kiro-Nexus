@@ -7,7 +7,7 @@ import type { ProposedOperation, RecordField } from "@nexus/schema";
 import { alignHeadings } from "../notes/align";
 import { docLines, occurrences, spanLines } from "../review/spans";
 import { sha256 } from "../workspace/atomic";
-import { acceptedNoteText, readKey, type Consulted, type ReadOnlyWorkspace } from "./tools";
+import { acceptedNoteText, type Consulted, type ReadOnlyWorkspace } from "./tools";
 
 const holdsLines = (text: string, lines: string) => occurrences(docLines(text), spanLines(lines)).length > 0;
 
@@ -96,16 +96,19 @@ export async function toProposedOperations(ops: AgentOperation[], ws: ReadOnlyWo
     } else if (o.op === "edit_note") {
       const raw = await ws.readNote(o.note);
       if (!raw) return { error: `Operation ${i + 1}: note not found: ${o.note}` };
-      // The section this edit belongs to: the one named, or the only section read that holds the lines.
-      const ofNote = [...reads.values()].filter((r) => r.path === raw.path);
-      const read = o.heading !== undefined
-        ? reads.get(readKey(raw.path, o.heading))
-        : (() => { const c = ofNote.filter((r) => holdsLines(r.text, o.before)); return c.length === 1 ? c[0] : undefined; })();
-      if (!read) return { error: `Operation ${i + 1}: read the section that holds these lines with read_note_section first, and give its headingSlug in heading.` };
+      // The part of a section this edit belongs to: a part this run was shown that holds the
+      // lines, in the section named (or, with no heading given, the only such part). The scope is
+      // exactly those lines, so lines the model was not shown cannot change (R5-8).
+      const ofNote = [...reads.values()].filter((r) => r.path === raw.path && (o.heading === undefined || r.headingSlug === (o.heading ?? null)));
+      if (ofNote.length === 0) return { error: `Operation ${i + 1}: read the section that holds these lines with read_note_section first, and give its headingSlug in heading.` };
+      const holding = ofNote.filter((r) => holdsLines(r.text, o.before));
+      if (holding.length === 0) return { error: `Operation ${i + 1}: these lines are not in the part of the section you read. Read the rest of it with read_note_section and fromLine, and use lines exactly as shown.` };
+      if (holding.length > 1) return { error: `Operation ${i + 1}: these lines appear in more than one section or part you read. Give the section's headingSlug in heading, and lines that appear only once.` };
+      const read = holding[0]!;
       const diskSlug = read.headingSlug === null ? null : diskSlugOf(acceptedNoteText(raw.content, raw.path, ws.unsettledChanges()), raw.content, read.headingSlug);
       if (read.headingSlug !== null && diskSlug === null) return { error: `Operation ${i + 1}: that section has an edit awaiting review. Edit it after that edit is decided.` };
       const after = o.after.replace(/\{\{issue:([^{}]+)\}\}/g, (m, ref: string) => (refToOp.has(ref) ? `{{issue:${refToOp.get(ref)}}}` : m));
-      out.push({ opId, kind: "note.replaceSpan", file: raw.path, baseRevision: raw.revision, before: o.before, after, scope: { headingSlug: diskSlug, sectionHash: sha256(read.text) } });
+      out.push({ opId, kind: "note.replaceSpan", file: raw.path, baseRevision: raw.revision, before: o.before, after, scope: { headingSlug: diskSlug, sectionHash: sha256(read.text), lines: { from: read.from, count: read.count } } });
     } else {
       const issue = issues.find((x) => x.key === o.issue.toUpperCase());
       if (!issue) return { error: `Operation ${i + 1}: no issue ${o.issue}.` };

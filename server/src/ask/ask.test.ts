@@ -73,7 +73,7 @@ describe("kickoff workspace", () => {
     expect(texts(r.answer.suggestions)).toMatch(/Create an issue for “Will writes the judge instructions”/);
     expect(r.answer.insufficientEvidence).toBe(false);
     const cites = Object.values(r.answer.citations);
-    expect(cites).toContainEqual(expect.objectContaining({ target: { kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions" } }));
+    expect(cites).toContainEqual(expect.objectContaining({ target: expect.objectContaining({ kind: "note", path: "meetings/2026-11-24 kickoff.md", headingSlug: "actions", headingText: "Actions", excerpt: expect.any(String) }) }));
     expect(cites).toContainEqual(expect.objectContaining({ label: "NEX-1 Build calendar view", target: { kind: "issue", key: "NEX-1" } }));
     expect(r.answer.removedCitations).toBe(0);
     expect(r.scopeNote).toMatch(/issue records from NEX \(1 of 1 read\)/);
@@ -181,7 +181,7 @@ describe("a second fictional workspace with different names and keys", () => {
     expect(facts).toMatch(/Aiyana books the venue.*tracked by OPS-2/);
     expect(texts(r.answer.discrepancies)).toMatch(/marks “Aiyana books the venue” as done, but OPS-2 is in progress/);
     expect(facts).not.toMatch(/NEX-|judge|calendar/i);
-    expect(Object.values(r.answer.citations).map((c) => c.target)).toContainEqual({ kind: "note", path: "standups/2026-11-20 planning.md", headingSlug: "action-items", headingText: "Action items" });
+    expect(Object.values(r.answer.citations).map((c) => c.target)).toContainEqual(expect.objectContaining({ kind: "note", path: "standups/2026-11-20 planning.md", headingSlug: "action-items", headingText: "Action items" }));
     expect(await hashTree(other)).toEqual(before);
   });
 });

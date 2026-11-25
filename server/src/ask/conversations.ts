@@ -9,7 +9,8 @@ const Citation = z.object({
   handle: z.string(),
   label: z.string(),
   target: z.union([
-    z.object({ kind: z.literal("note"), path: z.string(), headingSlug: z.string().nullable(), headingText: z.string().nullable() }),
+    // excerpt: added in run 6 (R5-10); older conversation files have none.
+    z.object({ kind: z.literal("note"), path: z.string(), headingSlug: z.string().nullable(), headingText: z.string().nullable(), excerpt: z.string().nullable().optional() }),
     z.object({ kind: z.literal("issue"), key: z.string() }),
   ]),
 });

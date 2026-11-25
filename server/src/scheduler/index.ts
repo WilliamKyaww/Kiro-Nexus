@@ -30,22 +30,36 @@ export function setNativeStatus(state: AppState, status: { available: boolean; r
   native.set(state, status);
 }
 
+/**
+ * One delivery record; each surface shows it. `native` tells the desktop app whether to add the
+ * operating system's notification (a setting of this workspace). Published synchronously, and
+ * only by the running scheduler of the workspace that is open or opening (R5-13), so a late
+ * reminder from a closed workspace never reaches the next one.
+ */
+export function publishDelivery(state: AppState, scheduler: Scheduler, delivery: Delivery, settings: ReminderSettings): void {
+  if (scheduler.isStopped || schedulers.get(state) !== scheduler) return;
+  // While the workspace opens, state.service is not set yet; once it is set, it must be this one.
+  if (state.service !== null && state.service !== scheduler.service) return;
+  if (delivery.workspaceId !== scheduler.service.manifest.workspaceId) return;
+  state.publish({ type: "notification", delivery, native: settings.nativeNotifications });
+}
+
 export function installReminders(state: AppState): void {
   state.onOpen.push(async (service) => {
     // Runs inside the open sequence: review recovery has run, but state.service is not set yet.
     const engine = engineFor(state);
     if (!engine) throw new NexusError("INTERNAL", "Reminders need the review journal, which did not load.");
-    const scheduler: Scheduler = new Scheduler(service, engine, (delivery: Delivery) => {
-      // One delivery record; each surface shows it. `native` tells the desktop app whether to
-      // add the operating system's notification (a setting of this workspace).
-      void scheduler.settings().then((s) => state.publish({ type: "notification", delivery, native: s.nativeNotifications }));
-    }, state.log, clock);
+    const scheduler: Scheduler = new Scheduler(service, engine, (delivery, settings) => publishDelivery(state, scheduler, delivery, settings), state.log, clock);
     schedulers.set(state, scheduler);
-    await scheduler.start(testClock ? 0 : undefined).catch((e) => state.log(`reminders: ${(e as Error).message}`));
+    // A failed start (a damaged delivery log) is logged by the scheduler, and each tick retries it,
+    // so the workspace still opens and reminders resume once the log is repaired or replaced (R5-5).
+    await scheduler.start(testClock ? 0 : undefined).catch(() => undefined);
   });
-  state.onClose.push(async (service) => {
+  // First on close, before the other hooks: the scheduler stops, and its running work is let
+  // finish (it records and shows nothing more), before the workspace's files are released (R5-13).
+  state.onClose.unshift(async (service) => {
     const s = schedulers.get(state);
-    if (s && s.service === service) { s.stop(); schedulers.delete(state); }
+    if (s && s.service === service) { schedulers.delete(state); await s.stop(); }
   });
   // An accepted date, a manual edit or a new event: reschedule without waiting for the timer.
   state.bus.on("event", (e: { type: string; path?: string }) => {
@@ -73,7 +87,14 @@ export function reminderRoutes(state: AppState) {
         settings: await s.settings(),
         native: native.get(state) ?? (process.env.NEXUS_DESKTOP === "1" ? { available: false, reason: "The desktop app has not reported its notification support yet." } : null),
         workspaceId: s.service.manifest.workspaceId,
+        problems: await s.problems(),
       };
+    });
+    // R5-5: the way out of a damaged delivery log, offered by Notifications. Refused (409) when the log is fine.
+    app.post("/api/v1/reminders/delivery-log/replace", async () => {
+      const result = await requireScheduler(state).replaceDamagedLog();
+      state.publish({ type: "notifications.seen" }); // every tab reloads its list and badge
+      return result;
     });
     app.get("/api/v1/notifications/:id", async (request) => {
       const id = (request.params as { id: string }).id;

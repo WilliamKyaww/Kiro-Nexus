@@ -26,8 +26,11 @@ Clock (real, or the test clock) ───┼─► Scheduler (one per open works
   - `scheduledAt`, `status` (`delivering`, `delivered` or `missed`), `deliveredAt`;
   - `batch`: the start-up a missed entry was recorded in.
 
-  Entries older than 60 days are pruned beyond the newest 500. A pruned key's time is
-  long past, so it can never be due again.
+  Entries older than 60 days are pruned beyond the newest 500. Pruning records the
+  latest pruned instant as `prunedUpTo`, and nothing at or before it is delivered or
+  recorded again, so a clock set back cannot deliver a pruned key a second time (run 6,
+  R5-6). Only a missing log means first use; a damaged one stops delivery until the user
+  repairs or replaces it (R5-5).
 - **`.nexus/state/scheduler.json`**: `{ schemaVersion: 1, lastTickAt }`, written by
   each tick. It marks the end of the period in which Nexus was running.
 - **`.nexus/calendar.json`** is the shared event record. Hein owns its writing. This

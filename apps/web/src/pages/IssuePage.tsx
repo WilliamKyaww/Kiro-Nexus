@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
-import type { ChangeView, IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
+import type { ChangeView, Due, IssuePatch, IssueView, NoteLink, NoteView } from "@nexus/schema";
 import { ApiError, api, notePathParam } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
 import { priorityLabel, statusLabel } from "../format";
@@ -10,6 +10,8 @@ import { useOpenChanges } from "../review/review";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
 import { acknowledge } from "../issues/acknowledge";
+import { DueDateNotes } from "../issues/DueDateEditor";
+import { describeDue, dueFromInput, dueInputValue } from "../issues/dueEdit";
 
 export function IssuePage() {
   const { key = "" } = useParams();
@@ -22,6 +24,10 @@ export function IssuePage() {
   const form = draft?.values ?? null;
   const editBase = draft?.base ?? null;
   const [conflict, setConflict] = useState<{ current: IssueView; fields: string[] } | null>(null);
+  // The due value shown when the date was first changed. A chosen date keeps its time and zone,
+  // as on the board and the calendar, so a timed deadline never becomes all-day (R5-12, DEC-023).
+  const [dueFrom, setDueFrom] = useState<Due>(null);
+  const dueNoteId = useId();
   const [params] = useSearchParams();
   const changeParam = params.get("change");
   const openHere = useOpenChanges().filter((c) => c.recordKey === key && c.state !== "prepared");
@@ -99,21 +105,29 @@ export function IssuePage() {
     ? (Object.keys(form) as Array<keyof IssuePatch>).filter((f) => JSON.stringify(i[f]) !== JSON.stringify(editBase[f]))
     : [];
   const fieldName: Record<string, string> = { title: "Title", description: "Description", status: "Status", priority: "Priority", due: "Due date", noteLinks: "Linked notes" };
-  const shown = (v: unknown) => (v === null || v === undefined ? "none" : typeof v === "string" ? v : JSON.stringify(v));
-  const dueDate = value.due && "date" in value.due ? value.due.date : "";
+  const shown = (f: string, v: unknown) => (f === "due" ? describeDue((v ?? null) as Due)
+    : v === null || v === undefined ? "none" : typeof v === "string" ? v : JSON.stringify(v));
+  const dueDrafted = !!form && "due" in form;
+  const dueShape: Due = dueDrafted ? dueFrom : i.due; // the value whose time and zone a chosen date keeps
+  const dueDate = dueInputValue(value.due ?? null);
+  const changeDue = (date: string) => {
+    if (!dueDrafted) setDueFrom(i.due);
+    set({ due: dueFromInput(dueShape, date) });
+  };
 
   return (
     <section className="page issue-page" aria-labelledby="issue-h">
       <BackToConversation />
       <p className="path"><Link to="/projects">Projects</Link> / <Link to={`/projects/${i.projectKey}`}>{i.projectKey}</Link> / {i.key}</p>
       <h1 id="issue-h"><span className="issue-key">{i.key}</span> {i.title}</h1>
+      <ReusedKey issueKey={i.key} />
       {extraIssue.aboveFields.map((Slot, n) => <Slot key={n} issue={i} />)}
       {conflict ? (
         <div className="conflict" role="alert" data-testid="issue-conflict">
           <p><strong>Someone else changed {conflict.fields.length ? conflict.fields.map((f) => fieldName[f] ?? f).join(", ") : "this issue"} since you started editing.</strong> Your edits are still in the form. Nothing was saved.</p>
           <ul className="plain">
             {conflict.fields.map((f) => (
-              <li key={f}>{fieldName[f] ?? f}: theirs “{shown(conflict.current[f as keyof IssueView])}”, yours “{shown(form?.[f as keyof IssuePatch])}”</li>
+              <li key={f}>{fieldName[f] ?? f}: theirs “{shown(f, conflict.current[f as keyof IssueView])}”, yours “{shown(f, form?.[f as keyof IssuePatch])}”</li>
             ))}
           </ul>
           <div className="row">
@@ -147,10 +161,13 @@ export function IssuePage() {
               {Object.entries(priorityLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </label>
-          <label data-field-wrapper="due" className={pendingClass("due").trim() || undefined} data-change-id={pendingByField.get("due")?.changeId} tabIndex={pendingByField.has("due") ? -1 : undefined}>Due date
-            <input type="date" value={dueDate} onChange={(e) => set({ due: e.target.value ? { date: e.target.value } : null })} data-field="due" />
-            {pendingByField.has("due") ? <span className="pending-badge">{pendingByField.get("due")!.state === "conflicted" ? "Conflict" : "Pending review"}</span> : null}
-          </label>
+          <div className="due-field">
+            <label data-field-wrapper="due" className={pendingClass("due").trim() || undefined} data-change-id={pendingByField.get("due")?.changeId} tabIndex={pendingByField.has("due") ? -1 : undefined}>Due date
+              <input type="date" value={dueDate} onChange={(e) => changeDue(e.target.value)} aria-describedby={dueNoteId} data-field="due" />
+              {pendingByField.has("due") ? <span className="pending-badge">{pendingByField.get("due")!.state === "conflicted" ? "Conflict" : "Pending review"}</span> : null}
+            </label>
+            <DueDateNotes id={dueNoteId} shape={dueShape} date={dueDate} />
+          </div>
         </div>
         <label>Description<textarea rows={4} value={value.description} onChange={(e) => set({ description: e.target.value })} data-field="description" /></label>
         <div className="row">
@@ -166,6 +183,28 @@ export function IssuePage() {
     </section>
   );
 }
+type ProposedIssue = { key: string; title: string; state: string; at: string; source: string; reusedBy?: string | null };
+
+/**
+ * A workspace from before run 5 may have given this issue's key to a proposal that was later
+ * rejected. Links made for that proposal now lead here, so say so (R5-7).
+ */
+function ReusedKey({ issueKey }: { issueKey: string }) {
+  const proposed = useQuery({
+    queryKey: ["review", "proposed-issue", issueKey],
+    queryFn: () => api.get<{ proposed: null | ProposedIssue }>(`/review/proposed-issue?key=${encodeURIComponent(issueKey)}`),
+  });
+  const p = proposed.data?.proposed;
+  if (!p?.reusedBy) return null;
+  const when = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(p.at));
+  return (
+    <p className="notice" role="note" data-testid="reused-key">
+      {issueKey} was also the key of “{p.title}”, a new issue proposed by an edit ({p.source}) and {p.state === "accepted" ? "accepted" : "not kept"} on {when}.
+      A link made for that proposal may have meant it, not this issue.
+    </p>
+  );
+}
+
 /** An issue key that does not exist: say whether it was a proposal that was rejected (R4-7). */
 function IssueGone({ issueKey }: { issueKey: string }) {
   const proposed = useQuery({

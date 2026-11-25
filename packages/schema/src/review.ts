@@ -20,8 +20,17 @@ export const RecordField = z.enum(["title", "description", "status", "priority",
 export const Actor = z.enum(["agent", "demo", "user", "system"]);
 
 export const SpanContext = z.strictObject({ lineBefore: z.string().nullable(), lineAfter: z.string().nullable() });
-/** One section of a note on disk (null: the whole note) and the SHA-256 of its text as read. */
-export const Scope = z.strictObject({ headingSlug: z.string().max(200).nullable(), sectionHash: z.string().min(1) });
+/**
+ * One section of a note on disk (null: the whole note) and the SHA-256 of its text as read.
+ * Since run 6, `lines` names the exact lines a read returned, counted from the heading line
+ * (0) or from the top of the note, and the hash covers those raw lines, heading line included
+ * (R5-8). Scopes saved before run 6 have no `lines`: their hash covers the trimmed body.
+ */
+export const Scope = z.strictObject({
+  headingSlug: z.string().max(200).nullable(),
+  sectionHash: z.string().min(1),
+  lines: z.strictObject({ from: z.number().int().min(0), count: z.number().int().min(1) }).optional(),
+});
 
 export const ChangeRecord = z.strictObject({
   changeId: z.string().regex(/^chg_[0-9A-HJKMNP-TV-Z]{26}$/),

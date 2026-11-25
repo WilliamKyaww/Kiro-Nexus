@@ -160,10 +160,14 @@ Schemas: `packages/schema/src/reminders.ts`. Spec: `.kiro/specs/reminders/`.
 
 - Hein's calendar slice creates and edits events. Reminders only read this
   file.
-- `start` and `end` use the same shape as an issue's `due`.
+- `start` and `end` use the same shape as an issue's `due`. Their `timeZone`
+  must be an IANA zone the runtime recognises (since run 6, R5-4).
+- Event `id`s are unique in the file (since run 6, R5-6).
 - `reminder: false` turns off that event's reminder.
-- A missing file means there are no events. A file that is not valid is
-  skipped, and the log says so.
+- A missing file means there are no events. Rows are checked one at a time: a
+  row that is not valid, or that repeats an `id`, is skipped and listed under
+  "Some items have no reminder" in Notifications, with its file and record.
+  Other reminders are not affected. An empty file is reported in the same way.
 - The scheduler reads it again on every tick, at least every 30 seconds.
 
 ### `state/deliveries.json` (service state, not user data)
@@ -190,9 +194,20 @@ One record per reminder occurrence, shared by every surface (DEC-009):
   away" shows only the current start-up's batch.
 - `seenUpTo` drives the unseen count on the rail.
 - Old entries are pruned beyond the newest 500, but only once they are more
-  than 60 days past.
-- If this file is not valid, Nexus delivers no reminders rather than risk a
-  duplicate.
+  than 60 days past. `prunedUpTo` (since run 6) is the latest scheduled
+  instant pruned: nothing at or before it is delivered or recorded again,
+  even if the clock is set back (R5-6).
+- Only a missing file means first use. An empty file, a file that is not
+  valid JSON or not in this format, or one that cannot be read is damaged
+  (R5-5):
+  - Nexus delivers no reminders and leaves the file as it is;
+  - Notifications names the file and offers **Start a new delivery log**
+    (`POST /api/v1/reminders/delivery-log/replace`). It first keeps a copy
+    as `deliveries.damaged-<instant>.json` beside it, and the new log's
+    `prunedUpTo` is the moment of the replacement, so nothing that came due
+    earlier is delivered or listed again;
+  - after a repair by hand, reminders resume at the next tick, without
+    reopening the workspace.
 
 ### `state/scheduler.json` (service state)
 
