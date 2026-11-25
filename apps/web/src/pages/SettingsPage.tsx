@@ -5,6 +5,7 @@ import type { ReminderSettings, WorkspaceView } from "@nexus/schema";
 import { ApiError, api } from "../api";
 import { ErrorNote } from "../components/ErrorNote";
 import { notificationsKey, useNotifications } from "../notifications/notifications";
+import { AppearanceSettings } from "../theme/AppearanceSettings";
 
 type Cap = "unknown" | "yes" | "no" | "error";
 export interface ProviderView {
@@ -57,6 +58,8 @@ export function SettingsPage() {
   return (
     <section className="page settings" aria-labelledby="settings-h">
       <h1 id="settings-h">Settings</h1>
+
+      <AppearanceSettings />
 
       <h2>Workspace</h2>
       <p>{workspace.data?.workspace ? <>Open: <strong>{workspace.data.workspace.name}</strong> <span className="muted">({workspace.data.workspace.root})</span></> : "No workspace is open."} <Link to="/workspace">Change workspace</Link></p>

@@ -17,6 +17,8 @@ import { NotificationsPage, OpenNotificationPage } from "./pages/NotificationsPa
 import { useNotifications } from "./notifications/notifications";
 import { setProgress } from "./ask/ask";
 import { extraShell } from "./slices";
+import { ThemeSwitch } from "./theme/ThemeSwitch";
+import { loadAppearance, receiveAppearance } from "./theme/appearance";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: (count, error) => count < 1 && !(error as { status?: number }).status, refetchOnWindowFocus: false } },
@@ -25,6 +27,7 @@ const queryClient = new QueryClient({
 export function App({ initialSession }: { initialSession: SessionState }) {
   const [session, setSession] = useState(initialSession);
   useEffect(() => onSessionChange(setSession), []);
+  useEffect(() => { if (session.status === "ready") void loadAppearance(); }, [session.status]);
   if (session.status !== "ready") return <LaunchScreen reason={session.reason} />;
   return (
     <QueryClientProvider client={queryClient}>
@@ -65,6 +68,7 @@ function useLiveUpdates(): boolean {
   const [connected, setConnected] = useState(false);
   useEffect(() => subscribeEvents((event) => {
     if (event.type === "workspace.changed") { void client.invalidateQueries(); return; }
+    if (event.type === "appearance.changed") { receiveAppearance(event.appearance); return; }
     if (event.type === "file.changed" && typeof event.path === "string") {
       if (event.path.startsWith(".nexus/")) {
         void client.invalidateQueries({ queryKey: ["issues"] });
@@ -118,9 +122,10 @@ function Shell() {
             ))}
           </ul>
           <div className="rail-footer">
+            <ThemeSwitch />
             <NavLink to="/workspace" className="workspace-link">
               <span className="muted">Workspace</span>
-              <strong>{ws ? ws.name : "None open"}</strong>
+              <strong title={ws ? ws.name : undefined}>{ws ? ws.name : "None open"}</strong>
             </NavLink>
             <p className={connected ? "live ok" : "live"} role="status">{connected ? "Live updates on" : "Connecting…"}</p>
           </div>

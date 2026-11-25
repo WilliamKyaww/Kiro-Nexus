@@ -2,7 +2,7 @@
 version: 1
 slug: "wireframe-index-html"
 primary_target: "wireframe/index.html"
-related_targets: ["wireframe/wireframe.css","wireframe/wireframe.js"]
+related_targets: ["wireframe/wireframe.css","wireframe/wireframe.js","wireframe/theme-boot.js"]
 ---
 
 ## Scope
@@ -16,7 +16,7 @@ Will and Hein are judging a look for the real app, and hackathon judges may see 
 ## Constraints
 
 - Pure HTML, CSS and JS with hardcoded fictional data. No build step and no dependencies.
-- Only `wireframe/` changes. The app in `apps/`, `server/` and `packages/` is untouched.
+- Pure static files in `wireframe/`. Since run 6 the app in `apps/` shares the six palettes and the light and dark rules (DEC-028); layout and components there remain Hein's.
 - `npm run mcp:smoke` must keep passing: the "Apply fixed demo changes" button, "AI is off", "Wireframe prototype" in an accessible name, "Kickoff, 24 November", "NEX-1 Build calendar view", "3 Dec 2026" and "5 Dec 2026", and "What was wrong".
 - One small dot indicator explains that the data is fictional, on hover, focus or tap. No repeated "fictional" or "not AI" labels.
 - Keyboard use, visible focus, reduced motion and a 390 px width throughout. British English.
@@ -29,7 +29,7 @@ The category standard, chosen by Will on 25 November 2026. Match the craft of Li
 
 THESIS: Nexus looks like a calm, well-made workspace, where a note and an issue sit one click apart and every agent change waits visibly for a decision. It refuses novelty chrome and dark "AI" styling.
 
-OWN-WORLD: A cool neutral shell (zinc greys) with a floating white work panel, one iris-blue accent for actions and selection, amber reserved for pending review, and plain status colours (grey To do, amber-orange In progress, green Done). System UI type, small radii, hairline borders, drawn SVG icons in one stroke weight.
+OWN-WORLD: A cool neutral shell (zinc greys) with a floating white work panel (a graphite panel one step above a near-black shell in the dark theme), one iris-blue accent for actions and selection, amber reserved for pending review, and plain status colours (grey To do, amber-orange In progress, green Done). System UI type, small radii, hairline borders, drawn SVG icons in one stroke weight.
 
 STORY: The visitor sees the kickoff note, follows a link to NEX-1 or the graph, asks what is outstanding, and then steps through two pending changes with the review bar.
 
@@ -44,4 +44,4 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 ## Unresolved
 
 - The graph view is listed as outside the first release in the PRD. It is in the wireframe at Will's request; adding it to the app needs a PRD change.
-- Dark mode is not designed.
+- Dark mode was designed in run 6 (DEC-028): Light, Dark and Match system, three palettes per theme, the Dark mode switch in the top bar and Settings → Appearance. Hein keeps the final identity, the calendar and agenda, and card ordering.

@@ -475,7 +475,7 @@ document.addEventListener("click", (e) => {
   if (!e.target.closest(".proto")) setTip(false);
   const t = e.target.closest("[data-toast]");
   if (t) toast(t.dataset.toast);
-  if (e.target.closest("[data-palette]")) openPalette();
+  if (e.target.closest("[data-command-palette]")) openPalette();
   const a = e.target.closest("a[data-anchor]");
   if (a) {
     e.preventDefault();
@@ -552,6 +552,63 @@ boardEl.addEventListener("dragstart", (e) => { const c = e.target.closest(".card
 boardEl.addEventListener("dragend", () => $$(".dragging, .drop", boardEl).forEach((x) => x.classList.remove("dragging", "drop")));
 boardEl.addEventListener("dragover", (e) => { const col = e.target.closest(".col"); if (col) { e.preventDefault(); $$(".col", boardEl).forEach((x) => x.classList.toggle("drop", x === col)); } });
 boardEl.addEventListener("drop", (e) => { const col = e.target.closest(".col"); if (col) { e.preventDefault(); moveIssue(e.dataTransfer.getData("text/plain"), col.dataset.status, true); } });
+
+// ---- Appearance (run 6, DEC-028): the quick switch in the top bar and Settings → Appearance ----
+// theme-boot.js has already set the theme before the first paint; this keeps the controls in step.
+const looks = window.nexusAppearance;
+const LOOKS = {
+  light: [["porcelain", "Porcelain", "Pale zinc shell, white work panel and an iris accent. The default."], ["linen", "Linen", "Warm paper greys with a deep teal accent."], ["mist", "Mist", "Cool blue-greys with a cobalt accent."]],
+  dark: [["graphite", "Graphite", "Neutral graphite layers with a soft iris accent. The default."], ["midnight", "Midnight", "Blue-black layers with a sky-blue accent."], ["plum", "Plum", "Violet-black layers with a lilac accent."]],
+};
+let pref = looks.read();
+const themeSwitch = $(".theme-switch");
+// Each card is a labelled radio with a small preview drawn in that palette's own tokens.
+for (const group of $$(".ap-group")) {
+  const t = group.dataset.apTheme;
+  $(".ap-cards", group).innerHTML = LOOKS[t].map(([id, name, text]) => `
+    <label class="ap-card">
+      <input class="sr-only" type="radio" name="ap-${t}" value="${id}">
+      <span class="ap-preview" data-theme="${t}" data-palette="${id}" aria-hidden="true">
+        <span class="pv-rail"><span class="pv-dot"></span><span class="pv-nav pv-on"></span><span class="pv-nav"></span><span class="pv-nav"></span></span>
+        <span class="pv-panel"><span class="pv-title">Kickoff</span><span class="pv-text">Hein builds the <span class="pv-select">calendar</span> view</span><span class="pv-row"><span class="pv-cite">NEX-1</span><span class="pv-pend">Pending</span></span><span class="pv-button">Accept</span></span>
+      </span>
+      <span class="ap-name">${name}</span>
+      <span class="ap-text">${text}</span>
+      <span class="ap-selected"><svg class="i"><use href="#i-check"/></svg>Selected</span>
+    </label>`).join("");
+}
+function syncLooks() {
+  const shown = looks.apply(pref);
+  const dark = shown === "dark";
+  themeSwitch.setAttribute("aria-checked", String(dark));
+  themeSwitch.title = dark ? "Switch to the light theme" : "Switch to the dark theme";
+  $(".theme-switch-state", themeSwitch).textContent = dark ? "On" : "Off";
+  $$('input[name="ap-mode"]').forEach((r) => { r.checked = r.value === pref.mode; });
+  for (const t of ["light", "dark"]) {
+    $$(`input[name="ap-${t}"]`).forEach((r) => {
+      const on = r.value === pref[t];
+      r.checked = on;
+      r.closest(".ap-card").dataset.selected = String(on);
+    });
+  }
+  $(".ap-now").textContent = `Showing the ${shown} theme${pref.mode === "system" ? ", as your computer is set to" : ""}. The Dark mode switch in the top bar does the same on any page.`;
+}
+function setLooks(change) {
+  pref = { ...pref, ...change };
+  if (!looks.save(pref)) toast("This browser would not store the choice, so it lasts until you close the tab.");
+  syncLooks();
+}
+// From Match system, the switch picks the opposite of what is shown, as an explicit choice.
+themeSwitch.addEventListener("click", () => setLooks({ mode: looks.theme(pref) === "dark" ? "light" : "dark" }));
+document.addEventListener("change", (e) => {
+  const r = e.target.closest('input[name="ap-mode"], input[name="ap-light"], input[name="ap-dark"]');
+  if (!r) return;
+  setLooks(r.name === "ap-mode" ? { mode: r.value } : { [r.name.slice(3)]: r.value });
+});
+looks.query?.addEventListener("change", () => { if (pref.mode === "system") syncLooks(); });
+// Another tab of the wireframe changed the choice.
+window.addEventListener("storage", (e) => { if (e.key === looks.KEY) { pref = looks.read(); syncLooks(); } });
+syncLooks();
 
 // ---- Start ----
 $$("svg.i").forEach((s) => s.setAttribute("aria-hidden", "true"));

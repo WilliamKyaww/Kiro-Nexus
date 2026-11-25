@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-25T02:53:23.203Z",
+  "generatedAt": "2026-11-25T13:09:12.106Z",
   "title": "Design System: Nexus",
   "extensions": {
     "colorMeta": {
@@ -97,12 +97,12 @@
       "pend": {
         "role": "secondary",
         "displayName": "Review Amber",
-        "canonical": "#8f5200",
+        "canonical": "#8a4f00",
         "tonalRamp": [
           "#4b3a10",
-          "#8f5200",
+          "#8a4f00",
           "#f2b13a",
-          "#ecc06a",
+          "#e7b95a",
           "#ffd98c",
           "#ffe4a0",
           "#fff4d8",
@@ -115,9 +115,9 @@
         "canonical": "#fff4d8",
         "tonalRamp": [
           "#4b3a10",
-          "#8f5200",
+          "#8a4f00",
           "#f2b13a",
-          "#ecc06a",
+          "#e7b95a",
           "#ffd98c",
           "#ffe4a0",
           "#fff4d8",
@@ -127,12 +127,12 @@
       "pend-line": {
         "role": "secondary",
         "displayName": "Amber Hairline",
-        "canonical": "#ecc06a",
+        "canonical": "#e7b95a",
         "tonalRamp": [
           "#4b3a10",
-          "#8f5200",
+          "#8a4f00",
           "#f2b13a",
-          "#ecc06a",
+          "#e7b95a",
           "#ffd98c",
           "#ffe4a0",
           "#fff4d8",
@@ -145,9 +145,9 @@
         "canonical": "#fffcf3",
         "tonalRamp": [
           "#4b3a10",
-          "#8f5200",
+          "#8a4f00",
           "#f2b13a",
-          "#ecc06a",
+          "#e7b95a",
           "#ffd98c",
           "#ffe4a0",
           "#fff4d8",
@@ -161,7 +161,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -202,7 +202,7 @@
       "bad": {
         "role": "tertiary",
         "displayName": "Brick",
-        "canonical": "#be3220",
+        "canonical": "#b8301e",
         "tonalRamp": [
           "#150705",
           "#44110a",
@@ -251,7 +251,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -266,7 +266,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -277,11 +277,11 @@
       "ink-3": {
         "role": "neutral",
         "displayName": "Zinc",
-        "canonical": "#686873",
+        "canonical": "#62626d",
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -296,7 +296,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -311,7 +311,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -326,7 +326,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -341,7 +341,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -352,11 +352,11 @@
       "sunk": {
         "role": "neutral",
         "displayName": "Well",
-        "canonical": "#f7f7f9",
+        "canonical": "#f6f6f8",
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -371,7 +371,7 @@
         "tonalRamp": [
           "#17171c",
           "#474751",
-          "#686873",
+          "#62626d",
           "#8a8a95",
           "#d3d3db",
           "#e4e4ea",
@@ -423,6 +423,72 @@
           "#a3a3ae",
           "#cdcdd6"
         ]
+      },
+      "control-line": {
+        "role": "neutral",
+        "displayName": "Control Edge",
+        "canonical": "#8a8a96",
+        "tonalRamp": "#62626d #8a8a96 #d3d3db"
+      },
+      "graphite-shell": {
+        "role": "neutral",
+        "displayName": "Graphite Shell",
+        "canonical": "#0e0f11",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-panel": {
+        "role": "neutral",
+        "displayName": "Graphite Panel",
+        "canonical": "#18191c",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-raised": {
+        "role": "neutral",
+        "displayName": "Graphite Raised",
+        "canonical": "#212226",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-line-2": {
+        "role": "neutral",
+        "displayName": "Graphite Hairline",
+        "canonical": "#373940",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-ink": {
+        "role": "neutral",
+        "displayName": "Off-white",
+        "canonical": "#ededf0",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-ink-3": {
+        "role": "neutral",
+        "displayName": "Graphite Zinc",
+        "canonical": "#9597a2",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-accent": {
+        "role": "primary",
+        "displayName": "Soft Iris",
+        "canonical": "#5a61d6",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-accent-ink": {
+        "role": "primary",
+        "displayName": "Light Iris",
+        "canonical": "#a9aeff",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-pend": {
+        "role": "secondary",
+        "displayName": "Night Amber",
+        "canonical": "#f2b64e",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
+      },
+      "graphite-pend-soft": {
+        "role": "secondary",
+        "displayName": "Night Amber Wash",
+        "canonical": "#2e2412",
+        "tonalRamp": "#0e0f11 #121316 #18191c #212226 #27282d #373940 #9597a2 #b6b8c0 #ededf0"
       }
     },
     "typographyMeta": {
@@ -552,7 +618,7 @@
       },
       {
         "name": "reduced-motion",
-        "value": "transition: none; animation: none; glow target: outline 2px solid #8f5200, outline-offset 3px",
+        "value": "transition: none; animation: none; glow target: outline 2px solid #8a4f00, outline-offset 3px",
         "purpose": "Under prefers-reduced-motion every transition and animation is off, and the glow becomes a static Review Amber outline."
       }
     ],
@@ -569,7 +635,71 @@
         "name": "phone",
         "value": "640px"
       }
-    ]
+    ],
+    "themes": {
+      "attributes": "data-theme (light | dark) and data-palette on <html>; tokens per [data-theme][data-palette] pair",
+      "defaults": {
+        "light": "porcelain",
+        "dark": "graphite",
+        "mode": "system"
+      },
+      "palettes": [
+        {
+          "theme": "light",
+          "id": "porcelain",
+          "name": "Porcelain",
+          "shell": "#f2f2f5",
+          "panel": "#ffffff",
+          "ink": "#17171c",
+          "accent": "#4a52cf"
+        },
+        {
+          "theme": "light",
+          "id": "linen",
+          "name": "Linen",
+          "shell": "#f2efe9",
+          "panel": "#fffdf9",
+          "ink": "#1f1b15",
+          "accent": "#1d6a73"
+        },
+        {
+          "theme": "light",
+          "id": "mist",
+          "name": "Mist",
+          "shell": "#ecf0f5",
+          "panel": "#ffffff",
+          "ink": "#132030",
+          "accent": "#2356c4"
+        },
+        {
+          "theme": "dark",
+          "id": "graphite",
+          "name": "Graphite",
+          "shell": "#0e0f11",
+          "panel": "#18191c",
+          "ink": "#ededf0",
+          "accent": "#5a61d6"
+        },
+        {
+          "theme": "dark",
+          "id": "midnight",
+          "name": "Midnight",
+          "shell": "#0a0f17",
+          "panel": "#121924",
+          "ink": "#e6edf7",
+          "accent": "#2f6bd8"
+        },
+        {
+          "theme": "dark",
+          "id": "plum",
+          "name": "Plum",
+          "shell": "#110e15",
+          "panel": "#1a1620",
+          "ink": "#f0ebf5",
+          "accent": "#7f4fcf"
+        }
+      ]
+    }
   },
   "components": [
     {
@@ -586,7 +716,7 @@
       "refersTo": "button-secondary",
       "description": "White outlined button for every other action, such as Apply fixed demo changes, Today and Send test reminder.",
       "html": "<button class=\"ds-btn-secondary\" type=\"button\">Apply fixed demo changes</button>",
-      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line-2, #d3d3db); border-radius: 7px; background: #fff; color: var(--ink, #17171c); font: 550 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s, color .12s; } .ds-btn-secondary:hover { background: var(--sunk, #f7f7f9); border-color: #c4c4cd; } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-btn-secondary:disabled { opacity: .45; cursor: not-allowed; }"
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line-2, #d3d3db); border-radius: 7px; background: #fff; color: var(--ink, #17171c); font: 550 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s, color .12s; } .ds-btn-secondary:hover { background: var(--sunk, #f6f6f8); border-color: #c4c4cd; } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-btn-secondary:disabled { opacity: .45; cursor: not-allowed; }"
     },
     {
       "name": "Search Trigger",
@@ -594,7 +724,7 @@
       "refersTo": "search-trigger",
       "description": "Top-bar field that opens the command palette, with Ctrl K keycaps.",
       "html": "<button class=\"ds-search\" type=\"button\" aria-keyshortcuts=\"Control+K\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"m20 20-4.2-4.2\"/></svg><span class=\"ds-search-text\">Search notes and issues</span><span class=\"ds-search-keys\" aria-hidden=\"true\"><kbd class=\"ds-kbd\">Ctrl</kbd><kbd class=\"ds-kbd\">K</kbd></span></button>",
-      "css": ".ds-search { display: flex; align-items: center; gap: 8px; width: 360px; max-width: 100%; height: 34px; padding: 0 6px 0 11px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; color: var(--ink-3, #686873); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); text-align: left; cursor: pointer; transition: border-color .15s; } .ds-search svg { flex: none; } .ds-search:hover { border-color: var(--line-2, #d3d3db); } .ds-search:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-search-text { flex: 1; } .ds-search-keys { display: flex; gap: 3px; } .ds-kbd { padding: 2px 5px; border: 1px solid var(--line-2, #d3d3db); border-bottom-width: 2px; border-radius: 4px; background: #fff; color: var(--ink-3, #686873); font: 550 11px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); }"
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; width: 360px; max-width: 100%; height: 34px; padding: 0 6px 0 11px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; color: var(--ink-3, #62626d); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); text-align: left; cursor: pointer; transition: border-color .15s; } .ds-search svg { flex: none; } .ds-search:hover { border-color: var(--line-2, #d3d3db); } .ds-search:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-search-text { flex: 1; } .ds-search-keys { display: flex; gap: 3px; } .ds-kbd { padding: 2px 5px; border: 1px solid var(--line-2, #d3d3db); border-bottom-width: 2px; border-radius: 4px; background: #fff; color: var(--ink-3, #62626d); font: 550 11px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); }"
     },
     {
       "name": "Ask Composer",
@@ -602,7 +732,7 @@
       "refersTo": "composer",
       "description": "The centred Home composer with the Ask and Edit modes, context chips and Send, shown with AI off.",
       "html": "<form class=\"ds-composer\"><textarea class=\"ds-composer-text\" rows=\"3\" aria-label=\"Ask Nexus about your notes and board\" placeholder=\"What did we agree, what is on the board, and what is still missing?\"></textarea><div class=\"ds-composer-bar\"><span class=\"ds-composer-seg\" role=\"group\" aria-label=\"Mode\"><button type=\"button\" aria-pressed=\"true\">Ask</button><button type=\"button\" aria-pressed=\"false\">Edit</button></span><span class=\"ds-composer-chip\"><span class=\"ds-composer-dot\" aria-hidden=\"true\"></span>AI is off</span><button class=\"ds-composer-send\" type=\"submit\" disabled><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 19V5M6 11l6-6 6 6\"/></svg><span>Send</span></button></div></form>",
-      "css": ".ds-composer { width: 560px; max-width: 100%; padding: 14px 14px 10px; border: 1px solid var(--line-2, #d3d3db); border-radius: 14px; background: #fff; color: var(--ink, #17171c); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); box-shadow: 0 8px 22px -12px rgb(18 18 28 / .22), 0 1px 2px rgb(18 18 28 / .05); transition: border-color .15s, box-shadow .15s; } .ds-composer:focus-within { border-color: var(--accent-line, #c8ccf6); box-shadow: 0 0 0 3px var(--accent-soft, #eef0fd), 0 8px 22px -12px rgb(18 18 28 / .22); } .ds-composer-text { display: block; width: 100%; padding: 2px 2px 10px; border: 0; outline: none; resize: none; background: transparent; color: inherit; font: 400 15px/1.55 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); caret-color: var(--accent, #4a52cf); } .ds-composer-text::placeholder { color: var(--ink-3, #686873); } .ds-composer-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-composer-seg { display: inline-flex; padding: 2px; border: 1px solid var(--line, #e4e4ea); border-radius: 8px; background: var(--sunk, #f7f7f9); } .ds-composer-seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3, #686873); font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-seg button[aria-pressed='true'] { background: #fff; color: var(--ink, #17171c); box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .08); } .ds-composer-seg button:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 1px; } .ds-composer-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--line, #e4e4ea); border-radius: 7px; background: var(--sunk, #f7f7f9); color: var(--ink-2, #474751); font: 500 12.5px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-composer-dot { width: 7px; height: 7px; border-radius: 50%; background: #9e9ea8; } .ds-composer-send { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--accent, #4a52cf); border-radius: 7px; background: var(--accent, #4a52cf); color: #fff; font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-send:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-composer-send:disabled { opacity: .45; cursor: not-allowed; }"
+      "css": ".ds-composer { width: 560px; max-width: 100%; padding: 14px 14px 10px; border: 1px solid var(--line-2, #d3d3db); border-radius: 14px; background: #fff; color: var(--ink, #17171c); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); box-shadow: 0 8px 22px -12px rgb(18 18 28 / .22), 0 1px 2px rgb(18 18 28 / .05); transition: border-color .15s, box-shadow .15s; } .ds-composer:focus-within { border-color: var(--accent-line, #c8ccf6); box-shadow: 0 0 0 3px var(--accent-soft, #eef0fd), 0 8px 22px -12px rgb(18 18 28 / .22); } .ds-composer-text { display: block; width: 100%; padding: 2px 2px 10px; border: 0; outline: none; resize: none; background: transparent; color: inherit; font: 400 15px/1.55 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); caret-color: var(--accent, #4a52cf); } .ds-composer-text::placeholder { color: var(--ink-3, #62626d); } .ds-composer-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-composer-seg { display: inline-flex; padding: 2px; border: 1px solid var(--line, #e4e4ea); border-radius: 8px; background: var(--sunk, #f6f6f8); } .ds-composer-seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3, #62626d); font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-seg button[aria-pressed='true'] { background: #fff; color: var(--ink, #17171c); box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .08); } .ds-composer-seg button:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 1px; } .ds-composer-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--line, #e4e4ea); border-radius: 7px; background: var(--sunk, #f6f6f8); color: var(--ink-2, #474751); font: 500 12.5px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-composer-dot { width: 7px; height: 7px; border-radius: 50%; background: #9e9ea8; } .ds-composer-send { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--accent, #4a52cf); border-radius: 7px; background: var(--accent, #4a52cf); color: #fff; font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-send:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-composer-send:disabled { opacity: .45; cursor: not-allowed; }"
     },
     {
       "name": "Sidebar Navigation",
@@ -610,7 +740,7 @@
       "refersTo": "nav-item",
       "description": "Section list on the shell; the current item lifts to white with an iris icon.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Sections\"><a href=\"#\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z\"/></svg>Home</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5h7l4.5 4.5V20a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zM13.5 3.5v5h5M9.5 12.5h5M9.5 16h4\"/></svg>Notes</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M9.5 4.5v15M15 4.5v15\"/></svg>Projects</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14zM10 20.5a2 2 0 0 0 4 0\"/></svg>Notifications<span class=\"ds-nav-badge\">1</span></a></nav>",
-      "css": ".ds-nav { display: grid; gap: 1px; width: 216px; padding: 10px; background: var(--shell, #f2f2f5); font: 500 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-nav a { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 7px; color: var(--ink-2, #474751); text-decoration: none; transition: background-color .12s, color .12s; } .ds-nav a svg { width: 16px; height: 16px; flex: none; color: var(--ink-3, #686873); } .ds-nav a:hover { background: var(--hover, #e8e8ed); color: var(--ink, #17171c); } .ds-nav a:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-nav a[aria-current='page'] { background: #fff; color: var(--ink, #17171c); font-weight: 600; box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .06); } .ds-nav a[aria-current='page'] svg { color: var(--accent, #4a52cf); } .ds-nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent, #4a52cf); color: #fff; font-size: 11px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; }"
+      "css": ".ds-nav { display: grid; gap: 1px; width: 216px; padding: 10px; background: var(--shell, #f2f2f5); font: 500 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-nav a { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 7px; color: var(--ink-2, #474751); text-decoration: none; transition: background-color .12s, color .12s; } .ds-nav a svg { width: 16px; height: 16px; flex: none; color: var(--ink-3, #62626d); } .ds-nav a:hover { background: var(--hover, #e8e8ed); color: var(--ink, #17171c); } .ds-nav a:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-nav a[aria-current='page'] { background: #fff; color: var(--ink, #17171c); font-weight: 600; box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .06); } .ds-nav a[aria-current='page'] svg { color: var(--accent, #4a52cf); } .ds-nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent, #4a52cf); color: #fff; font-size: 11px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; }"
     },
     {
       "name": "Citation Chip",
@@ -626,7 +756,7 @@
       "refersTo": "pending-tag",
       "description": "A proposed value awaiting review: dashed amber date chip, the struck-through old value and the Pending review tag.",
       "html": "<div class=\"ds-pending\"><span class=\"ds-pending-date\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec 2026<span class=\"ds-sr\"> (pending review)</span></span><span class=\"ds-pending-was\">was 5 Dec 2026</span><span class=\"ds-pending-tag\">Pending review</span></div>",
-      "css": ".ds-pending { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 400 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-pending-date { display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px dashed var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-pending-date svg { width: 13px; height: 13px; flex: none; } .ds-pending-was { color: var(--ink-3, #686873); font-size: 12px; text-decoration: line-through; } .ds-pending-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 11.5px; font-weight: 650; white-space: nowrap; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }"
+      "css": ".ds-pending { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 400 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-pending-date { display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px dashed var(--pend-line, #e7b95a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8a4f00); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-pending-date svg { width: 13px; height: 13px; flex: none; } .ds-pending-was { color: var(--ink-3, #62626d); font-size: 12px; text-decoration: line-through; } .ds-pending-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #e7b95a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8a4f00); font-size: 11.5px; font-weight: 650; white-space: nowrap; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }"
     },
     {
       "name": "Board Card",
@@ -634,7 +764,7 @@
       "refersTo": "board-card",
       "description": "Issue card in a board column, at rest and with a pending due-date change.",
       "html": "<ul class=\"ds-col\"><li class=\"ds-card\"><div class=\"ds-card-top\"><span class=\"ds-card-key\">NEX-3</span><span class=\"ds-av\" aria-label=\"Will\">W</span></div><a class=\"ds-card-title\" href=\"#\">Record the demo video</a><div class=\"ds-card-meta\"><span class=\"ds-prio ds-prio-medium\" aria-label=\"Medium priority\"><i></i><i></i><i></i></span><span class=\"ds-due\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec</span></div></li><li class=\"ds-card\" data-state=\"pending\"><div class=\"ds-card-top\"><span class=\"ds-card-key\">NEX-1</span><span class=\"ds-av ds-av-hein\" aria-label=\"Hein\">H</span></div><a class=\"ds-card-title\" href=\"#\">Build calendar view</a><div class=\"ds-card-meta\"><span class=\"ds-prio ds-prio-high\" aria-label=\"High priority\"><i></i><i></i><i></i></span><span class=\"ds-due\" data-state=\"pending\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec</span><span class=\"ds-card-tag\">Pending</span><span class=\"ds-card-note\" title=\"Linked to Kickoff › Actions\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10.5 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1M13.5 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1\"/></svg></span></div></li></ul>",
-      "css": ".ds-col { list-style: none; display: grid; gap: 8px; width: 280px; margin: 0; padding: 8px; border: 1px solid var(--line, #e4e4ea); border-radius: 12px; background: var(--sunk, #f7f7f9); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); color: var(--ink, #17171c); } .ds-card { padding: 10px 12px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; box-shadow: 0 1px 2px rgb(18 18 28 / .06); cursor: grab; transition: border-color .12s, box-shadow .12s; } .ds-card:hover { border-color: var(--line-2, #d3d3db); box-shadow: 0 6px 14px -8px rgb(18 18 28 / .24); } .ds-card[data-state='pending'] { border-color: var(--pend-line, #ecc06a); background: #fffcf3; } .ds-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 12px; } .ds-card-key { color: var(--ink-3, #686873); font-weight: 500; font-variant-numeric: tabular-nums; } .ds-av { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: #6a58cf; color: #fff; font-size: 10.5px; font-weight: 700; } .ds-av-hein { background: #0f8574; } .ds-card-title { display: block; margin-bottom: 10px; color: var(--ink, #17171c); font-weight: 550; line-height: 1.4; text-decoration: none; } .ds-card-title:hover { text-decoration: underline; text-decoration-color: var(--line-2, #d3d3db); text-underline-offset: 3px; } .ds-card-title:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 4px; border-radius: 3px; } .ds-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-prio { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 14px; height: 12px; flex: none; } .ds-prio i { width: 3px; border-radius: 1px; background: var(--line-2, #d3d3db); } .ds-prio i:nth-child(1) { height: 5px; } .ds-prio i:nth-child(2) { height: 8px; } .ds-prio i:nth-child(3) { height: 12px; } .ds-prio-medium i:nth-child(-n+2), .ds-prio-high i { background: var(--ink-2, #474751); } .ds-due { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #686873); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-due svg { width: 13px; height: 13px; } .ds-due[data-state='pending'] { padding: 0 5px; border: 1px dashed var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); } .ds-card-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 11.5px; font-weight: 650; } .ds-card-note { display: inline-flex; margin-left: auto; color: var(--ink-3, #686873); } .ds-card-note svg { width: 14px; height: 14px; }"
+      "css": ".ds-col { list-style: none; display: grid; gap: 8px; width: 280px; margin: 0; padding: 8px; border: 1px solid var(--line, #e4e4ea); border-radius: 12px; background: var(--sunk, #f6f6f8); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); color: var(--ink, #17171c); } .ds-card { padding: 10px 12px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; box-shadow: 0 1px 2px rgb(18 18 28 / .06); cursor: grab; transition: border-color .12s, box-shadow .12s; } .ds-card:hover { border-color: var(--line-2, #d3d3db); box-shadow: 0 6px 14px -8px rgb(18 18 28 / .24); } .ds-card[data-state='pending'] { border-color: var(--pend-line, #e7b95a); background: #fffcf3; } .ds-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 12px; } .ds-card-key { color: var(--ink-3, #62626d); font-weight: 500; font-variant-numeric: tabular-nums; } .ds-av { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: #6a58cf; color: #fff; font-size: 10.5px; font-weight: 700; } .ds-av-hein { background: #0f8574; } .ds-card-title { display: block; margin-bottom: 10px; color: var(--ink, #17171c); font-weight: 550; line-height: 1.4; text-decoration: none; } .ds-card-title:hover { text-decoration: underline; text-decoration-color: var(--line-2, #d3d3db); text-underline-offset: 3px; } .ds-card-title:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 4px; border-radius: 3px; } .ds-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-prio { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 14px; height: 12px; flex: none; } .ds-prio i { width: 3px; border-radius: 1px; background: var(--line-2, #d3d3db); } .ds-prio i:nth-child(1) { height: 5px; } .ds-prio i:nth-child(2) { height: 8px; } .ds-prio i:nth-child(3) { height: 12px; } .ds-prio-medium i:nth-child(-n+2), .ds-prio-high i { background: var(--ink-2, #474751); } .ds-due { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #62626d); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-due svg { width: 13px; height: 13px; } .ds-due[data-state='pending'] { padding: 0 5px; border: 1px dashed var(--pend-line, #e7b95a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8a4f00); } .ds-card-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #e7b95a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8a4f00); font-size: 11.5px; font-weight: 650; } .ds-card-note { display: inline-flex; margin-left: auto; color: var(--ink-3, #62626d); } .ds-card-note svg { width: 14px; height: 14px; }"
     },
     {
       "name": "Status Rings",
@@ -654,7 +784,7 @@
   ],
   "narrative": {
     "northStar": "The Decision Desk",
-    "overview": "Nexus is a desk for a small team's meetings and work. A cool zinc-grey shell holds one floating white work panel, and inside it a note and the issue it mentions sit one click apart. Everything at rest is quiet: hairline borders, small radii, the platform's own type and a single iris-blue accent for what the user can act on or where they are. The one warm colour is amber, and it is lit only while an agent change waits for the user to accept or reject it. When the review is finished, the amber goes out.\n\nThis is a dense working surface in the manner of Linear for the board, Notion or Obsidian for notes and Temporal for the calendar and shell, borrowing their behaviours and none of their branding. Density comes from 13px controls and 14px text on a fixed ramp; calm comes from tonal layering and restraint rather than decoration. The AI is treated like any other part of the workspace: an answer sits on the same white panel, in the same type, with its citations as small iris chips that open the exact heading or issue. Nexus refuses novelty chrome and dark \"AI\" styling.\n\nThis system is a proposal for Will first and then Hein, who owns Nexus's final visual identity, and it can change until both agree. It is recorded from the static wireframe in `wireframe/` (`index.html`, `wireframe.css` and `wireframe.js`), whose `:root` custom properties are the source of the tokens above. It has not yet been applied to the real app in `apps/`. A few values are literals in the stylesheet rather than custom properties (Amber Paper, Lit Iris, Pale Iris and the Review Night set); they are recorded as tokens so the app can adopt them as such. Dark mode is not designed.",
+    "overview": "Nexus is a desk for a small team's meetings and work. A cool zinc-grey shell holds one floating white work panel, and inside it a note and the issue it mentions sit one click apart. Everything at rest is quiet: hairline borders, small radii, the platform's own type and a single iris-blue accent for what the user can act on or where they are. The one warm colour is amber, and it is lit only while an agent change waits for the user to accept or reject it. When the review is finished, the amber goes out.\n\nThis is a dense working surface in the manner of Linear for the board, Notion or Obsidian for notes and Temporal for the calendar and shell, borrowing their behaviours and none of their branding. Density comes from 13px controls and 14px text on a fixed ramp; calm comes from tonal layering and restraint rather than decoration. The AI is treated like any other part of the workspace: an answer sits on the same white panel, in the same type, with its citations as small iris chips that open the exact heading or issue. Nexus refuses novelty chrome and dark \"AI\" styling.\n\nThis system is a proposal for Will first and then Hein, who owns Nexus's final visual identity, and it can change until both agree. Will approved its light direction on 25 November 2026 (`5ce82b4`, DEC-026, DEC-028). It is recorded from the static wireframe in `wireframe/` (`index.html`, `wireframe.css`, `wireframe.js` and `theme-boot.js`). The values above are the default light palette, Porcelain; the six palettes and their tokens are listed under Themes and palettes. Since run 6 the working app in `apps/` uses the same palettes and the same light and dark rules, while its layout and components remain placeholders for Hein. No colour is a literal outside the token section of either stylesheet.",
     "keyCharacteristics": [
       "A cool zinc shell with one floating white work panel and 1px hairline borders.",
       "One accent, iris, for actions, selection, links and citations.",
@@ -707,21 +837,26 @@
       },
       {
         "name": "The Night Overlay Rule",
-        "body": "Dark surfaces are for things that float above the work and then leave: the review bar in Review Night, and the tooltip and toast in Graphite. The work panel and everything on it stay light.",
+        "body": "In the light themes, dark surfaces are for things that float above the work and then leave: the review bar in Review Night, and the tooltip and toast in Graphite. The work panel and everything on it stay light. In the dark themes the same things are a step lighter than the panel, with a Strong Hairline edge, so they still read as floating.",
         "section": "elevation"
       },
       {
         "name": "The One Glow Rule",
         "body": "The glow is the only authored animation. Everything else is a state change of 120–250ms on the ease-out curve.",
         "section": "components"
+      },
+      {
+        "name": "The Every Palette Rule",
+        "section": "colors",
+        "body": "Every palette defines every semantic token and passes the computed contrast check: 4.5:1 for text, 3:1 for control boundaries, focus and status marks. Amber means awaiting review in all six."
       }
     ],
     "dos": [
       "**Do** mark every pending value in three ways: an Amber Wash fill with an Amber Hairline border, a \"Pending review\" or \"Pending\" tag, and screen-reader text. Show the value it replaces beside it, struck through.",
       "**Do** show one pending change everywhere its item appears (the note, the issue, the board card and the calendar entry), so the user can decide where it applies.",
       "**Do** pair each status colour with its ring shape (empty, half-filled, filled with a check), so status reads without colour.",
-      "**Do** separate with a 1px Hairline (#e4e4ea) or the Well (#f7f7f9) before using a shadow.",
-      "**Do** give every interactive element a 2px Iris outline at a 2px offset on focus, and Pale Iris (#aab0ff) on the review bar.",
+      "**Do** separate with a 1px Hairline (#e4e4ea) or the Well (#f6f6f8) before using a shadow.",
+      "**Do** give every interactive element a 2px outline in the palette's focus colour at a 2px offset (Iris in Porcelain, the light accent text colour in the dark palettes), and Pale Iris (#aab0ff) on the light review bar.",
       "**Do** keep notes and issue descriptions to a 68ch measure, and check every view at 390px.",
       "**Do** draw icons as SVG on a 24px grid with a 1.75 stroke and round caps and joins."
     ],
@@ -733,7 +868,7 @@
       "**Don't** fill cards, columns or rows with a status colour; status lives in the ring.",
       "**Don't** use monospace except for Markdown source, code and file paths.",
       "**Don't** put a label or eyebrow above a heading, or use Unicode glyphs or emoji as icons.",
-      "**Don't** make the work panel dark or derive a dark theme by inverting these tokens; dark mode is not designed yet."
+      "**Don't** derive a palette by inverting another, or add one without every semantic token and a passing contrast check (4.5:1 for text, 3:1 for control boundaries and marks)."
     ]
   }
 }

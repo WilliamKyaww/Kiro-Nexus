@@ -8,28 +8,39 @@ colors:
   accent-line: "#c8ccf6"
   accent-on-dark: "#5058d8"
   focus-on-dark: "#aab0ff"
-  pend: "#8f5200"
+  pend: "#8a4f00"
   pend-soft: "#fff4d8"
-  pend-line: "#ecc06a"
+  pend-line: "#e7b95a"
   pend-wash: "#fffcf3"
   st-todo: "#8a8a95"
   st-progress: "#c96f00"
   st-done: "#2b9a68"
-  bad: "#be3220"
+  bad: "#b8301e"
   teal: "#0f8f80"
   violet: "#7552cc"
   ink: "#17171c"
   ink-2: "#474751"
-  ink-3: "#686873"
+  ink-3: "#62626d"
+  control-line: "#8a8a96"
   line-2: "#d3d3db"
   line: "#e4e4ea"
   hover: "#e8e8ed"
   shell: "#f2f2f5"
-  sunk: "#f7f7f9"
+  sunk: "#f6f6f8"
   panel: "#ffffff"
   review-night: "#1b1b21"
   review-control: "#2b2b33"
   review-control-line: "#3b3b45"
+  graphite-shell: "#0e0f11"
+  graphite-panel: "#18191c"
+  graphite-raised: "#212226"
+  graphite-line-2: "#373940"
+  graphite-ink: "#ededf0"
+  graphite-ink-3: "#9597a2"
+  graphite-accent: "#5a61d6"
+  graphite-accent-ink: "#a9aeff"
+  graphite-pend: "#f2b64e"
+  graphite-pend-soft: "#2e2412"
 typography:
   display:
     fontFamily: "Segoe UI Variable Display, Segoe UI, system-ui, -apple-system, Helvetica Neue, Arial, sans-serif"
@@ -252,7 +263,7 @@ Nexus is a desk for a small team's meetings and work. A cool zinc-grey shell hol
 
 This is a dense working surface in the manner of Linear for the board, Notion or Obsidian for notes and Temporal for the calendar and shell, borrowing their behaviours and none of their branding. Density comes from 13px controls and 14px text on a fixed ramp; calm comes from tonal layering and restraint rather than decoration. The AI is treated like any other part of the workspace: an answer sits on the same white panel, in the same type, with its citations as small iris chips that open the exact heading or issue. Nexus refuses novelty chrome and dark "AI" styling.
 
-This system is a proposal for Will first and then Hein, who owns Nexus's final visual identity, and it can change until both agree. It is recorded from the static wireframe in `wireframe/` (`index.html`, `wireframe.css` and `wireframe.js`), whose `:root` custom properties are the source of the tokens above. It has not yet been applied to the real app in `apps/`. A few values are literals in the stylesheet rather than custom properties (Amber Paper, Lit Iris, Pale Iris and the Review Night set); they are recorded as tokens so the app can adopt them as such. Dark mode is not designed.
+This system is a proposal for Will first and then Hein, who owns Nexus's final visual identity, and it can change until both agree. Will approved its light direction on 25 November 2026 (`5ce82b4`, DEC-026, DEC-028). It is recorded from the static wireframe in `wireframe/` (`index.html`, `wireframe.css`, `wireframe.js` and `theme-boot.js`). The values above are the default light palette, Porcelain; the six palettes and their tokens are listed under Themes and palettes. Since run 6 the working app in `apps/` uses the same palettes and the same light and dark rules, while its layout and components remain placeholders for Hein. No colour is a literal outside the token section of either stylesheet.
 
 **Key Characteristics:**
 - A cool zinc shell with one floating white work panel and 1px hairline borders.
@@ -272,38 +283,38 @@ A restrained palette of cool zinc neutrals with one iris accent, one reserved am
 - **Deep Iris** (#3a41b0): text links, wikilinks, citation text, the current note in the file tree and the hover state of a primary button.
 - **Iris Mist** (#eef0fd): fills for citations, the Ask tag, the current file, the selected palette result, calendar issue entries, a board column under a drag and the composer's focus ring.
 - **Iris Hairline** (#c8ccf6): borders of citations and the focused composer, link underlines at rest and the board drop target's border.
-- **Lit Iris** (#5058d8): Accept and Send correction on the dark review bar, where Iris would sit too dark. A stylesheet literal.
-- **Pale Iris** (#aab0ff): the focus outline and caret on the review bar. A stylesheet literal.
+- **Lit Iris** (#5058d8): Accept and Send correction on the dark review bar, where Iris would sit too dark. Token `--rb-accept`; Linen and Mist derive it from their accent.
+- **Pale Iris** (#aab0ff): the focus outline and caret on the review bar. Token `--rb-focus`; Linen and Mist derive it from their accent.
 
 ### Secondary
 Review Amber is a reserved state, not a second accent.
-- **Review Amber** (#8f5200): text of pending tags and pending values, the fill of a checked box whose change is pending, the reduced-motion outline and the pending dot in the phone calendar. 5.7:1 on Amber Wash.
+- **Review Amber** (#8a4f00): text of pending tags and pending values, the fill of a checked box whose change is pending, the reduced-motion outline and the pending dot in the phone calendar. 6.0:1 on Amber Wash.
 - **Amber Wash** (#fff4d8): the fill of pending tags, pending issue properties, pending checklist rows and pending calendar entries.
-- **Amber Hairline** (#ecc06a): the border of pending items. It is solid on rows, cards and tags, and dashed on a pending date chip and on the replaced value.
-- **Amber Paper** (#fffcf3): the lighter fill of a whole pending board card or linked-issue card, so a large surface is marked without shouting. A stylesheet literal.
+- **Amber Hairline** (#e7b95a): the border of pending items. It is solid on rows, cards and tags, and dashed on a pending date chip and on the replaced value.
+- **Amber Paper** (#fffcf3): the lighter fill of a whole pending board card or linked-issue card, so a large surface is marked without shouting. Token `--pend-wash`, mixed from Amber Wash and the panel.
 
 ### Tertiary
 Status and category colours, used only in small marks.
 - **Pebble** (#8a8a95): the To do ring. 3.4:1 on white.
 - **Ember** (#c96f00): the half-filled In progress ring. At least 3:1 on white and on Amber Wash.
 - **Fern** (#2b9a68): the filled Done ring, the "Recorded facts" marker in an answer and a done issue's dot in the phone calendar.
-- **Brick** (#be3220): late due dates, deadlines in the calendar and the "Discrepancies" marker in an answer. 5.7:1 on white.
+- **Brick** (#b8301e): late due dates, deadlines in the calendar and the "Discrepancies" marker in an answer. 6.0:1 on white.
 - **Lagoon** (#0f8f80): calendar events, drawn as a round dot.
 - **Heather** (#7552cc): project identity, as the project tile and the project dot in the sidebar.
 
 ### Neutral
 - **Graphite** (#17171c): primary text, the selected tab's underline, and the surface of the tooltip and toast.
 - **Slate** (#474751): secondary text, sidebar labels and filled priority bars.
-- **Zinc** (#686873): meta text, resting icons, placeholders and pane labels. 5.5:1 on white and 4.9:1 on Shell.
+- **Zinc** (#62626d): meta text, resting icons, placeholders and pane labels. 6.0:1 on white and 5.4:1 on Shell.
 - **Strong Hairline** (#d3d3db): control borders, empty priority bars, keycaps and dashed placeholders.
 - **Hairline** (#e4e4ea): every divider and the border of the panel, cards, columns, tables and boxed lists.
 - **Hover Grey** (#e8e8ed): the hover fill of sidebar items and icon buttons.
 - **Shell** (#f2f2f5): the app background behind the panel, the sidebar, and text on the review bar.
-- **Well** (#f7f7f9): board columns, chips, code, the Markdown source, out-of-month days and row hover inside the panel.
+- **Well** (#f6f6f8): board columns, chips, code, the Markdown source, out-of-month days and row hover inside the panel.
 - **Panel White** (#ffffff): the work panel, cards, controls and the composer.
-- **Review Night** (#1b1b21): the review bar. A stylesheet literal.
-- **Night Control** (#2b2b33): Previous, Next, Reject, Done and Skip on the review bar. A stylesheet literal.
-- **Night Hairline** (#3b3b45): the borders of those buttons. A stylesheet literal.
+- **Review Night** (#1b1b21): the review bar in the light themes. Token `--rb-bg`.
+- **Night Control** (#2b2b33): Previous, Next, Reject, Done and Skip on the review bar in the light themes. Token `--rb-btn`.
+- **Night Hairline** (#3b3b45): the borders of those buttons. Token `--rb-btn-line`.
 
 ### Named Rules
 **The Amber Lamp Rule.** Amber is lit only while a change awaits review. It never marks a warning, a priority, a highlight, a hover or the brand. When the last change is accepted or rejected, no amber remains on the screen.
@@ -311,6 +322,25 @@ Status and category colours, used only in small marks.
 **The One Iris Rule.** Iris is the only accent. It marks what acts (primary buttons, the Ask tag), where the user is (the current item, today, the selected result) and what opens elsewhere (links, citations, calendar issue entries). Nothing is iris for decoration.
 
 **The Glyph-First Status Rule.** Pebble, Ember and Fern appear only inside small drawn marks: the status ring, a calendar dot or an answer's section marker. They never fill a card, tint a column or colour text. This is what keeps Ember from reading as Review Amber, because the two share a hue.
+
+### Themes and palettes
+Added in run 6 (PRD-081, DEC-028). The user chooses Light, Dark or Match system in Settings → Appearance, or flips between light and dark with the Dark mode switch on any screen. Each theme remembers its own palette. `<html>` carries `data-theme` and `data-palette`, and every colour is a semantic token defined per pair, so a palette card's preview is simply an element with its own pair.
+
+| Theme | Palette | Shell | Panel | Raised | Text | Accent | Accent text |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Light | **Porcelain** (default) | #f2f2f5 | #ffffff | #ffffff | #17171c | #4a52cf iris | #3a41b0 |
+| Light | **Linen** | #f2efe9 | #fffdf9 | #fffdf9 | #1f1b15 | #1d6a73 deep teal | #165860 |
+| Light | **Mist** | #ecf0f5 | #ffffff | #ffffff | #132030 | #2356c4 cobalt | #1c459e |
+| Dark | **Graphite** (default) | #0e0f11 | #18191c | #212226 | #ededf0 | #5a61d6 soft iris | #a9aeff |
+| Dark | **Midnight** | #0a0f17 | #121924 | #19212e | #e6edf7 | #2f6bd8 sky blue | #8bb6ff |
+| Dark | **Plum** | #110e15 | #1a1620 | #221d2a | #f0ebf5 | #7f4fcf lilac | #cdaeff |
+
+- **Dark layering.** Surfaces step up in lightness from the shell to the sidebar, the panel and raised things (composer, cards, controls, popovers), each about one step apart, with hairlines doing most of the separating. Shadows deepen to black at higher opacity, and the panel never goes pure black.
+- **Reading colour.** Dark text is off-white (#ededf0 in Graphite). On the Graphite panel, secondary text (#b6b8c0) is 8.9:1 and tertiary text (#9597a2) is 6.0:1.
+- **Amber in the dark.** Review Amber becomes a light amber (#f2b64e) on a dark amber wash (#2e2412), and it still means only "awaiting review". Citations stay in the accent, accepted in green and destructive in red, so the four states remain distinct in every palette.
+- **Review bar.** Review Night in the light themes; in the dark themes, the raised surface with a Strong Hairline edge and the palette's own pills.
+- **Contrast floor.** Every palette passes 4.5:1 for normal text on each surface, 3:1 for control boundaries, focus and status marks, and 4.5:1 for white on the accent and its hover. The browser and wireframe tests compute this from the real stylesheets.
+- **Native parts.** `color-scheme` follows the theme, so form controls, scrollbars and dialogs match. Selection, caret and focus colours come from the palette.
 
 ## Typography
 
@@ -366,7 +396,7 @@ Depth is tonal first and hairline second: the Shell lies behind the Panel White 
 ### Named Rules
 **The Hairline First Rule.** Separate with a Hairline border or a step to the Well before reaching for a shadow. A shadow means the thing floats or moves.
 
-**The Night Overlay Rule.** Dark surfaces are for things that float above the work and then leave: the review bar in Review Night, and the tooltip and toast in Graphite. The work panel and everything on it stay light.
+**The Night Overlay Rule.** In the light themes, dark surfaces are for things that float above the work and then leave: the review bar in Review Night, and the tooltip and toast in Graphite. The work panel and everything on it stay light. In the dark themes the same things are a step lighter than the panel, with a Strong Hairline edge, so they still read as floating.
 
 ## Shapes
 
@@ -414,14 +444,14 @@ Squared, quiet and compact.
 
 ### Navigation
 - **Sidebar:** it sits on the Shell, with the workspace switcher at the top (white, a Hairline border, 9px corners and Rise). Items are 32px, with 7px corners, a 16px Zinc icon 10px from a Slate label at 500. Hover fills Hover Grey and turns the text Graphite. The current item becomes Panel White with a Hairline ring and Rise, its label goes to 600 and its icon turns Iris. Group labels are 12px at 600 in Zinc, and Settings is pinned to the bottom.
-- **Top bar:** the brand (a 24px Iris tile with two linked white rings, and the name at 15px and 650), a search trigger up to 520px wide, and at the right the data dot and New.
+- **Top bar:** the brand (a 24px Iris tile with two linked white rings, and the name at 15px and 650), a search trigger up to 520px wide, and at the right the Dark mode switch, the data dot and New. At phone width the switch keeps only its icon and knob, and its name stays for assistive technology.
 - **Tabs:** 34px, 13px Zinc labels at 550; the selected tab is Graphite with a 2px Graphite underline on a Hairline rule.
 - **Breadcrumbs:** 13px Zinc with 14px chevrons; the current segment is Graphite at 550.
 - **Phone:** the menu button slides the sidebar in as a 268px drawer with Pop over the Scrim, in 220ms on the ease-out curve.
 
 ### Review Bar and Pending Marker
 The signature of Nexus: one floating bar for deciding, and the same amber marker wherever the change applies.
-- **Review bar:** Review Night, 14px corners and Pop, centred over the panel, up to 860px wide and 10px above the bottom edge. On the left is "Change 1 of 2", then where and what changed, a state pill and how many changes still await review. On the right are Previous, Next, Reject and Accept; Done replaces Reject and Accept once every change is settled. Reject opens a feedback row that asks what was wrong or what should be kept, with Send correction and Skip.
+- **Review bar:** Review Night (the raised surface with a Strong Hairline edge in the dark themes), 14px corners and Pop, centred over the panel, up to 860px wide and 10px above the bottom edge. On the left is "Change 1 of 2", then where and what changed, a state pill and how many changes still await review. On the right are Previous, Next, Reject and Accept; Done replaces Reject and Accept once every change is settled. Reject opens a feedback row that asks what was wrong or what should be kept, with Send correction and Skip.
 - **State pills on the bar:** Pending in dark amber with a pale amber label, Accepted in dark green with a pale green label, and Rejected in dark red with a pale red label, all at 11.5px and 650 with 5px corners.
 - **Pending marker:** on the page, a pending item has an Amber Wash fill, an Amber Hairline border and a 20px "Pending review" tag. A pending date chip uses a dashed Amber Hairline, and the value it replaces sits beside it, struck through in Zinc ("was 5 Dec 2026"). Screen readers hear "pending review". The same change is marked on the note, the issue, the board card and the calendar entry.
 - **The glow:** when the bar moves to a change, its target glows once. An amber outline 5px out and a pale amber fill fade to nothing over 1.9s on the ease-out curve, leaving the steady pending marker. Under reduced motion it is a static 2px Review Amber outline at a 3px offset, and every transition is off.
@@ -438,8 +468,8 @@ The signature of Nexus: one floating bar for deciding, and the same amber marker
 - **Do** mark every pending value in three ways: an Amber Wash fill with an Amber Hairline border, a "Pending review" or "Pending" tag, and screen-reader text. Show the value it replaces beside it, struck through.
 - **Do** show one pending change everywhere its item appears (the note, the issue, the board card and the calendar entry), so the user can decide where it applies.
 - **Do** pair each status colour with its ring shape (empty, half-filled, filled with a check), so status reads without colour.
-- **Do** separate with a 1px Hairline (#e4e4ea) or the Well (#f7f7f9) before using a shadow.
-- **Do** give every interactive element a 2px Iris outline at a 2px offset on focus, and Pale Iris (#aab0ff) on the review bar.
+- **Do** separate with a 1px Hairline (#e4e4ea) or the Well (#f6f6f8) before using a shadow.
+- **Do** give every interactive element a 2px outline in the palette's focus colour at a 2px offset (Iris in Porcelain, the light accent text colour in the dark palettes), and Pale Iris (#aab0ff) on the light review bar.
 - **Do** keep notes and issue descriptions to a 68ch measure, and check every view at 390px.
 - **Do** draw icons as SVG on a 24px grid with a 1.75 stroke and round caps and joins.
 
@@ -451,4 +481,4 @@ The signature of Nexus: one floating bar for deciding, and the same amber marker
 - **Don't** fill cards, columns or rows with a status colour; status lives in the ring.
 - **Don't** use monospace except for Markdown source, code and file paths.
 - **Don't** put a label or eyebrow above a heading, or use Unicode glyphs or emoji as icons.
-- **Don't** make the work panel dark or derive a dark theme by inverting these tokens; dark mode is not designed yet.
+- **Don't** derive a palette by inverting another, or add one without every semantic token and a passing contrast check (4.5:1 for text, 3:1 for control boundaries and marks).

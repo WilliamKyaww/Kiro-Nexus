@@ -1,6 +1,7 @@
 // Slice extensions registered by main.ts.
 import type { FastifyInstance } from "fastify";
 import type { RouteContext } from "./app";
+import { appearanceRoutes } from "./appearance";
 import { askRoutes, settleInterruptedRuns } from "./ask/routes";
 import { installNotes, notesRoutes } from "./notes";
 import { installProviders, providerRoutes } from "./providers";
@@ -9,7 +10,7 @@ import { installReminders, reminderRoutes } from "./scheduler";
 import type { AppState } from "./state";
 
 export function extraPlugins(state: AppState): Array<(app: FastifyInstance, ctx: RouteContext) => void> {
-  return [reviewRoutes(state), notesRoutes(state), providerRoutes(state), askRoutes(state), reminderRoutes(state)];
+  return [reviewRoutes(state), notesRoutes(state), providerRoutes(state), askRoutes(state), reminderRoutes(state), appearanceRoutes(state)];
 }
 
 /**

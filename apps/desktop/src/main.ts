@@ -1,6 +1,6 @@
 // Electron main: starts the local service in a utilityProcess, mints a launch
 // code and loads the same web UI in a sandboxed window (architecture 4.2).
-import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, Notification, safeStorage, shell, utilityProcess, type IpcMainInvokeEvent, type UtilityProcess } from "electron";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -151,6 +151,17 @@ async function launchUrl(port: number): Promise<string> {
   return `http://127.0.0.1:${port}/#launch=${launchCode}`;
 }
 
+/**
+ * The window's background before the page paints: the canvas of the stored appearance (run 6),
+ * so a dark profile never flashes white. The page itself sets the full theme.
+ */
+const CANVAS: Record<string, string> = { porcelain: "#f2f2f5", linen: "#f2efe9", mist: "#ecf0f5", graphite: "#0e0f11", midnight: "#0a0f17", plum: "#110e15" };
+function windowBackground(): string {
+  let a: { mode?: string; light?: string; dark?: string } = {};
+  try { a = JSON.parse(readFileSync(join(profileDir, "appearance.json"), "utf8")); } catch { /* no preference yet: Match system */ }
+  const dark = a.mode === "dark" || ((a.mode ?? "system") === "system" && nativeTheme.shouldUseDarkColors);
+  return dark ? CANVAS[a.dark ?? ""] ?? CANVAS.graphite! : CANVAS[a.light ?? ""] ?? CANVAS.porcelain!;
+}
 async function createWindow(): Promise<void> {
   const port = servicePort ?? (servicePort = await startService());
   const origin = `http://127.0.0.1:${port}`;
@@ -159,6 +170,7 @@ async function createWindow(): Promise<void> {
     height: 860,
     title: "Nexus",
     show: false,
+    backgroundColor: windowBackground(),
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       sandbox: true,

@@ -150,3 +150,4 @@ export interface ApiErrorBody { error: { code: string; message: string; details?
 export * from "./review";
 export * from "./time";
 export * from "./reminders";
+export * from "./appearance";

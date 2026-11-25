@@ -577,7 +577,9 @@ status control.
 ## DEC-026: The wireframe proposes the category-standard look, with Impeccable's records at the repo root
 - **Status:** Proposed (Will chose the direction on 2026-11-25; Hein has not
   seen it). Adoption by the app needs Will's go-ahead and Hein's agreement,
-  because Hein owns the final visual identity.
+  because Hein owns the final visual identity. **Update (run 6):** Will approved
+  the light direction and authorised its colours and theme controls in the app
+  (DEC-028). Hein's agreement on the final identity is still pending.
 **Decision.**
 - **Look.** The wireframe uses the category standard: a cool grey shell with
   a floating white panel, one iris accent, amber only for changes awaiting
@@ -629,3 +631,38 @@ status control.
 - *Require both neighbours to match.* Any edit to an adjacent line would then turn a
   reversal into a conflict.
 - *Treat an empty log as new.* It risks repeating deliveries, which DEC-009 forbids.
+
+## DEC-028: Light and dark appearance, kept in the local profile
+- **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 2, under Will's overnight
+  authorisation; awaiting human review). Adds PRD-081. Spec: `.kiro/specs/appearance/`.
+  Will approved the light direction of the wireframe at `5ce82b4` on 25 November 2026 and
+  authorised its colours and the theme controls in the working app. Hein keeps the final
+  overall identity, the calendar and agenda, and card ordering (DEC-026).
+**Decision.**
+- **Choices.** Light, Dark or Match system, with Match system for a fresh profile. Each
+  theme has three original palettes and remembers its own: Porcelain (the approved look,
+  the light default), Linen and Mist; Graphite (the dark default, a neutral graphite after
+  Linear and Open WebUI), Midnight and Plum.
+- **Tokens.** `<html>` carries `data-theme` and `data-palette`, and every colour is a
+  semantic custom property per pair, in the app and in the wireframe. Four light values
+  moved slightly so text passes 4.5:1 on every surface, hover included: Zinc to #62626d,
+  Review Amber to #8a4f00, Brick to #b8301e and the Well to #f6f6f8.
+- **Storage.** The app keeps `appearance.json` in the local profile, so the browser and
+  desktop routes share it and a new port keeps it. The service writes the preference into
+  the app shell's `<html>`, and the external `/theme-boot.js` sets the theme before the
+  first paint (the CSP allows no inline script). Electron opens its window on the stored
+  canvas colour. The wireframe has no service and uses `localStorage`.
+- **Quick switch.** A switch named "Dark mode" shows the theme on screen. From Match system
+  it chooses the opposite theme as an explicit mode, so one press always changes what the
+  user sees.
+- **Review bar.** It stays Review Night over the light themes. In the dark themes it is the
+  raised surface with a visible edge, because a darker strip would sink into the panel.
+**Alternatives.**
+- *`localStorage` in the app.* It is tied to the origin, so a service on another port
+  would forget it, and the browser and Electron would differ.
+- *Per workspace.* Appearance belongs to the person and the computer. Switching workspaces
+  would change the theme.
+- *A three-state switch (light, dark, system).* One press would not always change what is
+  shown.
+- *Inverting the light tokens for dark.* It breaks the contrast floor and the meaning of
+  amber.

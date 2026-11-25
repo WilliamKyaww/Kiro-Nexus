@@ -503,6 +503,33 @@ open).
       the journal);
     - screenshots at 1360 × 900 and 390 × 844.
 
+### Run 6: run-5 repairs and light and dark appearance (verified by Kiro, 2026-11-25; no human review yet)
+
+- **Run-5 review repairs** (`e2dd950`, DEC-027). All thirteen findings from Astra 6.2's
+  run-5 review are repaired, each with a test that failed first. The record is
+  `docs/reviews/2026-11-25-run5-review.md`.
+- **Light and dark appearance** (DEC-028, PRD-081). It works with AI off, in the browser
+  and in Electron.
+  - A **Dark mode** switch sits in the side bar on every screen. It works by keyboard,
+    keeps focus, and says On or Off. Above 760 px the side bar stays in view on long
+    pages; at 390 px the switch is at the top of each page.
+  - **Settings → Appearance** offers Light, Dark and Match system, and three palettes for
+    each theme with a small preview each. The current one says "Selected" with a tick. A
+    choice applies at once.
+  - Match system follows the computer's setting while it is selected, without a reload.
+  - The choice is kept in the local profile. It survives navigation, a reload, a
+    restart on another port and a workspace switch, and the first paint already uses it,
+    in Electron too.
+  - Switching keeps a note draft, the conversation and the position in a review.
+  - Every palette passes 4.5:1 for text on each surface and 3:1 for control edges and
+    focus, computed from the real stylesheet.
+  - The wireframe has the same palettes, a switch in its top bar and the same Settings
+    section, with its choice in the browser's storage.
+  - Evidence: `appearance.spec.ts` (8 tests plus a screenshot run),
+    `appearance-conversation.spec.ts` (the provider double, not AI),
+    `wireframe-appearance.spec.ts` (3 tests), `appearance.test.ts` (6 tests) and
+    screenshots of both themes at desktop and 390 px.
+
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,

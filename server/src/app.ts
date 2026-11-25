@@ -1,5 +1,6 @@
 // HTTP surface (architecture 4.1, DEC-011).
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
@@ -9,6 +10,7 @@ import {
   CreateIssueRequest, CreateNoteRequest, CreateProjectRequest, OpenWorkspaceRequest, SampleWorkspaceRequest,
   SaveNoteRequest, SessionRequest, UpdateIssueRequest, type WorkspaceView,
 } from "@nexus/schema";
+import { injectAppearance, readAppearance } from "./appearance";
 import { NexusError } from "./errors";
 import { SessionManager, bearer } from "./security/session";
 import type { AppState } from "./state";
@@ -210,12 +212,14 @@ export function createApp(options: AppOptions): FastifyInstance {
   if (options.webDist && indexFile && existsSync(indexFile)) {
     app.register(fastifyStatic, { root: options.webDist, prefix: "/", index: false, wildcard: false, decorateReply: true });
   }
-  app.setNotFoundHandler((request, reply: FastifyReply) => {
+  app.setNotFoundHandler(async (request, reply: FastifyReply) => {
     if (request.method !== "GET" || request.url.startsWith("/api/")) {
       return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Not found." } });
     }
     if (!indexFile || !existsSync(indexFile)) return reply.code(503).type("text/plain").send("The Nexus UI has not been built. Run: npm run build");
-    return reply.type("text/html; charset=utf-8").sendFile("index.html");
+    // The stored appearance rides on <html>, so the first paint already has the right theme (run 6).
+    const html = injectAppearance(await readFile(indexFile, "utf8"), await readAppearance(options.state.profileDir));
+    return reply.type("text/html; charset=utf-8").header("cache-control", "no-store").send(html);
   });
 
   return app;

@@ -1,7 +1,7 @@
 # Nexus PRD: architecture
 
 - **Status:** Approved by Will at `7b775cd` (2026-11-24); amendments 1-4 applied (DEC-011 to DEC-014)
-- **Last updated:** 2026-11-24
+- **Last updated:** 2026-11-25 (appearance preference in the profile, DEC-028)
 - **Traces to:** `structure.md` (PRD-xxx); intake R-*/D-*; decisions
   DEC-005 to DEC-014.
 
@@ -84,6 +84,7 @@ Each package owns its unit tests beside the source (`*.test.ts`).
 | API keys (desktop) | `%APPDATA%\Nexus\secrets.bin` | Electron main | Encrypted with `safeStorage` (DPAPI) |
 | API keys (browser) | Service memory only | Service | Cleared when the service stops |
 | Recent workspaces | `%APPDATA%\Nexus\recent.json` | Service | Paths only |
+| Appearance | `%APPDATA%\Nexus\appearance.json` (the local profile) | Service | Mode and the light and dark palettes; no workspace data. The service writes it into the app shell's `<html>` so the first paint is themed (PRD-081, DEC-028) |
 
 Everything under `.nexus/` except `lock` and `state/` is meaningful user
 data; documenting it is part of B1 (`docs/data-format.md`).
@@ -147,6 +148,7 @@ The session model below implements amendment 1 (DEC-011).
 | Agent | `POST /conversations`, `POST /conversations/{id}/messages` (`mode: ask|edit`), `GET /conversations` |
 | Review | `GET /reviews?state=pending`, `POST /changes/{id}/accept`, `POST /changes/{id}/reject`, `POST /changes/{id}/feedback`, `POST /changes/{id}/resolve-conflict` |
 | Providers | `GET/POST/DELETE /providers`, `POST /providers/{id}/test`, `PUT /providers/{id}/session-key` (browser only) |
+| Appearance | `GET/PUT /appearance` (profile preference; publishes `appearance.changed`) |
 | Events | `GET /events` (SSE): `file.changed`, `review.updated`, `notification`, `run.progress` |
 
 Writes carry a base revision; a stale write returns `409 REVISION_MISMATCH`

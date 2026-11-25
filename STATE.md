@@ -1,12 +1,12 @@
 # State
 
-- **Date updated:** 2026-11-25 (wireframe overhaul delivered as a design
-  proposal; run 5 delivered on 2026-11-24)
-- **Active phase:** none authorised. Run 5 is used up, and its review relay
-  is ready for Will to send. Slice C's live check (task 5) is still waiting
-  for Will's free key.
-- **Last spec:** `.kiro/specs/reminders/`. Tasks 1 to 5 are done. Task 6
-  (event writing and click-through on a real event) is Hein's.
+- **Date updated:** 2026-11-25 (overnight run 6: stages 1 and 2 delivered;
+  stage 3, the J7 correction loop, is next)
+- **Active phase:** overnight run 6, stage 3. Slice C's live check (task 5)
+  is still waiting for Will's free key.
+- **Last spec:** `.kiro/specs/appearance/`. Tasks 1 to 7 are done.
+  `.kiro/specs/reminders/` task 6 (event writing and click-through on a real
+  event) is still Hein's.
 - **Also touched in run 5:**
   - `.kiro/specs/ask-readonly/` (task 10);
   - `.kiro/specs/board-calendar/` (task 5);
@@ -268,7 +268,8 @@ code):**
 
 | Stage | Commit | Evidence |
 | --- | --- | --- |
-| 1. R5-1 to R5-13 repaired; E2E portable to the Kiro IDE (DEC-027) | (this commit) | `docs/reviews/2026-11-25-run5-review.md`. Every new test failed on the unrepaired code first. 267 of 267 unit tests (37 files), 45 of 45 E2E, and the Electron specs pass 7 of 7 with `ELECTRON_RUN_AS_NODE=1` |
+| 1. R5-1 to R5-13 repaired; E2E portable to the Kiro IDE (DEC-027) | `e2dd950` | `docs/reviews/2026-11-25-run5-review.md`. Every new test failed on the unrepaired code first. 267 of 267 unit tests (37 files), 45 of 45 E2E, and the Electron specs pass 7 of 7 with `ELECTRON_RUN_AS_NODE=1` |
+| 2. Light and dark appearance in the app and the wireframe (DEC-028, PRD-081) | (this commit) | `.kiro/specs/appearance/tasks.md`. `appearance.test.ts` (6), `appearance.spec.ts` (8, Edge and Electron, plus a screenshot run), `appearance-conversation.spec.ts` (provider double), `wireframe-appearance.spec.ts` (3). Typecheck clean; 273 of 273 unit tests (38 files); 57 of 57 E2E with 1 skipped (the screenshot run); secret scan (332 files); `mcp:smoke` 6 of 6. Screenshots in `.tmp/appearance-shots/` (`before/` at `e2dd950`, `after/`, `wireframe/`) |
 
 ## Wireframe overhaul (Will's request, 2026-11-25)
 
@@ -283,7 +284,10 @@ and DEC-026.
   first-viewport check passed at 1440 and 390 px. The finish review ran in
   fresh sub-agents: one review and two verdict passes. Its last two small
   items were fixed but not re-scored.
-- **Not yet:** seen by Will or Hein, or applied to `apps/`.
+- **Since then:** Will approved the light direction, and run 6 applied its
+  palettes and the light and dark rules to `apps/` (DEC-028). The app's
+  layout and components are still placeholders, and Hein has not seen
+  either.
 
 ## Milestone log (run 5)
 
@@ -451,6 +455,9 @@ Will ran. Its eleven findings were repaired in run 5
 | 26 | Reminders that came due while Nexus was closed are listed once as "While you were away" and never delivered late (DEC-025) | Will |
 | 27 | On a narrow screen only the newest in-app reminder shows, at the bottom. The Notifications list has them all | Hein |
 | 28 | A timed due date is edited as a day in its own zone. The calendar shows it on its day in the workspace zone, and a time in a clock gap moves forward with a notice (DEC-023) | Will, Hein |
+| 29 | The six palette names and values, the review bar as a raised strip in dark, and the switch in the side bar (app) or top bar (wireframe) are Kiro's choices within Will's brief (DEC-028) | Will, Hein |
+| 30 | Four approved light values moved slightly so every text pair passes 4.5:1, hover included: Zinc #62626d, Review Amber #8a4f00, Brick #b8301e and the Well #f6f6f8 | Will, Hein |
+| 31 | Above 760 px the app's side bar is sticky, so the switch stays in view on long pages; the workspace name truncates with its full name on hover | Hein |
 
 ## Blockers and risks
 

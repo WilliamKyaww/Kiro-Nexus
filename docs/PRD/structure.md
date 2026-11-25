@@ -5,7 +5,8 @@
 - **Owners:** Will (product, persistence, review, providers, agent), Hein
   (navigation, board and calendar presentation, sample data, accessibility,
   demo)
-- **Last updated:** 2026-11-24
+- **Last updated:** 2026-11-25 (PRD-081, appearance, added in run 6 under
+  Will's authorisation; DEC-028)
 - **Inputs:** `docs/intake/2026-11-24-product-brief.md` (cited as `R-*`
   and `D-*`) and `docs/intake/kiroween-rules-summary.md`
 - **Companions:** `architecture.md` (how it works) and `techstack.md` (what
@@ -258,6 +259,7 @@ the schedule forces it.
 | PRD-075 | Capabilities are probed. The model is pinned per run. Errors are clear. Steps and retries are capped | Must | R-S6 | Unit tests; release check R-V5 |
 | PRD-076 | Keys are held in OS-protected storage on desktop, or for the session only. They never reach the workspace, renderer storage, logs, the repository or the build | Must | R-S7, R-S8 | Secret-scan test over the workspace, logs and package |
 | PRD-080 | Keyboard operation, visible focus and reduced-motion support throughout, including review | Must | R-D-A, R-V6 | Keyboard-only review run; axe checks |
+| PRD-081 | Light, Dark and Match system, with a quick switch on every screen and at least three palettes per theme, remembered per local profile and applied from the first paint. Amber means awaiting review only, and text meets 4.5:1 in every palette | Should | Will, run 6 (25 Nov 2026); DEC-028 | `appearance.spec.ts` (browser and Electron), `appearance.test.ts`; screenshots in both themes |
 | PRD-090 | A free judge route, the sample workspace, reproducible instructions, and labels on any fixture or replay | Must | R-D-E, R-E3 | Clean-setup rehearsal |
 | PRD-091 | **To be resolved before release:** a team-provided evaluation route lets judges try the live AI workflow free of charge. It must not bundle a private key in the distributable. A judge's own key is a second option. A replay does not satisfy this requirement | Must | R-D-E, DEC-014 | A recorded live run through the chosen route, made from a clean setup |
 | PRD-092 | The browser launches from a fresh session through a single-use launch code. An unauthenticated client cannot read workspace data, mutate it or open the event stream. Tokens never appear in query strings or logs | Must | R-S1, R-S7, DEC-011 | Automated tests for a fresh launch, a reused code, a missing token, a wrong `Host` header, and a scan of the logs |
