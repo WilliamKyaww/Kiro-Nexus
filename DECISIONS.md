@@ -787,3 +787,20 @@ status control.
 - *remark-parse for link detection.* It would match the preview exactly, but adding it
   needs Will's approval; Kiro's policy blocked the install. The shared rule agrees with it
   on all but 4 of 20,026 generated notes.
+
+## DEC-032: Nexus is released under the MIT licence, and its history is public
+- **Status:** Accepted (Will, 2026-11-25).
+**Decision.**
+- **Licence.** Nexus's own code and documents are under the MIT licence, in `LICENSE`,
+  unmodified so that GitHub detects it. The copyright line names William Kyaww and Hein.
+  Third-party work keeps its own licence (`docs/licences.md`); the committed Impeccable
+  skill stays Apache-2.0.
+- **Publication.** `main` is pushed to <https://github.com/WilliamKyaww/Kiro-Nexus> with its
+  full history: the journals, reviews and relays included. The documents name Will's
+  internal tools and their folder only; none of their content is in the repository, and
+  the reference screenshots stay in the ignored `docs/design/references/`.
+**Alternatives.**
+- *Apache-2.0.* It adds an explicit patent grant, but is longer and asks contributors to
+  mark changed files. Nothing in Nexus needs that.
+- *Squash the history before publishing.* History is never rewritten here (`AGENTS.md`),
+  and the journal is evidence for the Kiro write-up.

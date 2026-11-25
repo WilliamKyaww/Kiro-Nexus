@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local-first Markdown notebook and project board with reviewable agent edits (Kiroween 2026).",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": "^24.14.0 || >=26"

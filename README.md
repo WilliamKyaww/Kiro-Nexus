@@ -232,7 +232,6 @@ document to the question it answers. Specs live in `.kiro/specs/`.
 
 ## Licence
 
-To be chosen by Will and Hein before submission. The repository needs an
-open-source licence that GitHub can detect; see
-`docs/submission-checklist.md`. Third-party work is listed in
-`docs/licences.md`.
+Nexus is released under the MIT licence; see `LICENSE`. Third-party work
+keeps its own licence and is listed in `docs/licences.md`, for example the
+Impeccable skill in `.kiro/skills/impeccable/`, which is Apache-2.0.

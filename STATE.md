@@ -1,7 +1,7 @@
 # State
 
 - **Date updated:** 2026-11-25 (R6-1 to R6-17 repaired and recorded; relay
-  for the re-review written)
+  for the re-review written; MIT licence added and `main` pushed to GitHub)
 - **Active phase:** none authorised. The R6 repairs are done (the R6
   repairs milestone log below) and wait for Astra 6.2's re-review, through
   `docs/reviews/relays/2026-11-25-run6-repairs.md`. Slice C's live check
@@ -26,6 +26,12 @@
   to DEC-014).
 
 ## Authorisation
+
+- **Push to GitHub (granted by Will on 2026-11-25: "please push to main,
+  update the repo"): used up.** One fast-forward push of `main` to
+  `origin/main` (<https://github.com/WilliamKyaww/Kiro-Nexus>), with the
+  full history and the MIT licence added first (DEC-032). Each later push
+  still needs Will's request.
 
 - **R6 repairs (granted by Will on 2026-11-25: "Fix all 17 please"): used
   up.** All seventeen are repaired and committed, and the relay is written.
@@ -468,7 +474,9 @@ Will ran. Its eleven findings were repaired in run 5
    `.kiro/settings/`. The exact steps and JSON are in `docs/tooling.md`.
    Then confirm that Kiro discovers the server, and run one tool call.
 5. **Final rules recheck before submission** (`docs/submission-checklist.md`).
-6. **Choose an open-source licence** (the README says "to be chosen").
+6. **Done: the licence is MIT** (`LICENSE`, DEC-032). Will: check that
+   the copyright line ("William Kyaww and Hein") is how you both want to
+   be named, and that GitHub shows MIT in the repository's About section.
 7. **Will: decide about `vitest.config.ts`.** It is deleted in the working
    tree and was never committed as deleted. To restore it, run
    `git restore vitest.config.ts`. Until it is restored or replaced:

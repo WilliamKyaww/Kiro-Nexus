@@ -4,6 +4,9 @@ This page lists the third-party work in the repository, or used to build
 it. The rules require disclosure of pre-existing work beyond standard
 frameworks, libraries and templates.
 
+Nexus's own code and documents are released under the MIT licence
+(`LICENSE`, DEC-032). Each item below keeps its own licence.
+
 ## Committed third-party files
 
 | Item | Location | Source | Licence |

@@ -66,7 +66,7 @@ pass on `e61a3d4` and run 4:
   live Edit check), and personalised reminders. Not authorised yet.
 - [ ] **E Package, rehearse and submit** (PRD-073, PRD-090 to PRD-092, R-V1
   to R-V6). Owners: Will and Hein. Gate: `docs/submission-checklist.md`.
-  This includes choosing an open-source licence.
+  The licence is chosen: MIT (DEC-032).
 
 ## P1: if time allows before 2 December
 
