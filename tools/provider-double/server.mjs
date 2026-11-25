@@ -22,6 +22,7 @@
 // Corrections (CORRECTION_REQUEST_JSON in the question): the date or quoted line the reason
 // names, on the same target, or nothing when it names none.
 //   nexus-test-double-stray       corrects a different field, which Nexus refuses
+//   nexus-test-double-wide        corrects note lines and also ticks the line above, which Nexus refuses
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -297,6 +298,13 @@ function correctionStep(req, resultOf, variant, n) {
     sources = section?.handle ? [section.handle] : [];
     if (proposal === undefined) {
       const quoted = String(req.reason ?? "").match(/[“"]([^”"]+)[”"]/)?.[1];
+      if (quoted && !section?.error && variant === "wide") {
+        // Reaches past the disputed lines: it also ticks the line above them, which Nexus must refuse.
+        const lines = String(section.text ?? "").split(/\r?\n/);
+        const at = lines.findIndex((l) => `${l}\n` === t.lines || l === String(t.lines).replace(/\n$/, ""));
+        const above = at > 0 ? lines[at - 1] : null;
+        if (above) return { tool_calls: [toolCall("propose_changes", { operations: [{ op: "edit_note", note: t.note, heading: t.heading ?? null, before: `${above}\n${t.lines}`, after: `${above.replace("[ ]", "[x]")}\n${quoted}` }] }, n)] };
+      }
       if (quoted && !section?.error) return { tool_calls: [toolCall("propose_changes", { operations: [{ op: "edit_note", note: t.note, heading: t.heading ?? null, before: t.lines, after: quoted }] }, n)] };
       return { tool_calls: [toolCall("final_answer", answerOf({ insufficientReason: "The reason does not quote the text to use, so the test double proposed no change." }), n)] };
     }

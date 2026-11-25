@@ -2,11 +2,11 @@
 // change starts a correction run in Edit mode, in the change's conversation, bound to that
 // change and to its target. Its proposal supersedes the rejected change once it is journaled.
 import type { FastifyInstance } from "fastify";
-import { FeedbackRequest, type ChangeRecord, type ChangeView, type ProposedOperation } from "@nexus/schema";
+import { FeedbackRequest, type ChangeRecord, type ChangeView } from "@nexus/schema";
 import type { RouteContext } from "../app";
 import { NexusError } from "../errors";
 import { requireEngine } from "../review";
-import { docLines, locate, occurrences, spanLines } from "../review/spans";
+import type { ReviewEngine } from "../review/engine";
 import type { AppState } from "../state";
 import { newId, type WorkspaceService } from "../workspace/service";
 import { admitConversation, releaseConversation, startRun } from "./routes";
@@ -15,27 +15,29 @@ import { admitConversation, releaseConversation, startRun } from "./routes";
 const admitting = new Set<string>();
 
 type Target =
-  | { kind: "field"; recordId: string; issue: string; field: string; current: unknown }
-  | { kind: "note"; note: string; heading: string | null; lines: string; region: { start: number; end: number } };
+  | { kind: "field"; issue: string; field: string; current: unknown }
+  | { kind: "note"; note: string; heading: string | null; lines: string };
 
 const shown = (value: unknown) => JSON.stringify(value ?? null);
 
-/** The disputed target as it is now, or why a correction cannot be placed. */
-async function targetOf(service: WorkspaceService, change: ChangeRecord): Promise<Target | { error: string }> {
+/**
+ * The disputed target as it is now, or why a correction cannot be placed. It describes the target
+ * to the model; the engine checks the write boundary itself, under the write lock (R6-4).
+ */
+async function targetOf(service: WorkspaceService, engine: ReviewEngine, change: ChangeRecord): Promise<Target | { error: string }> {
   if (change.kind === "record.updateField") {
     const issue = service.listIssues().find((i) => i.id === change.target.recordId);
     if (!issue || !change.target.field) return { error: "The issue this change was for no longer exists, so there is nothing to correct." };
-    return { kind: "field", recordId: issue.id, issue: issue.key, field: change.target.field, current: issue[change.target.field] };
+    return { kind: "field", issue: issue.key, field: change.target.field, current: issue[change.target.field] };
   }
   const raw = await service.readNoteRaw(change.file).catch(() => null);
   if (!raw) return { error: `The note ${change.file} no longer exists, so there is nothing to correct.` };
-  const lines = String(change.before);
-  // After the rejection, the change's original lines are back where it was proposed.
-  const at = lines ? locate(raw.content, lines, change.context) : { status: "missing" as const };
-  if (at.status !== "ok") {
+  // After the rejection, the change's original lines are back where it was proposed, in its
+  // own section (found by the same rules as a reversal, R6-1).
+  if (!engine.correctionRegion(raw.content, change)) {
     return { error: "The lines this change covered were edited after it was rejected, so Nexus cannot tell where a correction belongs. Edit them by hand, or ask again in Edit." };
   }
-  return { kind: "note", note: raw.rel, heading: change.scope?.headingSlug ?? null, lines, region: { start: at.start, end: at.start + Math.max(at.length, 1) } };
+  return { kind: "note", note: raw.rel, heading: change.scope?.headingSlug ?? null, lines: String(change.before) };
 }
 
 function describe(target: Target): string {
@@ -62,25 +64,6 @@ function correctionPrompt(view: ChangeView, change: ChangeRecord, target: Target
   ].join("\n");
 }
 
-/** Every operation must be on the disputed target (Requirement 5.3). */
-async function scopeError(service: WorkspaceService, target: Target, ops: ProposedOperation[]): Promise<string | null> {
-  const where = target.kind === "field" ? `the ${target.field} of ${target.issue}` : `the rejected lines of ${target.note}`;
-  const refuse = `A correction may change only ${where}. Nexus wrote nothing. Propose one change to that target, or call final_answer.`;
-  if (ops.length !== 1) return refuse;
-  const op = ops[0]!;
-  if (target.kind === "field") {
-    if (op.kind !== "record.updateField" || op.field !== target.field) return refuse;
-    const issue = service.listIssues().find((i) => i.key === op.recordKey);
-    return issue?.id === target.recordId ? null : refuse;
-  }
-  if (op.kind !== "note.replaceSpan" || service.notePath(op.file).rel !== target.note) return refuse;
-  const raw = await service.readNoteRaw(target.note);
-  if (!raw) return refuse;
-  const span = spanLines(op.before);
-  const overlaps = occurrences(docLines(raw.content), span).some((s) => s < target.region.end && target.region.start < s + Math.max(span.length, 1));
-  return overlaps ? null : refuse;
-}
-
 /**
  * Start the correction of a rejected change from its saved reason, or report the one already
  * running or proposed. Always answers with the change, whose `correction` says what happened.
@@ -95,11 +78,11 @@ export async function startCorrection(state: AppState, changeId: string): Promis
     const { run, change } = engine.correctionTarget(changeId);
     const current = await view();
     if (change.state !== "rejected" || !change.feedback || !current.correctable) return current;
-    if (change.correction?.state === "running" || change.correction?.state === "proposed") return current;
+    if (change.correction && ["running", "unwritten", "proposed"].includes(change.correction.state)) return current;
     const reason = change.feedback.text;
     const conversationId = run.source.conversationId!;
     const fail = (message: string) => engine.endCorrection(changeId, null, { state: "failed", message });
-    const target = await targetOf(service, change);
+    const target = await targetOf(service, engine, change);
     if ("error" in target) return fail(target.error);
     if (!admitConversation(conversationId)) return fail("The conversation was answering another question, so the correction did not start. Retry when it has finished.");
     let holdsSlot = true;
@@ -113,7 +96,6 @@ export async function startCorrection(state: AppState, changeId: string): Promis
           correction: {
             changeId,
             modelQuestion: correctionPrompt(current, change, target, reason),
-            checkScope: (ops) => scopeError(service, target, ops),
             onEnd: async (id, outcome) => { await engine.endCorrection(changeId, id, outcome); },
           },
         });

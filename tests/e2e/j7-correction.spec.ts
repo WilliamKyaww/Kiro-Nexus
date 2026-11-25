@@ -174,6 +174,20 @@ test("Skip asks nothing more; a correction that fails keeps its reason across a 
   await expect(failed).toContainText(`Your reason is saved: “${REASON}”`);
   await shot(page, "j7-correction-failed-desktop");
 
+  // The failed turn in the conversation retries the same bound correction, never an ordinary
+  // Edit that could change anything else (R6-5). The provider is still down, so it fails again.
+  const disputed = (await journal(ws)).find((c) => c.kind === "record.updateField" && c.feedback?.text === REASON)!;
+  await page.goto(`http://127.0.0.1:${svc!.port}/c/${conversations[0]!.id}`);
+  const transcript = page.locator("ol.transcript > li");
+  await expect(transcript.last().getByRole("alert")).toBeVisible();
+  const count = await transcript.count();
+  const sent = page.waitForRequest((r) => r.method() === "POST" && /\/api\/v1\/(conversations|review)\//.test(r.url()), { timeout: 10_000 });
+  await transcript.nth(count - 1).getByRole("button", { name: /^Retry/ }).click();
+  expect(new URL((await sent).url()).pathname).toBe(`/api/v1/review/changes/${disputed.changeId}/correction`);
+  await expect(transcript.nth(count - 1)).toContainText("The correction did not finish.");
+  await expect(transcript.nth(count - 1).getByRole("button", { name: "Retry correction" })).toBeVisible();
+  await expect(transcript.nth(count + 1).getByRole("alert")).toContainText("The correction did not finish.", { timeout: 60_000 });
+
   // After a restart it is listed the same way, and Retry corrects once the provider is back.
   await svc!.stop();
   svc = await startService(profile, undefined, [], { NEXUS_TEST_CLOCK: NOW });

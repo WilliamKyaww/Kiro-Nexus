@@ -42,14 +42,13 @@ export function releaseConversation(conversationId: string): void {
 }
 
 /**
- * A correction run (PRD-064, architecture 7.4): the rejected change it corrects, the prompt the
- * model receives (the conversation shows the shorter question), and the check that keeps every
- * proposed operation on the disputed target.
+ * A correction run (PRD-064, architecture 7.4): the rejected change it corrects, and the prompt
+ * the model receives (the conversation shows the shorter question). The engine keeps every
+ * proposed operation on the disputed target, under the write lock (R6-4).
  */
 export interface CorrectionRun {
   changeId: string;
   modelQuestion: string;
-  checkScope: (operations: ProposedOperation[]) => Promise<string | null>;
   /** How the run ended without a proposal: recorded on the rejected change. */
   onEnd: (askRunId: string, outcome: { state: "no-change" | "failed"; message: string }) => Promise<void>;
 }
@@ -125,11 +124,13 @@ export async function startRun(state: AppState, service: WorkspaceService, conve
   const runId = extra.runId ?? newId("run");
   const correction = extra.correction;
   const at = new Date().toISOString();
-  const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null, authority };
+  // A correction's turns name the change they correct, so a retry from the conversation stays bound to it (R6-5).
+  const bound = correction ? { correctionOf: correction.changeId } : {};
+  const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null, authority, ...bound };
   let history: PriorTurn[] = [];
   await conversations.update(conversationId, (c) => {
     history = priorTurns(c.messages); // the answered turns before this question
-    c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null, authority });
+    c.messages.push({ id: newId("msg"), role: "user", at, runId, text: question, status: "complete", answer: null, meta: null, error: null, authority, ...bound });
     if (c.messages.filter((m) => m.role === "user").length === 1 && c.title === "New conversation") c.title = question.slice(0, 80);
     c.messages.push(pending);
     c.updatedAt = at;
@@ -152,9 +153,8 @@ export async function startRun(state: AppState, service: WorkspaceService, conve
       if (state.service !== service) {
         throw new NexusError("CONFLICT", "The workspace this question was asked in was closed or switched, so Nexus wrote nothing. Open it again and ask again.", { reason: "workspace-changed" });
       }
-      // A correction may change only the disputed target; anything else goes back to the model.
-      const outOfScope = correction ? await correction.checkScope(operations) : null;
-      if (outOfScope) throw new NexusError("VALIDATION", outOfScope, { reason: "out-of-scope" });
+      // A correction may change only the disputed target: the engine refuses anything else, and
+      // the refusal goes back to the model.
       const fixtureLabel = profile.capabilities.fixture ? " (test double, not AI)" : "";
       const outcome = await engine.propose(
         { kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent",

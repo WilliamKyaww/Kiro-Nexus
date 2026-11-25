@@ -26,6 +26,8 @@ export interface Message {
   authority?: "ask" | "edit";
   /** Edit turns only: what the run proposed for review. */
   edit?: EditOutcome | null;
+  /** A correction's turns: the rejected change they correct (R6-5). */
+  correctionOf?: string;
 }
 export interface EditChange { changeId: string; kind: ChangeView["kind"]; summary: string; recordKey: string | null; file: string; state: string; dependsOn: string[] }
 export interface EditOutcome { reviewRunId: string | null; phase: string | null; changes: EditChange[]; failedFiles: Array<{ path: string; error: string | null }> }

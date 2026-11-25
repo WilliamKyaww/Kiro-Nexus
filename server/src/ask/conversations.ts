@@ -49,6 +49,8 @@ export const Message = z.object({
     changes: z.array(z.object({ changeId: z.string(), kind: z.string(), summary: z.string(), recordKey: z.string().nullable(), file: z.string(), state: z.string(), dependsOn: z.array(z.string()) })),
     failedFiles: z.array(z.object({ path: z.string(), error: z.string().nullable() })),
   }).nullable().optional(),
+  // Added in the R6 repairs: the rejected change a correction turn corrects (R6-5).
+  correctionOf: z.string().max(60).optional(),
 });
 export const Conversation = z.object({
   schemaVersion: z.literal(1),

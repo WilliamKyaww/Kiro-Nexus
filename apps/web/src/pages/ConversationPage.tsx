@@ -6,7 +6,7 @@ import { AnswerCard } from "../ask/AnswerCard";
 import { Composer } from "../ask/Composer";
 import { EditCard } from "../ask/EditCard";
 import { cancelRun, editRunsToOpen, useAsk, useConversation, useProgress, type Message } from "../ask/ask";
-import { changeUrl } from "../review/review";
+import { changeUrl, useReviewActions } from "../review/review";
 
 function Running({ message }: { message: Message }) {
   const activity = useProgress(message.runId);
@@ -25,6 +25,8 @@ function Running({ message }: { message: Message }) {
 function RetryButton({ message, edit, disabled, onRetry }: { message: Message; edit: boolean; disabled: boolean; onRetry: () => void }) {
   const [asking, setAsking] = useState(false);
   const proposed = message.edit?.changes.length ?? 0;
+  // A correction turn retries the same bound correction; the service refuses a second one.
+  if (message.correctionOf) return <button type="button" disabled={disabled} onClick={onRetry}>Retry correction</button>;
   if (asking) {
     return (
       <div className="row" role="group" aria-label="Retry this Edit">
@@ -43,6 +45,7 @@ export function ConversationPage() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const retry = useAsk();
+  const { correction } = useReviewActions();
   const endRef = useRef<HTMLDivElement>(null);
   const count = conversation.data?.messages.length ?? 0;
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [count]);
@@ -81,9 +84,13 @@ export function ConversationPage() {
             {m.role === "assistant" && m.status === "complete" ? <AnswerCard message={m} conversationId={c.id} /> : null}
             {m.role === "assistant" && (m.status === "failed" || m.status === "cancelled") ? (
               <div className={m.status === "failed" ? "error" : "notice"} role={m.status === "failed" ? "alert" : "note"}>
-                <p>{m.status === "cancelled" ? "Cancelled." : "This question could not be answered."} {m.error?.message}</p>
-                <RetryButton message={m} edit={userTurn(i)?.authority === "edit"} disabled={busy || retry.isPending}
+                <p>{m.status === "cancelled" ? "Cancelled." : m.correctionOf ? "The correction did not finish." : "This question could not be answered."} {m.error?.message}</p>
+                <RetryButton message={m} edit={userTurn(i)?.authority === "edit"} disabled={busy || retry.isPending || correction.isPending}
                   onRetry={() => {
+                    if (m.correctionOf) {
+                      correction.mutate({ changeId: m.correctionOf, action: "retry" }, { onSuccess: () => void client.invalidateQueries({ queryKey: ["conversation", c.id] }) });
+                      return;
+                    }
                     const turn = userTurn(i);
                     retry.mutate({ question: turn?.text ?? "", conversationId: c.id, mode: turn?.authority ?? "ask" }, { onSuccess: () => void client.invalidateQueries({ queryKey: ["conversation", c.id] }) });
                   }} />

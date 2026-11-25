@@ -47,7 +47,8 @@ afterEach(async () => { setFaultInjector(null); await service.close(); await rm(
 describe("the correction of a rejected change", () => {
   it("keeps the reason, starts once, and supersedes the change only when its correction is written", async () => {
     const rejected = await rejectedDate();
-    expect(rejected).toMatchObject({ state: "rejected", feedback: "Hein is away that week; make it 8 December.", correctable: true, correction: null, conversationId: "cnv_fixture" });
+    // Since R6-7 the request is saved with the reason, as queued, until its run starts.
+    expect(rejected).toMatchObject({ state: "rejected", feedback: "Hein is away that week; make it 8 December.", correctable: true, correction: { state: "queued" }, conversationId: "cnv_fixture" });
     expect(await nex1Due()).toEqual({ date: "2026-12-05" });
 
     const first = await engine.beginCorrection(rejected.changeId, "run_A", "cnv_fixture");
@@ -114,8 +115,11 @@ describe("the correction of a rejected change", () => {
     expect((await view(rejected.changeId)).correction).toMatchObject({ state: "running" });
     await engine.endCorrection(rejected.changeId, "run_A", { state: "no-change", message: "The reason does not name a date." });
     expect((await view(rejected.changeId)).correction).toMatchObject({ state: "no-change", message: "The reason does not name a date." });
-    // A new reason may replace the old one now that nothing is running.
-    expect((await engine.feedback(rejected.changeId, "Make it 8 December.")).feedback).toBe("Make it 8 December.");
+    // A new reason may replace the old one now that nothing is running; it queues a new request
+    // (R6-7), which here could not start.
+    expect((await engine.feedback(rejected.changeId, "Make it 8 December."))).toMatchObject({ feedback: "Make it 8 December.", correction: { state: "queued" } });
+    await expect(engine.dropCorrection(rejected.changeId)).rejects.toMatchObject({ code: "CONFLICT" }); // not while it is about to start
+    await engine.endCorrection(rejected.changeId, null, { state: "failed", message: "The conversation was answering another question." });
     expect((await engine.dropCorrection(rejected.changeId)).correction).toMatchObject({ state: "dropped" });
     expect(await engine.views("corrections")).toEqual([]);
     expect(await view(rejected.changeId)).toMatchObject({ state: "rejected", feedback: "Make it 8 December." });

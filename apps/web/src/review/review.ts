@@ -142,26 +142,30 @@ export function useReviewActions() {
     mutationFn: ({ change, text }: { change: ChangeView; text: string }) => api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/feedback`, { text }),
     onSuccess: async (result) => {
       const c = result.correction;
-      if (c?.state === "running") setReviewUi({ feedbackFor: null, correctionFor: result.changeId, message: "Your reason is saved. Nexus is preparing a corrected change from it." });
+      if (c?.state === "running" || c?.state === "queued") setReviewUi({ feedbackFor: null, correctionFor: result.changeId, message: "Your reason is saved. Nexus is preparing a corrected change from it." });
       else if (c?.state === "proposed") setReviewUi({ feedbackFor: null, message: "A corrected change was already proposed for this one." });
       else if (c?.state === "failed") setReviewUi({ feedbackFor: null, message: `Your reason is saved, but the correction did not start: ${c.message ?? "unknown error"}` });
       else if (result.sourceKind === "agent" && !result.correctable) setReviewUi({ feedbackFor: null, message: "Your reason is saved with the rejected change. Nexus corrects changes to an issue field or to note lines; for a new issue or link, ask again in Edit." });
       else setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change." });
       await refresh();
       // A correction opens here when it is proposed; otherwise move on to the next change.
-      if (c?.state !== "running") moveOn();
+      if (c?.state !== "running" && c?.state !== "queued") moveOn();
     },
     onError: (e) => setReviewUi({ message: (e as Error).message }),
   });
   // Retry a correction from the saved reason, or keep the change rejected.
+  // Used by the review bar and by a failed correction turn in its conversation, which must retry
+  // the same bound correction rather than send an ordinary Edit (R6-5).
   const correction = useMutation({
-    mutationFn: ({ change, action }: { change: ChangeView; action: "retry" | "drop" }) =>
-      api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/correction${action === "drop" ? "/drop" : ""}`),
+    mutationFn: ({ changeId, action }: { changeId: string; action: "retry" | "drop" }) =>
+      api.post<ChangeView>(`/review/changes/${encodeURIComponent(changeId)}/correction${action === "drop" ? "/drop" : ""}`),
     onSuccess: async (result, { action }) => {
       if (action === "drop") setReviewUi({ message: `Kept rejected: ${result.summary}`, correctionFor: null });
-      else if (result.correction?.state === "running") setReviewUi({ correctionFor: result.changeId, message: "Nexus is preparing a corrected change from your reason." });
+      else if (result.correction?.state === "running" || result.correction?.state === "queued") setReviewUi({ correctionFor: result.changeId, message: "Nexus is preparing a corrected change from your reason." });
+      else if (result.correction?.state === "proposed") setReviewUi({ message: "A corrected change was already proposed for this one." });
       else setReviewUi({ message: result.correction?.message ?? "The correction did not start." });
       await refresh();
+      await client.invalidateQueries({ queryKey: ["conversation"] });
     },
     onError: (e) => setReviewUi({ message: (e as Error).message }),
   });

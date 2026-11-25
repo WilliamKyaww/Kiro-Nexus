@@ -33,11 +33,14 @@ export const Scope = z.strictObject({
 });
 
 /**
- * running: a correction run is answering. proposed: it wrote a change that supersedes this one.
- * no-change: it finished without proposing. failed: it could not run or stopped. dropped: the
- * user kept the change rejected. The reason itself is the change's `feedback`.
+ * queued: the reason is saved and the run is about to start (saved with the reason, so a crash
+ * before the run starts is seen; R6-7). running: a correction run is answering. unwritten: it
+ * proposed a change whose file write did not happen yet (Retry writing or Discard; R6-3).
+ * proposed: its change can be reviewed, and supersedes this one. no-change: it finished without
+ * proposing. failed: it could not run, stopped, or its unwritten change was discarded. dropped:
+ * the user kept the change rejected. The reason itself is the change's `feedback`.
  */
-export const CorrectionState = z.enum(["running", "proposed", "no-change", "failed", "dropped"]);
+export const CorrectionState = z.enum(["queued", "running", "unwritten", "proposed", "no-change", "failed", "dropped"]);
 export const Correction = z.strictObject({
   state: CorrectionState,
   askRunId: z.string().max(60).nullable(),

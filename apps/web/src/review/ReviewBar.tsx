@@ -25,7 +25,7 @@ export function ReviewBar() {
     if (corrected) {
       setReviewUi({ correctionFor: null, message: "Nexus proposed a corrected change. Accept or reject it." });
       navigate(changeUrl(corrected));
-    } else if (corrections.some((c) => c.changeId === correctionFor && c.correction?.state !== "running")) {
+    } else if (corrections.some((c) => c.changeId === correctionFor && c.correction?.state !== "running" && c.correction?.state !== "queued")) {
       setReviewUi({ correctionFor: null, message: null }); // it ended without a proposal: the list below says why
     }
   }, [correctionFor, changes, corrections, navigate]);
@@ -96,8 +96,11 @@ export function ReviewBar() {
       ))}
       {corrections.map((c) => (
         <div key={c.changeId} className="correction-run" role="group" aria-label="Correction of a rejected change">
-          {c.correction?.state === "running" ? (
+          {c.correction?.state === "running" || c.correction?.state === "queued" ? (
             <p role="status"><strong>Preparing a correction</strong> of {c.summary}, from your reason: “{c.feedback}”</p>
+          ) : c.correction?.state === "unwritten" ? (
+            // Its change exists but was not written: "Not written" below offers Retry writing and Discard (R6-3).
+            <p><strong>The corrected change was not written</strong> for {c.summary}. {c.correction.message ?? ""}</p>
           ) : (
             <>
               <p>
@@ -105,8 +108,8 @@ export function ReviewBar() {
                 {c.correction?.message ?? ""} Your reason is saved: “{c.feedback}”
               </p>
               <div className="review-actions">
-                <button type="button" className="primary" disabled={correction.isPending} onClick={() => correction.mutate({ change: c, action: "retry" })}>Retry correction</button>
-                <button type="button" disabled={correction.isPending} onClick={() => correction.mutate({ change: c, action: "drop" })}>Keep it rejected</button>
+                <button type="button" className="primary" disabled={correction.isPending} onClick={() => correction.mutate({ changeId: c.changeId, action: "retry" })}>Retry correction</button>
+                <button type="button" disabled={correction.isPending} onClick={() => correction.mutate({ changeId: c.changeId, action: "drop" })}>Keep it rejected</button>
               </div>
             </>
           )}
