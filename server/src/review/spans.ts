@@ -1,5 +1,6 @@
 // Pure, line-aligned span logic for note changes (architecture 7.4, DEC-012).
 // Content is handled as LF internally; CRLF files are written back as CRLF.
+import { parseHeadings } from "@nexus/markdown";
 
 export interface Located { status: "ok"; start: number; length: number }
 export type LocateResult = Located | { status: "missing" } | { status: "ambiguous"; count: number };
@@ -69,6 +70,103 @@ export function locate(content: string, text: string, context: SpanContext | nul
   return { status: "ambiguous", count: found.length };
 }
 
+/** What identifies a note change in the current text: its lines, its neighbours and its section. */
+export interface NoteChangeIdentity {
+  before: unknown;
+  after: unknown;
+  context: SpanContext | null;
+  /** The section on disk the change was proposed in (an Edit run's scope); absent for the fixed demo and older journals. */
+  scope?: { headingSlug: string | null } | null;
+}
+
+/**
+ * Where a note change belongs in the current text (R6-1):
+ * - `note`: it has no recorded scope (the fixed demo, older journals), so the whole note, with
+ *   the run-5 rules of `locate`;
+ * - `section`: its recorded section, found by its heading slug (mapped through later recorded
+ *   heading moves). Only lines that start in that section can be the change;
+ * - `unknown`: it has a scope, but its section can no longer be told: the heading is gone, or the
+ *   change itself rewrites a heading line. The whole note, with stricter rules.
+ */
+export type ChangeSection = { kind: "note" } | { kind: "section"; range: LineRange } | { kind: "unknown" };
+
+const startsWithHeading = (text: unknown) => {
+  const first = spanLines(String(text ?? ""))[0];
+  return first !== undefined && parseHeadings(first).length > 0;
+};
+
+export function changeSection(content: string, change: NoteChangeIdentity, mapSlug: (slug: string) => string = (s) => s): ChangeSection {
+  if (!change.scope) return { kind: "note" };
+  if (startsWithHeading(change.after) || startsWithHeading(change.before)) return { kind: "unknown" };
+  const lines = docLines(content);
+  if (change.scope.headingSlug === null) return { kind: "section", range: { start: 0, end: lines.length } };
+  const slug = mapSlug(change.scope.headingSlug);
+  const headings = parseHeadings(content);
+  const i = headings.findIndex((h) => h.slug === slug);
+  if (i < 0) return { kind: "unknown" };
+  return { kind: "section", range: { start: headings[i]!.line, end: headings[i + 1]?.line ?? lines.length } };
+}
+
+/**
+ * Find the lines a note change wrote (its `after` text) in `content`, by the same rules for
+ * reversal, the accepted text, the review bar and overlap checks. Never guesses (R6-1):
+ * - Without a scope, `locate` decides, as in run 5.
+ * - In its own section, a repeated text is the occurrence whose two saved neighbours both match.
+ *   A sole occurrence is the change unless it keeps neither saved neighbour while one of them is
+ *   still elsewhere in the section: then it is other text, and the change is `missing`.
+ *   (A proposal's new lines are unique in their section when written; see `uniqueInSection`.)
+ * - When its section is unknown, a sole occurrence must keep a saved neighbour, and neither
+ *   saved neighbour may be elsewhere in the note.
+ */
+export function locateChange(content: string, change: NoteChangeIdentity, mapSlug?: (slug: string) => string): LocateResult {
+  const where = changeSection(content, change, mapSlug);
+  const text = String(change.after ?? "");
+  if (where.kind === "note") return locate(content, text, change.context);
+  const lines = docLines(content);
+  const span = spanLines(text);
+  const range = where.kind === "section" ? where.range : { start: 0, end: lines.length };
+  const found = occurrences(lines, span).filter((i) => i >= range.start && i < range.end);
+  if (found.length === 0) return { status: "missing" };
+  const context = change.context;
+  const ok = (start: number): LocateResult => ({ status: "ok", start, length: span.length });
+  if (found.length > 1) {
+    const both = context ? found.filter((i) => {
+      const c = contextAt(lines, i, span.length);
+      return c.lineBefore === context.lineBefore && c.lineAfter === context.lineAfter;
+    }) : [];
+    return both.length === 1 ? ok(both[0]!) : { status: "ambiguous", count: found.length };
+  }
+  const at = found[0]!;
+  if (!context) return ok(at);
+  const c = contextAt(lines, at, span.length);
+  const keeps = c.lineBefore === context.lineBefore || c.lineAfter === context.lineAfter;
+  // A saved neighbour still in the region, but not beside this occurrence, says it is other text.
+  const elsewhere = (saved: string | null, actual: string | null) => saved !== null && saved !== actual
+    && lines.some((l, j) => j >= range.start && j < range.end && (j < at || j >= at + span.length) && l === saved);
+  const contradicted = elsewhere(context.lineBefore, c.lineBefore) || elsewhere(context.lineAfter, c.lineAfter);
+  if (where.kind === "section") return keeps || !contradicted ? ok(at) : { status: "missing" };
+  return keeps && !contradicted ? ok(at) : { status: "missing" };
+}
+
+/**
+ * Whether a scoped change's new lines, just written at `start`, are the only copy in its section,
+ * so that the change can be found again later (R6-1). Changes without a section are not checked.
+ */
+export function uniqueInSection(content: string, change: NoteChangeIdentity, start: number): boolean {
+  const where = changeSection(content, change);
+  const span = spanLines(String(change.after ?? ""));
+  if (span.length === 0) return true;
+  if (where.kind === "section") {
+    const found = occurrences(docLines(content), span).filter((i) => i >= where.range.start && i < where.range.end);
+    return found.length === 1 && found[0] === start;
+  }
+  if (where.kind === "unknown") {
+    const loc = locateChange(content, change);
+    return loc.status === "ok" && loc.start === start;
+  }
+  return true;
+}
+
 /** Replace `length` lines at `start` with `replacement`, preserving the file's line endings. */
 export function splice(content: string, start: number, length: number, replacement: string): string {
   const lines = docLines(content);
@@ -109,8 +207,12 @@ export function scopeOf(content: string, headingSlug: string | null, headings: A
   return { range: { start, end }, text: lines.slice(start + 1, end).join("\n").trim() };
 }
 
-/** The raw lines of a section (or the whole note) in parts of at most `maxChars`, whole lines only. */
-export function sectionParts(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>, maxChars: number): Array<ScopeLines & { text: string }> | null {
+/**
+ * The raw lines of a section (or the whole note) in parts of at most `maxChars`, whole lines
+ * only (R6-9). A single line too long for that is a part of its own, marked `oversized`: it
+ * cannot be shown whole, so it cannot be edited.
+ */
+export function sectionParts(content: string, headingSlug: string | null, headings: Array<{ slug: string; line: number }>, maxChars: number): Array<ScopeLines & { text: string; oversized: boolean }> | null {
   const lines = docLines(content);
   let start = 0;
   let end = lines.length;
@@ -124,17 +226,25 @@ export function sectionParts(content: string, headingSlug: string | null, headin
   // part runs to the end of the section, so a line added anywhere after it changes its hash.
   let last = end;
   while (last > start + 1 && (lines[last - 1] ?? "").trim() === "") last--;
-  const parts: Array<ScopeLines & { text: string }> = [];
+  // The trailing blank lines join the last part, so they count towards its size.
+  let tail = 0;
+  for (let j = last; j < end; j++) tail += lines[j]!.length + 1;
+  const cost = (j: number) => lines[j]!.length + 1 + (j + 1 === last ? tail : 0);
+  const part = (from: number, to: number) => {
+    const text = lines.slice(from, to).join("\n");
+    return { from: from - start, count: to - from, text, oversized: text.length > maxChars };
+  };
+  const parts: Array<ScopeLines & { text: string; oversized: boolean }> = [];
   let from = start;
   while (from < last) {
     let to = from;
     let size = 0;
-    while (to < last && (to === from || size + (lines[to]!.length + 1) <= maxChars)) { size += lines[to]!.length + 1; to++; }
+    while (to < last && (to === from || size + cost(to) <= maxChars)) { size += cost(to); to++; }
     if (to >= last) to = end;
-    parts.push({ from: from - start, count: to - from, text: lines.slice(from, to).join("\n") });
+    parts.push(part(from, to));
     from = to;
   }
-  if (parts.length === 0) parts.push({ from: 0, count: Math.max(end - start, 1), text: lines.slice(start, Math.max(end, start + 1)).join("\n") });
+  if (parts.length === 0) parts.push(part(start, Math.max(end, start + 1)));
   return parts;
 }
 

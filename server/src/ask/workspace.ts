@@ -1,6 +1,8 @@
 // The only view of the workspace that Ask receives: read methods, no writes (PRD-051).
+import type { ChangeRecord } from "@nexus/schema";
 import type { SearchIndex } from "../notes/search";
 import type { ReviewEngine } from "../review/engine";
+import { locateChange } from "../review/spans";
 import type { WorkspaceService } from "../workspace/service";
 import type { ReadOnlyWorkspace } from "./tools";
 
@@ -16,5 +18,7 @@ export function readOnlyWorkspace(service: WorkspaceService, index: SearchIndex,
     projects: () => service.listProjects(),
     issues: () => service.listIssues(),
     unsettledChanges: () => engine?.unsettledChanges() ?? [],
+    // The engine's own rules, so the accepted text Ask reads agrees with what Reject would do (R6-1).
+    locateNoteChange: (content: string, change: ChangeRecord) => (engine ? engine.locateNoteChange(content, change) : locateChange(content, change)),
   });
 }

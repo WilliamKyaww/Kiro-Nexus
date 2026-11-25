@@ -13,7 +13,7 @@ import { sha256 } from "../workspace/atomic";
 import { newId, type WorkspaceService } from "../workspace/service";
 import { addIssue, addLink, applyRecordChange, canonical, createdUnchanged, hasLink, removeIssue, removeLink, sameValue, setField, validFieldValue } from "./records";
 import { slugMoves } from "../notes/align";
-import { applyEdits, locate, normaliseSpan, scopeOf, splice, type SpanEdit } from "./spans";
+import { applyEdits, changeSection, locate, locateChange, normaliseSpan, scopeOf, splice, uniqueInSection, type LocateResult, type SpanEdit } from "./spans";
 
 /** How often a note text names an issue key as a whole word. */
 const mentions = (text: string, key: string) => (text.match(new RegExp(`(?<![A-Za-z0-9-])${key.replace(/[-]/g, "\\-")}(?![0-9])`, "g")) ?? []).length;
@@ -167,7 +167,7 @@ export class ReviewEngine {
         if (!notes.has(change.file)) notes.set(change.file, (await this.service.readNoteRaw(change.file).catch(() => null))?.content ?? null);
         const content = notes.get(change.file);
         if (content != null && (change.state === "pending" || change.state === "conflicted")) {
-          const loc = locate(content, String(change.after), change.context);
+          const loc = this.locateNoteChange(content, change);
           if (loc.status === "ok") lines = { start: loc.start, end: loc.start + loc.length - 1 };
         }
       } else {
@@ -192,6 +192,27 @@ export class ReviewEngine {
       });
     }
     return out;
+  }
+
+  /**
+   * A note change's recorded section slug as it is on disk now: the heading moves that later
+   * rejections recorded (`slugMoves`, ref "disk") are followed in order (R6-1).
+   */
+  private slugMapFor(change: ChangeRecord): (slug: string) => string {
+    const since = change.history[0]?.at ?? "";
+    const later = this.allChanges().map((x) => x.change)
+      .filter((c) => c !== change && c.file === change.file && c.slugMoves?.ref === "disk" && c.slugMoves.at >= since)
+      .sort((a, b) => a.slugMoves!.at.localeCompare(b.slugMoves!.at));
+    return (slug) => later.reduce((s, c) => c.slugMoves!.moves.find((m) => m.from === s)?.to ?? s, slug);
+  }
+
+  /**
+   * Where the lines a note change wrote are now, by one set of rules for reversal, the accepted
+   * text, the review bar, overlap and group decisions: an Edit change is looked for only in its
+   * own section (R6-1; `locateChange` in spans.ts).
+   */
+  locateNoteChange(content: string, change: ChangeRecord): LocateResult {
+    return locateChange(content, change, this.slugMapFor(change));
   }
 
   /** The rejected change and its run, for a correction (PRD-064). */
@@ -331,17 +352,32 @@ export class ReviewEngine {
           errors.push({ opId: group[result.index]!.opId, reason: group[result.index]!.scope ? `${why.replace(/\.$/, "")} in the section that was read.` : why });
           continue;
         }
+        // An Edit change is found again by its lines in its own section, so its new lines must be
+        // the only copy there once written; otherwise a later Reject could not tell them from the
+        // other copy (R6-1).
+        const repeated = group.findIndex((o, i) => !!o.scope
+          && !uniqueInSection(result.content, { before: edits[i]!.before, after: edits[i]!.after, context: result.placed[i]!.context, scope: o.scope }, result.placed[i]!.start));
+        if (repeated >= 0) {
+          errors.push({ opId: group[repeated]!.opId, reason: "The new lines would appear more than once in the section, so Nexus could not tell later which of them this change wrote. Make the new lines different from the other lines of the section." });
+          continue;
+        }
         // Lines that another change still awaiting a decision has written, or will write. A
         // change whose lines can no longer be found (edited by hand, then a conflict) still owns
-        // the region between its saved neighbouring lines; when even that is unknown, the note
-        // takes no new edit until the change is decided (R5-9).
+        // the region between its saved neighbouring lines. An Edit change owns at least its own
+        // section; when even that is unknown, the note takes no new edit until the change is
+        // decided (R5-9, R6-1).
         let unlocated: ChangeRecord | null = null;
-        const busy = open.filter((c) => c.kind === "note.replaceSpan" && c.file === rel).flatMap((c) => {
-          const loc = c.state === "prepared" ? locate(raw.content, String(c.before), null) : locate(raw.content, String(c.after), c.context);
+        const busy = open.filter((c) => c.kind === "note.replaceSpan" && c.file === rel).flatMap((c): Array<{ start: number; end: number; lost?: ChangeRecord }> => {
+          const loc = c.state === "prepared" ? locate(raw.content, String(c.before), null) : this.locateNoteChange(raw.content, c);
           if (loc.status === "ok") return [{ start: loc.start, end: loc.start + Math.max(loc.length, 1) }];
           if (c.state === "prepared") return [];
           const region = regionBetween(raw.content, c.context);
-          if (region) return [region];
+          const where = changeSection(raw.content, c, this.slugMapFor(c));
+          if (where.kind === "section") {
+            if (region && region.start >= where.range.start && region.end <= where.range.end) return [{ ...region, lost: c }];
+            return [{ ...where.range, lost: c }];
+          }
+          if (region) return [{ ...region, lost: c }];
           unlocated = c;
           return [];
         });
@@ -349,11 +385,18 @@ export class ReviewEngine {
           errors.push({ opId: group[0]!.opId, reason: `A change awaiting a decision in this note (“${summarise(unlocated)}”) can no longer be located, so Nexus cannot tell which lines it covers. Decide it first.` });
           continue;
         }
-        const clash = group.findIndex((_, i) => {
+        const blockers = group.map((_, i) => {
           const l = result.located[i]!;
-          return busy.some((b) => l.start < b.end && b.start < l.start + l.length);
+          return busy.find((b) => l.start < b.end && b.start < l.start + l.length);
         });
-        if (clash >= 0) { errors.push({ opId: group[clash]!.opId, reason: "These lines have another change awaiting review. Accept or reject it first." }); continue; }
+        const clash = blockers.findIndex((b) => b !== undefined);
+        if (clash >= 0) {
+          const lost = blockers[clash]!.lost;
+          errors.push({ opId: group[clash]!.opId, reason: lost
+            ? `A change awaiting a decision here (“${summarise(lost)}”) can no longer be located, so Nexus cannot tell which of these lines it covers. Decide it first.`
+            : "These lines have another change awaiting review. Accept or reject it first." });
+          continue;
+        }
         files.push({ path: rel, beforeHash: raw.revision, afterHash: sha256(result.content), state: "planned", error: null });
         group.forEach((o, i) => changes.push(mkChange(o, { before: edits[i]!.before, after: edits[i]!.after, context: result.placed[i]!.context, scope: o.scope ?? null })));
       }
@@ -584,6 +627,15 @@ export class ReviewEngine {
         continue;
       }
       const result = applyEdits(raw.content, edits.edits);
+      // As for a proposal: an Edit change's new lines must be the only copy in their section (R6-1).
+      const repeated = result.ok ? candidates.findIndex((c, i) => !!c.scope
+        && !uniqueInSection(result.content, { before: c.before, after: c.after, context: result.placed[i]!.context, scope: c.scope }, result.placed[i]!.start)) : -1;
+      if (repeated >= 0) {
+        const bad = candidates[repeated]!;
+        conflict(bad, "retry: the new lines would repeat other lines of the section");
+        candidates = candidates.filter((c) => c !== bad);
+        continue;
+      }
       if (result.ok) {
         file.beforeHash = raw.revision;
         file.afterHash = sha256(result.content);
@@ -679,13 +731,25 @@ export class ReviewEngine {
     return false;
   }
 
-  /** Whether a pending change's own target is still in the files: its issue, and its link (R5-2). */
-  private present(change: ChangeRecord): boolean {
-    if (change.kind === "note.replaceSpan") return true;
+  /**
+   * Whether a pending change's own target is still in the files: its issue, and its link (R5-2).
+   * With `content` (a group decision, also when recovery completes one), what it proposed must be
+   * there too (R6-2): a note change's new lines, found by the same rules as a reversal, and a
+   * field's proposed value. A note deletion leaves no lines to look for, so it is not checked.
+   */
+  private async present(change: ChangeRecord, content: boolean): Promise<{ ok: true } | { ok: false; reason: "missing" | "ambiguous" | "changed" }> {
+    if (change.kind === "note.replaceSpan") {
+      if (!content || String(change.after ?? "") === "") return { ok: true };
+      const raw = await this.service.readNoteRaw(change.file).catch(() => null);
+      if (!raw) return { ok: false, reason: "missing" };
+      const loc = this.locateNoteChange(raw.content, change);
+      return loc.status === "ok" ? { ok: true } : { ok: false, reason: loc.status };
+    }
     const issue = this.service.listIssues().find((i) => i.id === change.target.recordId);
-    if (!issue) return false;
-    if (change.kind === "record.addLink") return hasLink(issue, change.after as NoteLink);
-    return true;
+    if (!issue) return { ok: false, reason: "missing" };
+    if (change.kind === "record.addLink" && !hasLink(issue, change.after as NoteLink)) return { ok: false, reason: "missing" };
+    if (change.kind === "record.updateField" && content && !sameValue(issue[change.target.field!], change.after)) return { ok: false, reason: "changed" };
+    return { ok: true };
   }
 
   /** Open changes that depend on this one, transitively, most dependent first (for rejection). */
@@ -749,16 +813,25 @@ export class ReviewEngine {
     if (action === "accept") {
       // A change whose issue or link is no longer in the files cannot be accepted, and nothing
       // that needs it is accepted either.
-      const gone = members.filter((m) => m.state === "pending" && !this.present(m));
+      // In a group, each member's own content is checked as well (R6-2): a note line replaced by
+      // hand is not accepted as if the proposed line were there, and the issue and link it was
+      // to be accepted with stay pending for the user.
+      const gone: Array<{ m: ChangeRecord; reason: "missing" | "ambiguous" | "changed" }> = [];
+      for (const m of members) {
+        if (m.state !== "pending") continue;
+        const p = await this.present(m, members.length > 1);
+        if (!p.ok) gone.push({ m, reason: p.reason });
+      }
       if (gone.length) {
-        for (const m of gone) {
-          m.conflictReason = "missing";
-          this.mark(this.find(m.changeId).run, m, "conflicted", "system", "no longer in the files, so it cannot be accepted");
+        for (const { m, reason } of gone) {
+          m.conflictReason = reason;
+          this.mark(this.find(m.changeId).run, m, "conflicted", "system", "no longer in the files as proposed, so it cannot be accepted");
         }
         await clearDecision();
         this.publish({ type: "review.updated" });
-        throw new NexusError("CONFLICT", `${gone.map((g) => `“${summarise(g)}”`).join(" and ")} ${gone.length === 1 ? "is" : "are"} no longer in the files, so nothing was accepted. Decide ${gone.length === 1 ? "it" : "them"} first.`, {
-          reason: "target-missing", changes: gone.map((g) => ({ changeId: g.changeId, summary: summarise(g) })),
+        const names = gone.map(({ m }) => `“${summarise(m)}”`).join(" and ");
+        throw new NexusError("CONFLICT", `${names} ${gone.length === 1 ? "is" : "are"} no longer in the files as proposed, so nothing was accepted. Decide ${gone.length === 1 ? "it" : "them"} first.`, {
+          reason: "target-missing", changes: gone.map(({ m }) => ({ changeId: m.changeId, summary: summarise(m) })),
         });
       }
     } else {
@@ -823,7 +896,7 @@ export class ReviewEngine {
     let text = content;
     const open = this.unsettledChanges().filter((c) => c.kind === "note.replaceSpan" && c.file === path && (c.state === "pending" || c.state === "conflicted") && !asAccepted.includes(c.changeId));
     for (const c of open.reverse()) {
-      const loc = locate(text, String(c.after), c.context);
+      const loc = this.locateNoteChange(text, c);
       if (loc.status === "ok") text = splice(text, loc.start, loc.length, String(c.before));
     }
     return text;
@@ -911,7 +984,7 @@ export class ReviewEngine {
     if (change.kind === "note.replaceSpan") {
       const raw = await this.service.readNoteRaw(change.file);
       if (!raw) return { ok: false, reason: "missing" };
-      const loc = locate(raw.content, String(change.after), change.context);
+      const loc = this.locateNoteChange(raw.content, change);
       if (loc.status !== "ok") return { ok: false, reason: loc.status };
       const content = splice(raw.content, loc.start, loc.length, String(change.before));
       return {

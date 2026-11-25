@@ -3,13 +3,18 @@
 // tentatively through the review engine. Nothing is final until the user accepts it, and the
 // model has no way to accept anything.
 import { z } from "zod";
-import type { ProposedOperation, RecordField } from "@nexus/schema";
+import type { ChangeRecord, ProposedOperation, RecordField } from "@nexus/schema";
 import { alignHeadings } from "../notes/align";
 import { docLines, occurrences, spanLines } from "../review/spans";
 import { sha256 } from "../workspace/atomic";
 import { acceptedNoteText, type Consulted, type ReadOnlyWorkspace } from "./tools";
 
 const holdsLines = (text: string, lines: string) => occurrences(docLines(text), spanLines(lines)).length > 0;
+/** Whether an edit's lines include the long line of a part that was shown cut short, or its start. */
+const touchesLongLine = (text: string, lines: string) => {
+  const long = docLines(text).filter((l) => l.trim() !== "");
+  return spanLines(lines).some((l) => l.trim() !== "" && long.some((x) => x === l || x.startsWith(l.replace(/…$/, ""))));
+};
 
 const Ref = z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9_-]+$/);
 export const AgentOperation = z.discriminatedUnion("op", [
@@ -60,6 +65,9 @@ export const EDIT_SYSTEM = [
   "After proposing, call final_answer with a short summary in suggestions of what you proposed and why.",
 ].join("\n");
 
+/** The engine's rules for finding a note change's lines, when the workspace view provides them (R6-1). */
+const locatorOf = (ws: ReadOnlyWorkspace) => (ws.locateNoteChange ? (content: string, change: ChangeRecord) => ws.locateNoteChange!(content, change) : undefined);
+
 /** A heading slug of the accepted text, as the slug of the same heading on disk (R4-8). */
 function diskSlugOf(accepted: string, disk: string, slug: string): string | null {
   if (accepted === disk) return slug;
@@ -89,7 +97,7 @@ export async function toProposedOperations(ops: AgentOperation[], ws: ReadOnlyWo
       if (headingSlug !== null) {
         const raw = await ws.readNote(o.note);
         if (!raw) return { error: `Operation ${i + 1}: note not found: ${o.note}` };
-        headingSlug = diskSlugOf(acceptedNoteText(raw.content, raw.path, ws.unsettledChanges()), raw.content, headingSlug);
+        headingSlug = diskSlugOf(acceptedNoteText(raw.content, raw.path, ws.unsettledChanges(), locatorOf(ws)), raw.content, headingSlug);
         if (headingSlug === null) return { error: `Operation ${i + 1}: the heading “${o.heading}” has an edit awaiting review. Link to it after that edit is decided.` };
       }
       out.push({ opId, kind: "record.addLink", file: ".nexus/issues.json", ...(ref ? { issueRef: ref } : { recordKey: existing!.key, baseRevision: existing!.revision }), link: { notePath: o.note, headingSlug, headingText: null } });
@@ -98,14 +106,19 @@ export async function toProposedOperations(ops: AgentOperation[], ws: ReadOnlyWo
       if (!raw) return { error: `Operation ${i + 1}: note not found: ${o.note}` };
       // The part of a section this edit belongs to: a part this run was shown that holds the
       // lines, in the section named (or, with no heading given, the only such part). The scope is
-      // exactly those lines, so lines the model was not shown cannot change (R5-8).
+      // exactly those lines, as the read returned them in editable.text, so lines the model was
+      // not shown cannot change (R5-8, R6-9). A line too long to be shown whole is not editable.
       const ofNote = [...reads.values()].filter((r) => r.path === raw.path && (o.heading === undefined || r.headingSlug === (o.heading ?? null)));
       if (ofNote.length === 0) return { error: `Operation ${i + 1}: read the section that holds these lines with read_note_section first, and give its headingSlug in heading.` };
-      const holding = ofNote.filter((r) => holdsLines(r.text, o.before));
-      if (holding.length === 0) return { error: `Operation ${i + 1}: these lines are not in the part of the section you read. Read the rest of it with read_note_section and fromLine, and use lines exactly as shown.` };
+      const editable = ofNote.filter((r) => r.editable !== false);
+      const holding = editable.filter((r) => holdsLines(r.text, o.before));
+      if (holding.length === 0 && ofNote.some((r) => r.editable === false && touchesLongLine(r.text, o.before))) {
+        return { error: `Operation ${i + 1}: that line is too long to edit. Nexus shows only the start of a line longer than one read, so Edit cannot change it; the user can edit it by hand.` };
+      }
+      if (holding.length === 0) return { error: `Operation ${i + 1}: these lines are not in the part of the section you read. Read the rest of it with read_note_section and fromLine, and use whole lines exactly as editable.text shows them.` };
       if (holding.length > 1) return { error: `Operation ${i + 1}: these lines appear in more than one section or part you read. Give the section's headingSlug in heading, and lines that appear only once.` };
       const read = holding[0]!;
-      const diskSlug = read.headingSlug === null ? null : diskSlugOf(acceptedNoteText(raw.content, raw.path, ws.unsettledChanges()), raw.content, read.headingSlug);
+      const diskSlug = read.headingSlug === null ? null : diskSlugOf(acceptedNoteText(raw.content, raw.path, ws.unsettledChanges(), locatorOf(ws)), raw.content, read.headingSlug);
       if (read.headingSlug !== null && diskSlug === null) return { error: `Operation ${i + 1}: that section has an edit awaiting review. Edit it after that edit is decided.` };
       const after = o.after.replace(/\{\{issue:([^{}]+)\}\}/g, (m, ref: string) => (refToOp.has(ref) ? `{{issue:${refToOp.get(ref)}}}` : m));
       out.push({ opId, kind: "note.replaceSpan", file: raw.path, baseRevision: raw.revision, before: o.before, after, scope: { headingSlug: diskSlug, sectionHash: sha256(read.text), lines: { from: read.from, count: read.count } } });
