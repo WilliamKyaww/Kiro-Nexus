@@ -151,6 +151,63 @@ test("switching keeps a note draft and the position in a review", async ({ page 
   await expect(page.getByRole("status").filter({ hasText: "Unsaved changes" })).toBeVisible();
 });
 
+test("two sessions choosing palettes at the same time both keep their choice, and neither flicks back (R6-12)", async ({ page, browser }) => {
+  const card = (p: Page, group: string, name: string) => p.getByRole("group", { name: group }).locator(".palette-card").filter({ hasText: name });
+  await page.emulateMedia({ colorScheme: "light" });
+  await open(page);
+  await nav(page, "Settings");
+  const otherContext = await browser.newContext(); // session B: a separate browser session on the same profile
+  const pageB = await otherContext.newPage();
+  try {
+    await pageB.emulateMedia({ colorScheme: "light" });
+    await open(pageB);
+    await nav(pageB, "Settings");
+    // Record each palette pair session A shows from now on.
+    await page.evaluate(() => {
+      const w = window as unknown as { __shown: string[] };
+      w.__shown = [];
+      const root = document.documentElement;
+      new MutationObserver(() => w.__shown.push(`${root.getAttribute("data-light")}/${root.getAttribute("data-dark")}`)).observe(root, { attributes: true, attributeFilter: ["data-light", "data-dark"] });
+    });
+    // A's save is held until B's save has finished.
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    let reached!: () => void;
+    const saving = new Promise<void>((r) => { reached = r; });
+    await page.route("**/api/v1/appearance", async (route) => {
+      if (route.request().method() === "GET") return route.continue();
+      reached();
+      await held;
+      await route.continue();
+    });
+    await card(page, "Light palette", "Linen").click(); // A: Linen for light, slow to save
+    await saving;
+    await card(pageB, "Dark palette", "Plum").click(); // B: Plum for dark, meanwhile
+    await expect.poll(stored).toMatchObject({ dark: "plum" });
+    await expect(html(page)).toHaveAttribute("data-dark", "plum"); // B's choice reaches A while A's save is held
+    release();
+    const both = { schemaVersion: 1, mode: "system", light: "linen", dark: "plum" };
+    await expect.poll(stored).toEqual(both);
+    for (const [name, p] of [["A", page], ["B", pageB]] as const) {
+      await expect(html(p), name).toHaveAttribute("data-light", "linen");
+      await expect(html(p), name).toHaveAttribute("data-dark", "plum");
+      await expect(html(p), name).toHaveAttribute("data-palette", "linen");
+      await expect(card(p, "Light palette", "Linen").getByRole("radio"), name).toBeChecked();
+      await expect(card(p, "Dark palette", "Plum").getByRole("radio"), name).toBeChecked();
+    }
+    // A never went back to Porcelain, and once it showed Plum it never went back to Graphite.
+    const shown = await page.evaluate(() => (window as unknown as { __shown: string[] }).__shown);
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.filter((s) => !s.startsWith("linen/")), shown.join(", ")).toEqual([]);
+    expect(shown.slice(shown.indexOf("linen/plum")).filter((s) => s !== "linen/plum"), shown.join(", ")).toEqual([]);
+    await pageB.reload();
+    await expect(html(pageB)).toHaveAttribute("data-palette", "linen");
+    await expect(html(pageB)).toHaveAttribute("data-dark", "plum");
+  } finally {
+    await otherContext.close();
+  }
+});
+
 test("every palette can be chosen, says Selected in words, and meets the contrast targets", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await open(page);
@@ -264,5 +321,46 @@ test("Electron: the stored theme is there at the first paint, and the window ope
     expect(background.toLowerCase()).toBe("#f2f2f5");
   } finally {
     await again.close();
+  }
+});
+
+test("Electron: a stored preference of null falls back to the default, and the app opens on the matching canvas (R6-11)", async () => {
+  const electronPath = (await import("electron")).default as unknown as string;
+  const dir = join(base, "desktop-invalid");
+  const ws = join(dir, "ws");
+  const { cp } = await import("node:fs/promises");
+  await cp(join(process.cwd(), "samples", "meeting-workspace"), ws, { recursive: true });
+  await mkdir(join(dir, "profile"), { recursive: true });
+  await writeFile(join(dir, "profile", "appearance.json"), "null");
+  const env = { ...process.env, NEXUS_PROFILE_DIR: join(dir, "profile"), NEXUS_WORKSPACE: ws } as Record<string, string>;
+  delete env.ELECTRON_RUN_AS_NODE;
+  const app = await electron.launch({ executablePath: electronPath, args: [resolve("apps/desktop/dist/main.cjs")], env, timeout: 60_000 });
+  // A start-up failure is recorded instead of shown: a modal error box would leave the test waiting.
+  const failures: string[] = [];
+  app.process().stderr?.on("data", (d: Buffer) => {
+    for (const line of String(d).split(/\r?\n/)) if (line.startsWith("NEXUS_START_FAILURE ")) failures.push(line.slice("NEXUS_START_FAILURE ".length));
+  });
+  await app.evaluate(({ dialog }) => {
+    dialog.showErrorBox = (title: string, content: string) => { process.stderr.write(`NEXUS_START_FAILURE ${title}: ${content}\n`); };
+  });
+  try {
+    const win = await app.firstWindow().catch((e: Error) => { throw new Error(`The desktop app did not open a window. ${failures.join(" | ") || e.message}`); });
+    await win.waitForLoadState("domcontentloaded");
+    await expect(win.getByRole("switch", { name: "Dark mode" })).toBeVisible();
+    // The default is Match system: the page follows the scheme it sees, main the native one.
+    const pageDark = await win.evaluate(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const nativeDark = await app.evaluate(({ nativeTheme }) => nativeTheme.shouldUseDarkColors);
+    await expect(win.locator("html")).toHaveAttribute("data-mode", "system");
+    await expect(win.locator("html")).toHaveAttribute("data-theme", pageDark ? "dark" : "light");
+    await expect(win.locator("html")).toHaveAttribute("data-palette", pageDark ? "graphite" : "porcelain");
+    const background = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getBackgroundColor());
+    expect(background.toLowerCase()).toBe(nativeDark ? "#0e0f11" : "#f2f2f5");
+    // The next choice replaces the invalid file with a valid preference.
+    await win.getByRole("switch", { name: "Dark mode" }).click();
+    await expect.poll(async () => JSON.parse(await readFile(join(dir, "profile", "appearance.json"), "utf8")))
+      .toEqual({ schemaVersion: 1, mode: pageDark ? "light" : "dark", light: "porcelain", dark: "graphite" });
+    expect(failures).toEqual([]);
+  } finally {
+    await app.close().catch(() => { app.process().kill(); });
   }
 });

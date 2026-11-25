@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { appearanceFromText, effectiveTheme, type Appearance } from "@nexus/schema";
 
 const repoRoot = resolve(__dirname, "..", "..", "..");
 const profileDir = resolve(process.env.NEXUS_PROFILE_DIR ?? join(app.getPath("appData"), "Nexus"));
@@ -153,14 +154,16 @@ async function launchUrl(port: number): Promise<string> {
 
 /**
  * The window's background before the page paints: the canvas of the stored appearance (run 6),
- * so a dark profile never flashes white. The page itself sets the full theme.
+ * so a dark profile never flashes white. The page itself sets the full theme. The file is read
+ * through the service's own validator, so a missing, unreadable or invalid preference gives the
+ * same default here as in the service (R6-11).
  */
-const CANVAS: Record<string, string> = { porcelain: "#f2f2f5", linen: "#f2efe9", mist: "#ecf0f5", graphite: "#0e0f11", midnight: "#0a0f17", plum: "#110e15" };
+const CANVAS: Record<Appearance["light"] | Appearance["dark"], string> = { porcelain: "#f2f2f5", linen: "#f2efe9", mist: "#ecf0f5", graphite: "#0e0f11", midnight: "#0a0f17", plum: "#110e15" };
 function windowBackground(): string {
-  let a: { mode?: string; light?: string; dark?: string } = {};
-  try { a = JSON.parse(readFileSync(join(profileDir, "appearance.json"), "utf8")); } catch { /* no preference yet: Match system */ }
-  const dark = a.mode === "dark" || ((a.mode ?? "system") === "system" && nativeTheme.shouldUseDarkColors);
-  return dark ? CANVAS[a.dark ?? ""] ?? CANVAS.graphite! : CANVAS[a.light ?? ""] ?? CANVAS.porcelain!;
+  let text: string | null = null;
+  try { text = readFileSync(join(profileDir, "appearance.json"), "utf8"); } catch { /* no preference yet, or unreadable: the default */ }
+  const a = appearanceFromText(text);
+  return effectiveTheme(a, nativeTheme.shouldUseDarkColors) === "dark" ? CANVAS[a.dark] : CANVAS[a.light];
 }
 async function createWindow(): Promise<void> {
   const port = servicePort ?? (servicePort = await startService());
