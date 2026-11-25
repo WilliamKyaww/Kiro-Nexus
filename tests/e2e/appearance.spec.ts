@@ -22,7 +22,11 @@ async function open(page: Page) {
   await page.goto(await launchUrl(svc!));
   await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
 }
-const stored = async () => JSON.parse(await readFile(join(base, "profile", "appearance.json"), "utf8"));
+// Null until the first save writes the file: expect.poll fails at once if this throws, rather
+// than polling again, so a fresh profile under load must not throw.
+const stored = async () => {
+  try { return JSON.parse(await readFile(join(base, "profile", "appearance.json"), "utf8")); } catch { return null; }
+};
 
 test("a fresh profile matches the system, and the quick switch picks the opposite explicitly, by keyboard, keeping focus", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "dark" });
