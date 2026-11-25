@@ -197,6 +197,11 @@ One record per reminder occurrence, shared by every surface (DEC-009):
   than 60 days past. `prunedUpTo` (since run 6) is the latest scheduled
   instant pruned: nothing at or before it is delivered or recorded again,
   even if the clock is set back (R5-6).
+- If the file is missing when Nexus opens a workspace whose `scheduler.json`
+  shows it has run before, Nexus writes a new log at once whose `prunedUpTo`
+  is the latest time it had reached (`passedUpTo`). Nothing at or before
+  that is delivered or listed again, even if the clock is set back (R6-8).
+- With no `scheduler.json` either, it is a first use.
 - Only a missing file means first use. An empty file, a file that is not
   valid JSON or not in this format, or one that cannot be read is damaged
   (R5-5):
@@ -204,16 +209,24 @@ One record per reminder occurrence, shared by every surface (DEC-009):
   - Notifications names the file and offers **Start a new delivery log**
     (`POST /api/v1/reminders/delivery-log/replace`). It first keeps a copy
     as `deliveries.damaged-<instant>.json` beside it, and the new log's
-    `prunedUpTo` is the moment of the replacement, so nothing that came due
-    earlier is delivered or listed again;
+    `prunedUpTo` is the moment of the replacement, or the latest time Nexus
+    had reached if that is later, so nothing that came due earlier is
+    delivered or listed again;
   - after a repair by hand, reminders resume at the next tick, without
     reopening the workspace.
 
 ### `state/scheduler.json` (service state)
 
-`{ "schemaVersion": 1, "lastTickAt": "…" }` records the end of the last
-period in which Nexus was delivering reminders. Occurrences between it and
-the next start count as missed.
+`{ "schemaVersion": 1, "lastTickAt": "…", "passedUpTo": "…" }`:
+
+- `lastTickAt` records the end of the last period in which Nexus was
+  delivering reminders. Occurrences between it and the next start count as
+  missed. It follows the clock back, but never below the delivery log's
+  `prunedUpTo`.
+- `passedUpTo` (since the R6 repairs) is the latest time the scheduler has
+  reached. It never goes back, so a delivery log lost after the clock was
+  set back still keeps its boundary (R6-8). Files from before it have none,
+  and then `lastTickAt` stands in.
 
 ## `lock`
 

@@ -97,7 +97,16 @@ export const DeliveryLog = z.strictObject({
 export type DeliveryLog = z.infer<typeof DeliveryLog>;
 
 /** `.nexus/state/scheduler.json`: the end of the last period in which Nexus was delivering. */
-export const SchedulerState = z.strictObject({ schemaVersion: z.literal(SCHEMA_VERSION), lastTickAt: IsoInstant.nullable() });
+export const SchedulerState = z.strictObject({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  lastTickAt: IsoInstant.nullable(),
+  /**
+   * The latest time the scheduler has reached, which never goes back, even when the clock does.
+   * A lost delivery log takes its boundary from it, so nothing already passed is delivered again
+   * (R6-8). Added in the R6 repairs; older files have none.
+   */
+  passedUpTo: IsoInstant.optional(),
+});
 export type SchedulerState = z.infer<typeof SchedulerState>;
 
 /**

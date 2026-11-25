@@ -25,6 +25,8 @@ const TICK_MS = 30_000;
 const KEEP = 500;
 const KEEP_DAYS = 60;
 const LOG_FILE = ".nexus/state/deliveries.json";
+/** The later of two instants, ignoring a missing one. */
+const latest = (a: Date | null, b: Date | null): Date | null => (a && b ? (a.getTime() >= b.getTime() ? a : b) : a ?? b);
 
 /**
  * The delivery log exists but cannot be read or is not valid (R5-5). It is never taken for a new
@@ -97,20 +99,25 @@ export class Scheduler {
    * last tick may already have been delivered, so it is the log's boundary.
    */
   async readLog(): Promise<DeliveryLogT> {
+    return (await this.loadLog()).log;
+  }
+
+  private async loadLog(): Promise<{ log: DeliveryLogT; missing: boolean }> {
     let raw: string | null;
     try { raw = await this.service.readStateFile("deliveries.json"); } catch (e) {
       const code = e instanceof Error ? /\((\w+)\)\.$/.exec(e.message)?.[1] : undefined;
       throw damagedLog(`could not be read${code ? ` (${code})` : ""}`);
     }
     if (raw === null) {
-      const last = await this.lastTickAt();
-      return { schemaVersion: 1, seenUpTo: null, deliveries: [], ...(last ? { prunedUpTo: last.toISOString() } : {}) };
+      // A lost log: anything up to the latest time Nexus reached may have been delivered (R6-8).
+      const passed = (await this.checkpoint()).passedUpTo;
+      return { log: { schemaVersion: 1, seenUpTo: null, deliveries: [], ...(passed ? { prunedUpTo: passed.toISOString() } : {}) }, missing: true };
     }
     let value: unknown;
     try { value = JSON.parse(raw); } catch { throw damagedLog(raw.trim() ? "is not valid JSON" : "is empty"); }
     const parsed = DeliveryLog.safeParse(value);
     if (!parsed.success) throw damagedLog("is not in the format Nexus expects");
-    return parsed.data;
+    return { log: parsed.data, missing: false };
   }
 
   /**
@@ -134,17 +141,41 @@ export class Scheduler {
     await this.service.writeStateFile("deliveries.json", serialise(DeliveryLog, log));
   }
 
-  private async lastTickAt(): Promise<Date | null> {
+  /**
+   * The checkpoint: the last tick, and the latest time Nexus has reached (`passedUpTo`, which
+   * never goes back). A file from before the R6 repairs has no `passedUpTo`; its last tick is the
+   * best known instead.
+   */
+  private async checkpoint(): Promise<{ lastTickAt: Date | null; passedUpTo: Date | null }> {
     const raw = await this.service.readStateFile("scheduler.json");
-    if (raw === null) return null;
-    try { const s = SchedulerState.parse(JSON.parse(raw)); return s.lastTickAt ? new Date(s.lastTickAt) : null; } catch {
+    if (raw === null) return { lastTickAt: null, passedUpTo: null };
+    try {
+      const s = SchedulerState.parse(JSON.parse(raw));
+      const last = s.lastTickAt ? new Date(s.lastTickAt) : null;
+      const passed = s.passedUpTo ? new Date(s.passedUpTo) : null;
+      return { lastTickAt: last, passedUpTo: latest(passed, last) };
+    } catch {
       this.warnOnce("scheduler-state", "reminders: .nexus/state/scheduler.json is not valid; reminders that came due while Nexus was closed cannot be listed");
-      return null;
+      return { lastTickAt: null, passedUpTo: null };
     }
   }
 
-  private async setLastTickAt(at: Date): Promise<void> {
-    await this.service.writeStateFile("scheduler.json", serialise(SchedulerState, { schemaVersion: 1, lastTickAt: at.toISOString() }));
+  private async lastTickAt(): Promise<Date | null> {
+    return (await this.checkpoint()).lastTickAt;
+  }
+
+  /**
+   * Never earlier than the log's boundary (R6-8). A missing log takes its boundary from the
+   * checkpoint, so moving it back with the clock would let a delivered occurrence come round
+   * again. Nothing at or before the boundary is delivered or listed anyway, so holding the
+   * checkpoint there loses no reminder. `passedUpTo` keeps the latest time ever reached, so a
+   * clock set back while the log still exists cannot lower the boundary of a log lost later.
+   */
+  private async setLastTickAt(at: Date, log: DeliveryLogT): Promise<void> {
+    const floor = log.prunedUpTo ? new Date(log.prunedUpTo) : null;
+    const value = latest(floor, at)!;
+    const passed = latest((await this.checkpoint()).passedUpTo, value)!;
+    await this.service.writeStateFile("scheduler.json", serialise(SchedulerState, { schemaVersion: 1, lastTickAt: value.toISOString(), passedUpTo: passed.toISOString() }));
   }
 
   private warnOnce(key: string, line: string): void {
@@ -217,7 +248,7 @@ export class Scheduler {
   private async startUp(): Promise<number> {
     if (this.ready) return 0;
     const now = this.clock.now();
-    const log = await this.readLog();
+    const { log, missing } = await this.loadLog();
     let count = 0;
     for (const d of log.deliveries) {
       if (d.status === "delivering") { d.status = "missed"; d.batch = this.batch; count++; }
@@ -227,8 +258,10 @@ export class Scheduler {
       for (const o of (await this.dueBetween(last, now, log)).due) { log.deliveries.push(this.entry(o, "missed")); count++; }
     }
     if (this.stopped) return 0;
-    if (count) await this.writeLog(log);
-    await this.setLastTickAt(now);
+    // A lost log's boundary comes from the checkpoint: it is written down before the checkpoint
+    // is touched, so a clock set back cannot move it (R6-8). A first use has no boundary to keep.
+    if (count || (missing && log.prunedUpTo)) await this.writeLog(log);
+    await this.setLastTickAt(now, log);
     this.ready = true;
     this.lastFailure = null;
     if (count) this.log(`reminders: ${count} reminder${count === 1 ? "" : "s"} came due while Nexus was closed`);
@@ -278,7 +311,7 @@ export class Scheduler {
         delivered.push(d);
       }
       if (this.stopped) return delivered;
-      await this.setLastTickAt(now);
+      await this.setLastTickAt(now, log);
       this.lastFailure = null;
       return delivered;
     });
@@ -338,8 +371,7 @@ export class Scheduler {
       const damaged = await this.readLog().then(() => false, (e: unknown) => { if (isDamagedLog(e)) return true; throw e; });
       if (!damaged) throw new NexusError("CONFLICT", "The reminder delivery log is not damaged, so Nexus did not replace it.");
       const now = this.clock.now();
-      const last = await this.lastTickAt();
-      const boundary = last && last.getTime() > now.getTime() ? last : now;
+      const boundary = latest((await this.checkpoint()).passedUpTo, now)!;
       const keptAs = await this.service.keepDamagedStateFile("deliveries.json", now);
       await this.service.writeStateFile("deliveries.json", serialise(DeliveryLog, { schemaVersion: 1, seenUpTo: now.toISOString(), deliveries: [], prunedUpTo: boundary.toISOString() }));
       this.log(`reminders: started a new delivery log; the damaged one is kept as ${keptAs}`);
