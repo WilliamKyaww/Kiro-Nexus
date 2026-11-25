@@ -25,6 +25,38 @@ describe("R5-10: a cited section is checked against the text it read", () => {
   });
 });
 
+// R6-10 (Astra 6.2's review of run 6): both sections of the same name began with "Status", so the
+// excerpt matched the first one and the citation opened the wrong section without saying so.
+describe("R6-10: a cited section must be the only one of its name that holds the text it read", () => {
+  const original = "# Day\n\n## Tasks\n\nStatus\nDeliver parcels.\n";
+  const inserted = "# Day\n\n## Tasks\n\nStatus\nOrder lunch.\n\n## Tasks\n\nStatus\nDeliver parcels.\n";
+  const headings = [{ slug: "day", text: "Day", line: 0 }, { slug: "tasks", text: "Tasks", line: 2 }, { slug: "tasks-1", text: "Tasks", line: 7 }];
+
+  it("does not open the inserted section just because it also starts with the excerpt's line (the reviewer's case)", () => {
+    // A citation saved before run 6's repair keeps the one line it read.
+    expect(checkCitedSection(inserted, headings, "tasks", "Status")).toEqual({ slug: "tasks", moved: false, uncertain: true });
+  });
+
+  it("follows a longer excerpt to the section that holds all of it", () => {
+    expect(checkCitedSection(inserted, headings, "tasks", "Status\nDeliver parcels.")).toEqual({ slug: "tasks-1", moved: true, uncertain: false });
+    expect(checkCitedSection(inserted, headings, "tasks-1", "Status\nDeliver parcels.")).toEqual({ slug: "tasks-1", moved: false, uncertain: false });
+    expect(checkCitedSection(inserted, headings, "tasks", "Status\nOrder lunch.")).toEqual({ slug: "tasks", moved: false, uncertain: false });
+    // Without a second section of that name, the cited one is still checked as before.
+    expect(checkCitedSection(original, headings.slice(0, 2), "tasks", "Status\nDeliver parcels.")).toEqual({ slug: "tasks", moved: false, uncertain: false });
+    expect(checkCitedSection(original, headings.slice(0, 2), "tasks", "Book the van.\nCollect keys.")).toEqual({ slug: "tasks", moved: false, uncertain: true });
+  });
+
+  it("says it cannot tell when the sections hold the same text", () => {
+    const twins = "# Day\n\n## Tasks\n\nStatus\nDeliver parcels.\n\n## Tasks\n\nStatus\nDeliver parcels.\n";
+    expect(checkCitedSection(twins, headings, "tasks-1", "Status\nDeliver parcels.")).toEqual({ slug: "tasks-1", moved: false, uncertain: true });
+  });
+
+  it("prefers the section holding more of the excerpt after an edit to one of its lines", () => {
+    const edited = "# Day\n\n## Tasks\n\nStatus\nOrder lunch.\n\n## Tasks\n\nStatus\nDeliver parcels by noon.\nCollect keys.\n";
+    expect(checkCitedSection(edited, headings, "tasks", "Status\nDeliver parcels.\nCollect keys.")).toEqual({ slug: "tasks-1", moved: true, uncertain: false });
+  });
+});
+
 const pending: HeadingAlias = { slug: "approved-heading", to: "pending-preview", toText: "Pending preview", reason: "pending-rename" };
 
 describe("opening a heading link through renames", () => {

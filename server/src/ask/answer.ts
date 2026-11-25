@@ -165,13 +165,131 @@ export function datesIn(text: string): DateValue[] {
 
 /** An issue status a text states, as Nexus shows it ("to do", "in progress", "done"); "not done" is negated. */
 export interface StatusValue { status: "todo" | "in_progress" | "done"; negated: boolean }
-const STATUS_FORMS: Array<[RegExp, StatusValue["status"]]> = [[/\bto[ -]?do\b/gi, "todo"], [/\bin[ _-]progress\b/gi, "in_progress"], [/\bdone\b/gi, "done"]];
-export function statusesIn(text: string): StatusValue[] {
-  const out: StatusValue[] = [];
-  for (const [form, status] of STATUS_FORMS) {
-    for (const m of text.matchAll(form)) out.push({ status, negated: /(?:\bnot|n['’]t)\s+(?:yet\s+)?$/i.test(text.slice(0, m.index)) });
+
+/**
+ * Ordinary status wording (R6-6). "Started" is in progress, and "not started" is to do;
+ * "unfinished" and "incomplete" are negated "done". A ticked checkbox reads as done.
+ */
+const STATUS_FORMS: Array<{ form: RegExp; status: StatusValue["status"]; negative?: true; started?: true }> = [
+  { form: /\bto[ -]?do\b/gi, status: "todo" },
+  { form: /\bin[ _-]progress\b/gi, status: "in_progress" },
+  { form: /\bunder[ -]?way\b/gi, status: "in_progress" },
+  { form: /\bongoing\b/gi, status: "in_progress" },
+  { form: /\b(?:started|begun)\b/gi, status: "in_progress", started: true },
+  { form: /\b(?:done|finished|completed?|ticked)\b/gi, status: "done" },
+  { form: /\b(?:unfinished|incomplete|unticked)\b/gi, status: "done", negative: true },
+];
+/** "not", "isn't", "never", "no longer", with the adverbs that may follow, just before a status. */
+const NEGATION_BEFORE_STATUS = /(?:\b(?:not|never)|n['’]t|\bno longer)\s+(?:(?:yet|been|being|currently|actually|really|fully|even|ever|already|quite|still)\s+)*$/i;
+/** A negation up to three words before a date ("not due on", "isn't due by"). */
+const NEGATION_BEFORE_DATE = /(?:\b(?:not|never)|n['’]t|\bno longer)((?:\s+[a-z’']+){0,3})\s*$/i;
+
+/** A value a clause states, and the span of text that states it, its negation included. */
+interface Stated { start: number; end: number; negated: boolean }
+export interface StatedValues { dates: Array<Stated & { date: DateValue }>; statuses: Array<Stated & { status: StatusValue["status"] }> }
+
+/**
+ * The due dates and statuses a clause states, with negation (R6-6). A negation belongs to the
+ * value it comes just before, and never reaches back past an earlier value. "Not due until
+ * 5 December" states 5 December.
+ */
+export function valuesIn(text: string): StatedValues {
+  type Found = { start: number; end: number; date?: DateValue; status?: StatusValue["status"]; negative?: boolean; started?: boolean };
+  const found: Found[] = [];
+  const month = (name: string) => MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+  const date = (m: RegExpMatchArray, year: number | null, mo: number, day: number) => {
+    if (mo >= 1 && mo <= 12 && day >= 1 && day <= 31) found.push({ start: m.index!, end: m.index! + m[0].length, date: { year, month: mo, day } });
+  };
+  for (const m of text.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) date(m, Number(m[1]), Number(m[2]), Number(m[3]));
+  for (const m of text.matchAll(DAY_MONTH)) date(m, m[3] ? Number(m[3]) : null, month(m[2]!), Number(m[1]));
+  for (const m of text.matchAll(MONTH_DAY)) date(m, m[3] ? Number(m[3]) : null, month(m[1]!), Number(m[2]));
+  for (const f of STATUS_FORMS) for (const m of text.matchAll(f.form)) found.push({ start: m.index!, end: m.index! + m[0].length, status: f.status, negative: f.negative, started: f.started });
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const out: StatedValues = { dates: [], statuses: [] };
+  let prevEnd = 0;
+  for (const v of found) {
+    if (v.start < prevEnd) continue; // overlaps a value already read
+    const window = text.slice(prevEnd, v.start);
+    let start = v.start;
+    if (v.date) {
+      const n = window.match(NEGATION_BEFORE_DATE);
+      if (n) start = prevEnd + n.index!;
+      out.dates.push({ start, end: v.end, negated: !!n && !/\b(?:until|till)\b/i.test(n[1] ?? ""), date: v.date });
+    } else {
+      const n = window.match(NEGATION_BEFORE_STATUS);
+      if (n) start = prevEnd + n.index!;
+      const negated = !!n !== !!v.negative;
+      // "Not started" is a status of its own: to do.
+      if (v.started && negated) out.statuses.push({ start, end: v.end, negated: false, status: "todo" });
+      else out.statuses.push({ start, end: v.end, negated, status: v.status! });
+    }
+    prevEnd = v.end;
   }
   return out;
+}
+
+export function statusesIn(text: string): StatusValue[] {
+  return valuesIn(text).statuses.map(({ status, negated }) => ({ status, negated }));
+}
+
+/**
+ * The clauses of a statement, each checked on its own (R6-6): its sentences, and within them
+ * the parts joined by a semicolon or by "but", "and", "while", "whereas", "although", "though"
+ * or "however". Text in quotation marks or brackets is never split.
+ */
+export function clausesOf(text: string): string[] {
+  const masked = text.replace(/“[^”]*”|"[^"]*"|\([^)]*\)/g, (m) => "\u0001".repeat(m.length));
+  const out: string[] = [];
+  let from = 0;
+  for (const m of masked.matchAll(/[.!?]+(?=\s+[A-Z“"‘(\u0001]|\s*$)|\s*;\s*|,?\s+(?:but|and|while|whereas|although|though|however)\b,?(?=\s)/g)) {
+    out.push(text.slice(from, m.index));
+    from = m.index! + m[0].length;
+  }
+  out.push(text.slice(from));
+  return out.map((c) => c.trim()).filter((c) => c !== "");
+}
+
+/**
+ * The words that may surround the values Nexus checks in a statement about an action whose
+ * tracking it has checked (R6-6). Besides these, such a statement may use only the words of
+ * the actions, and of the names of the sources it cites. Anything else ("no", "matching",
+ * "untracked") is a claim Nexus cannot check, so the statement is not confirmed.
+ */
+const NEUTRAL_WORDS = new Set(`a an the this that these those it its their his her both which who whose
+  is are was were be been being has have had does do did will would should can could may might must
+  on in at by for of to from with as into under about per according
+  and but while whereas although though however also so
+  still already currently now yet
+  due date dated deadline set scheduled planned expected
+  issue record card task action item work ticket entry
+  note marks marked lists listed shows says records recorded states
+  section heading checklist checkbox meeting board project`.split(/\s+/).filter(Boolean));
+/** Words never accepted in such a statement outside a checked value, even when an action's text or a source's name holds them. */
+const NEVER_NEUTRAL = new Set(["no", "not", "none", "never", "nothing", "nobody", "neither", "nor", "without", "cannot", "untracked", "missing", "lack", "lacks", "lacking", "absent"]);
+const wordsOf = (text: string) => text.toLowerCase().replace(/[’']s\b/g, "").match(/[a-z0-9]+(?:['’][a-z]+)*/g) ?? [];
+/**
+ * A test for a set of words: a word of four or more letters also matches by its stem ("marked",
+ * "builds"); a shorter one only as written, so that "not" never passes as the stem of "note".
+ */
+function wordTest(words: Iterable<string>): (w: string) => boolean {
+  const exact = new Set(words);
+  const stems = new Set([...exact].filter((w) => w.length >= 4).map((w) => [...contentWords(w)][0] ?? w));
+  return (w) => exact.has(w) || (w.length >= 4 && stems.has([...contentWords(w)][0] ?? w));
+}
+const isNeutral = wordTest(NEUTRAL_WORDS);
+/** The words of a statement's clauses that are neither a value Nexus checks, a key, nor an allowed word. */
+function uncheckedWords(clauses: string[], keys: string[], allowedText: string[]): string[] {
+  const isAllowed = wordTest(allowedText.flatMap(wordsOf));
+  const keyForm = keys.length ? new RegExp(`\\b(?:${keys.map((k) => k.replace(/[^A-Za-z0-9]/g, "\\$&")).join("|")})\\b`, "gi") : null;
+  const out = new Set<string>();
+  for (const clause of clauses) {
+    const v = valuesIn(clause);
+    let rest = clause;
+    for (const s of [...v.dates, ...v.statuses]) rest = rest.slice(0, s.start) + " ".repeat(s.end - s.start) + rest.slice(s.end);
+    if (keyForm) rest = rest.replace(keyForm, (m) => " ".repeat(m.length));
+    for (const w of wordsOf(rest)) if (NEVER_NEUTRAL.has(w) || (!isNeutral(w) && !isAllowed(w))) out.add(w);
+  }
+  return [...out];
 }
 
 const sameDate = (a: DateValue, b: DateValue) => a.month === b.month && a.day === b.day && (a.year === null || b.year === null || a.year === b.year);
@@ -287,60 +405,91 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
   }
 
   // 2. Free-text facts and discrepancies.
-  // a. One that cites an issue record is checked against the fields the run read (R5-3): each
-  //    date or status it states must agree with a cited source. A date may be the record's due
-  //    date or appear in a cited note section; a status may be the record's, or the checkbox of
-  //    an action it is about in a cited section (the note's side of a discrepancy).
+  // a. One that cites an issue record is checked against the fields the run read (R5-3), clause
+  //    by clause (R6-6): each date or status a clause states, negated or not, must agree with a
+  //    cited source. A date may be the record's due date or appear in a cited note section; a
+  //    status may be the record's, or the checkbox of an action the clause is about in a cited
+  //    section (the note's side of a discrepancy). A clause's values are compared with the
+  //    record it names, else the one it names by title, else the previous clause's, else every
+  //    record cited.
   // b. When the answer gives tracking entries, they are the checked statement about each action
-  //    (R4-4). A statement about one of those actions is recorded only as an ordinary statement
-  //    about the issue Nexus confirmed tracks it: it cites that issue and states one of its
-  //    values as the record has it (for example its due date, or a status mismatch with the
-  //    note). Anything else would restate or deny the tracking result in unchecked wording.
+  //    (R4-4). A statement about one of those actions, or citing or naming the issue Nexus
+  //    confirmed tracks one, is recorded only as an ordinary statement about that issue: it
+  //    cites the issue, states one of its values as the record has it (for example its due
+  //    date, or a status mismatch with the note), and says nothing else that Nexus cannot check
+  //    (R6-6). One correct value cannot carry a denial of the tracking result in another clause.
   // c. With issue coverage incomplete, one that rests on a section of actions but cites no issue
   //    record cannot be confirmed (a structural rule).
   const tracked = tracking.map((t) => ({ action: t.action, confirmedIssues: t.confirmed && t.status === "tracked" ? t.issues : [] }));
-  const aboutTracked = (item: AnswerItem) => tracked.filter((t) => isAbout(item.text, t.action));
+  const keyForm = (key: string) => new RegExp(`\\b${key.replace(/[^A-Za-z0-9]/g, "\\$&")}\\b`, "i");
+  const names = (text: string, h: string) => { const rec = handles.evidenceOf(h)?.issue; return !!rec && keyForm(rec.key).test(text); };
+  const aboutTracked = (item: AnswerItem) => tracked.filter((t) => isAbout(item.text, t.action) || t.confirmedIssues.some((h) => item.sources.includes(h) || names(item.text, h)));
+  const citedRecords = (item: AnswerItem) => item.sources.flatMap((h) => { const rec = handles.evidenceOf(h)?.issue; return rec ? [{ h, rec }] : []; });
+  const trackingQualifier = (item: AnswerItem) => {
+    const records = citedRecords(item).map((x) => asRead(x.rec));
+    return records.length
+      ? `Not confirmed: Nexus checks whether an action is tracked only through its own sentences above, and the record${records.length === 1 ? "" : "s"} it read say${records.length === 1 ? "s" : ""} ${records.join("; ")}.`
+      : "Not confirmed: Nexus checks whether an action is tracked only through its own sentences above, not through the model's wording.";
+  };
   /** Which cited issue records agree with a stated value, and a qualifier if a value agrees with no cited source. */
   const checkValues = (item: AnswerItem): { agrees: Set<string>; problem: string | null } => {
     const agrees = new Set<string>();
-    const cited = item.sources.flatMap((h) => { const rec = handles.evidenceOf(h)?.issue; return rec ? [{ h, rec }] : []; });
+    const cited = citedRecords(item);
     if (cited.length === 0) return { agrees, problem: null };
-    const dates = datesIn(item.text);
-    const statuses = statusesIn(item.text);
-    if (dates.length === 0 && statuses.length === 0) return { agrees, problem: null };
-    // The records a statement is about: those it names by key, else those whose title it
-    // matches strongly, else every record it cites.
-    const named = cited.filter((x) => new RegExp(`\\b${x.rec.key.replace(/[^A-Za-z0-9]/g, "\\$&")}\\b`, "i").test(item.text));
-    const titled = cited.filter((x) => matchStrength(item.text, { title: x.rec.title, description: "" }).level === "strong");
-    const about = named.length ? named : titled.length ? titled : cited;
     const notes = item.sources.filter((h) => handles.get(h)?.target.kind === "note");
     const noteDates = notes.flatMap((h) => {
       const c = handles.get(h)!;
       return datesIn(`${c.target.kind === "note" ? c.target.path : ""} ${c.label} ${handles.evidenceOf(h)?.sectionText ?? ""}`);
     });
-    const tasks = notes.flatMap((h) => handles.evidenceOf(h)?.tasks ?? []).filter((t) => isAbout(item.text, t.text));
-    // `agrees` counts only a value that pins a field down: the due date, or the status itself.
-    // "Not done" fits two statuses, and a date in a description is not the due date, so
-    // neither can contradict the record nor show that the statement is about its values.
-    let wrong = false;
-    for (const d of dates) {
-      const due = about.filter((x) => dueDates(x.rec.due).some((a) => sameDate(d, a)));
-      due.forEach((x) => agrees.add(x.h));
-      const elsewhere = about.some((x) => datesIn(`${x.rec.title} ${x.rec.description}`).some((a) => sameDate(d, a))) || noteDates.some((a) => sameDate(d, a));
-      if (due.length === 0 && !elsewhere) wrong = true;
+    const noteTasks = notes.flatMap((h) => handles.evidenceOf(h)?.tasks ?? []);
+    const wrongAbout = new Set<(typeof cited)[number]>();
+    const wrongTasks = new Set<{ text: string; done: boolean }>();
+    let previous: typeof cited | null = null;
+    for (const clause of clausesOf(item.text)) {
+      const { dates, statuses } = valuesIn(clause);
+      const named = cited.filter((x) => keyForm(x.rec.key).test(clause));
+      const titled = cited.filter((x) => matchStrength(clause, { title: x.rec.title, description: "" }).level === "strong");
+      const own = named.length ? named : titled.length ? titled : null;
+      const about = own ?? previous ?? cited;
+      if (own) previous = own;
+      if (dates.length === 0 && statuses.length === 0) continue;
+      const tasks = noteTasks.filter((t) => isAbout(clause, t.text));
+      // `agrees` counts only a value that pins a field down: the due date, or the status itself.
+      // "Not done" fits two statuses, "not due on 3 December" fits every other date, and a date
+      // in a description is not the due date, so none of them shows that the statement is
+      // about the record's values. A negated value that the record holds contradicts it.
+      let wrong = false;
+      for (const d of dates) {
+        const due = about.filter((x) => dueDates(x.rec.due).some((a) => sameDate(d.date, a)));
+        if (d.negated) { if (due.length) wrong = true; continue; }
+        due.forEach((x) => agrees.add(x.h));
+        const elsewhere = about.some((x) => datesIn(`${x.rec.title} ${x.rec.description}`).some((a) => sameDate(d.date, a))) || noteDates.some((a) => sameDate(d.date, a));
+        if (due.length === 0 && !elsewhere) wrong = true;
+      }
+      for (const s of statuses) {
+        const hits = about.filter((x) => (x.rec.status === s.status) !== s.negated);
+        if (!s.negated) hits.forEach((x) => agrees.add(x.h));
+        // A ticked checkbox reads as "done"; an unticked one as anything but "done".
+        const inNote = tasks.some((t) => t.done ? (s.status === "done") !== s.negated : !(s.status === "done" && !s.negated));
+        if (hits.length === 0 && !inNote) wrong = true;
+      }
+      if (wrong) { about.forEach((x) => wrongAbout.add(x)); tasks.forEach((t) => wrongTasks.add(t)); }
     }
-    for (const s of statuses) {
-      const hits = about.filter((x) => (x.rec.status === s.status) !== s.negated);
-      if (!s.negated) hits.forEach((x) => agrees.add(x.h));
-      // A ticked checkbox reads as "done"; an unticked one as anything but "done".
-      const inNote = tasks.some((t) => t.done ? (s.status === "done") !== s.negated : !(s.status === "done" && !s.negated));
-      if (hits.length === 0 && !inNote) wrong = true;
-    }
-    if (!wrong) return { agrees, problem: null };
+    if (wrongAbout.size === 0) return { agrees, problem: null };
+    const about = [...wrongAbout];
     const records = about.map((x) => asRead(x.rec)).join("; ");
-    const marks = tasks.map((t) => `“${t.text}” as ${t.done ? "done" : "not done"}`).join(" and ");
+    const marks = [...wrongTasks].map((t) => `“${t.text}” as ${t.done ? "done" : "not done"}`).join(" and ");
     return { agrees, problem: `Not confirmed: the record${about.length === 1 ? "" : "s"} Nexus read say${about.length === 1 ? "s" : ""} ${records}${marks ? `, and the note marks ${marks}` : ""}.` };
   };
+  /** The words a statement may use besides the values Nexus checks: the actions, and the names of the sources it cites. */
+  const allowedText = (item: AnswerItem) => [
+    ...tracking.map((t) => t.action),
+    ...item.sources.flatMap((h) => {
+      const c = handles.get(h);
+      if (!c) return [];
+      return c.target.kind === "note" ? [c.label, c.target.path, c.target.headingText ?? ""] : [c.label, handles.evidenceOf(h)?.issue?.title ?? ""];
+    }),
+  ];
   const place = (list: AnswerItem[], item: AnswerItem) => {
     const values = checkValues(item);
     if (values.problem) { unconfirmed.push({ ...item, qualifier: values.problem }); return; }
@@ -348,8 +497,15 @@ export function validateAnswer(raw: unknown, handles: HandleRegistry, coverage: 
     // issue record) can restate one.
     const actions = item.sources.some(hasTasks) || item.sources.some(isIssue) ? aboutTracked(item) : [];
     if (actions.length && !actions.every((t) => t.confirmedIssues.some((h) => item.sources.includes(h) && values.agrees.has(h)))) {
-      unconfirmed.push({ ...item, qualifier: "Not confirmed: Nexus checks whether an action is tracked only through its own sentences above, not through the model's wording." });
+      unconfirmed.push({ ...item, qualifier: trackingQualifier(item) });
       return;
+    }
+    if (actions.length) {
+      const keys = citedRecords(item).map((x) => x.rec.key);
+      if (uncheckedWords(clausesOf(item.text), keys, allowedText(item)).length) {
+        unconfirmed.push({ ...item, qualifier: trackingQualifier(item) });
+        return;
+      }
     }
     const aboutActions = item.sources.some(hasTasks) && !item.sources.some(isIssue);
     if (!coverage.complete && aboutActions) unconfirmed.push({ ...item, qualifier: coverageQualifier(coverage) });

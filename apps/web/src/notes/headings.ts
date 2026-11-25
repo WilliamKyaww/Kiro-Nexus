@@ -66,22 +66,37 @@ export function resolveHeadingParam(heading: string, onDisk: string[], aliases: 
 }
 
 /**
- * Check a cited section against the line of text the citation read (`excerpt`, R5-10). When
- * the section no longer holds it but exactly one other heading of the same name does (a
- * heading of that name was added above it, say), that one is the cited section. When none
- * does, the link is uncertain. Without an excerpt (citations from before run 6), nothing is
- * checked.
+ * Check a cited section against the text the citation read (`excerpt`: one line, or up to three
+ * joined by "\n"; R5-10, R6-10). Every heading with the cited heading's name is a candidate,
+ * the cited one included, and each is scored by how much of the excerpt its section holds: all
+ * of it, in order, scores highest; otherwise each excerpt line it holds counts once.
+ *
+ * - The one candidate with the highest score is the cited section (`moved` when it is not the
+ *   resolved one, because a heading of that name was added above it, say).
+ * - When no candidate holds any of the excerpt, or several share the highest score (both
+ *   sections start with "Status", say), the link is uncertain: the note page says that it
+ *   cannot tell, rather than open one of them as if it were sure.
+ *
+ * Without an excerpt (citations from before run 6), nothing is checked.
  */
 export function checkCitedSection(content: string, headings: Array<{ slug: string; text: string; line: number }>, slug: string, excerpt: string | null):
   { slug: string; moved: boolean; uncertain: boolean } {
   if (!excerpt) return { slug, moved: false, uncertain: false };
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
-  const body = (i: number) => lines.slice(headings[i]!.line + 1, headings[i + 1]?.line ?? lines.length).map((l) => l.trim().slice(0, 120));
-  const holds = (i: number) => body(i).some((l) => l === excerpt || l.startsWith(excerpt));
   const at = headings.findIndex((h) => h.slug === slug);
   if (at < 0) return { slug, moved: false, uncertain: false };
-  if (holds(at)) return { slug, moved: false, uncertain: false };
-  const others = headings.map((h, i) => ({ h, i })).filter(({ h, i }) => i !== at && h.text === headings[at]!.text && holds(i));
-  if (others.length === 1) return { slug: others[0]!.h.slug, moved: true, uncertain: false };
-  return { slug, moved: false, uncertain: true };
+  const want = excerpt.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+  if (want.length === 0) return { slug, moved: false, uncertain: false };
+  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const body = (i: number) => lines.slice(headings[i]!.line + 1, headings[i + 1]?.line ?? lines.length).map((l) => l.trim().slice(0, 120)).filter((l) => l !== "");
+  const same = (line: string | undefined, w: string) => line !== undefined && (line === w || line.startsWith(w));
+  const score = (i: number) => {
+    const b = body(i);
+    if (b.some((_, k) => want.every((w, j) => same(b[k + j], w)))) return want.length + 1;
+    return want.filter((w) => b.some((l) => same(l, w))).length;
+  };
+  const scored = headings.map((h, i) => ({ h, i })).filter(({ h }) => h.text === headings[at]!.text).map((c) => ({ ...c, score: score(c.i) }));
+  const best = Math.max(...scored.map((c) => c.score));
+  const top = scored.filter((c) => c.score === best);
+  if (best === 0 || top.length !== 1) return { slug, moved: false, uncertain: true };
+  return { slug: top[0]!.h.slug, moved: top[0]!.i !== at, uncertain: false };
 }

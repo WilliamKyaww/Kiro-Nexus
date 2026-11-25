@@ -99,8 +99,9 @@ const actionWords = (action) => {
 /** Whether a recorded statement is about an action: it shares a word that identifies the action. */
 const isAbout = (text, action) => { const have = contentWords(text); return [...actionWords(action)].some((w) => have.has(w)); };
 
-// The record values a statement states, read the same way as Nexus (answer.ts datesIn and
-// statusesIn) but written again here, so that the check does not reuse the code it checks.
+// The record values a statement states, read the same way as Nexus (answer.ts datesIn,
+// valuesIn, clausesOf and uncheckedWords) but written again here, so that the check does not
+// reuse the code it checks.
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const MONTH = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const datesIn = (text) => {
@@ -113,14 +114,96 @@ const datesIn = (text) => {
   for (const m of s.matchAll(new RegExp(`\\b${MONTH}\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4})\\b)?`, "gi"))) push(m[3] ? Number(m[3]) : null, month(m[1]), Number(m[2]));
   return out;
 };
-const statusesIn = (text) => {
+// Ordinary status wording (R6-6): "under way" and "started" are in progress, "not started" is
+// to do, and "finished" or "complete" is done.
+const STATUS_WORDS = [
+  [/\bto[ -]?do\b/gi, "todo"], [/\bin[ _-]progress\b/gi, "in_progress"], [/\bunder[ -]?way\b/gi, "in_progress"], [/\bongoing\b/gi, "in_progress"],
+  [/\b(?:started|begun)\b/gi, "in_progress", "started"], [/\b(?:done|finished|completed?|ticked)\b/gi, "done"], [/\b(?:unfinished|incomplete|unticked)\b/gi, "done", "negative"],
+];
+/**
+ * The dates and statuses one clause states, each with whether it is negated (R6-6): "not",
+ * "isn't", "never" or "no longer" just before a status, or up to three words before a date
+ * ("not due on"). "Not due until 5 December" states 5 December. A negation never reaches back
+ * past an earlier value. Each value keeps its span, so the words it uses can be set aside.
+ */
+const valuesIn = (text) => {
   const s = String(text);
-  const out = [];
-  for (const [form, status] of [[/\bto[ -]?do\b/gi, "todo"], [/\bin[ _-]progress\b/gi, "in_progress"], [/\bdone\b/gi, "done"]]) {
-    for (const m of s.matchAll(form)) out.push({ status, negated: /(?:\bnot|n['’]t)\s+(?:yet\s+)?$/i.test(s.slice(0, m.index)) });
+  const month = (name) => MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+  const found = [];
+  const date = (m, year, mo, day) => { if (mo >= 1 && mo <= 12 && day >= 1 && day <= 31) found.push({ start: m.index, end: m.index + m[0].length, date: { year, month: mo, day } }); };
+  for (const m of s.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) date(m, Number(m[1]), Number(m[2]), Number(m[3]));
+  for (const m of s.matchAll(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTH}\\b\\.?(?:,?\\s+(\\d{4})\\b)?`, "gi"))) date(m, m[3] ? Number(m[3]) : null, month(m[2]), Number(m[1]));
+  for (const m of s.matchAll(new RegExp(`\\b${MONTH}\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4})\\b)?`, "gi"))) date(m, m[3] ? Number(m[3]) : null, month(m[1]), Number(m[2]));
+  for (const [form, status, kind] of STATUS_WORDS) for (const m of s.matchAll(form)) found.push({ start: m.index, end: m.index + m[0].length, status, kind });
+  found.sort((a, b) => a.start - b.start || b.end - a.end);
+  const dates = [];
+  const statuses = [];
+  let last = 0;
+  for (const v of found) {
+    if (v.start < last) continue;
+    const before = s.slice(last, v.start);
+    if (v.date) {
+      const n = before.match(/(?:\b(?:not|never)|n['’]t|\bno longer)((?:\s+[a-z’']+){0,3})\s*$/i);
+      dates.push({ date: v.date, negated: !!n && !/\b(?:until|till)\b/i.test(n[1] ?? ""), start: n ? last + n.index : v.start, end: v.end });
+    } else {
+      const n = before.match(/(?:\b(?:not|never)|n['’]t|\bno longer)\s+(?:(?:yet|been|being|currently|actually|really|fully|even|ever|already|quite|still)\s+)*$/i);
+      const negated = !!n !== (v.kind === "negative");
+      const start = n ? last + n.index : v.start;
+      statuses.push(v.kind === "started" && negated ? { status: "todo", negated: false, start, end: v.end } : { status: v.status, negated, start, end: v.end });
+    }
+    last = v.end;
   }
-  return out;
+  return { dates, statuses };
 };
+/** A statement's clauses: its sentences, and their parts joined by ";", "but", "and", "while", "whereas", "although", "though" or "however". Quotations and brackets stay whole. */
+const clausesOf = (text) => {
+  const s = String(text);
+  const masked = s.replace(/“[^”]*”|"[^"]*"|\([^)]*\)/g, (m) => "#".repeat(m.length));
+  const out = [];
+  let from = 0;
+  for (const m of masked.matchAll(/[.!?]+(?=\s+[A-Z“"‘(#]|\s*$)|\s*;\s*|,?\s+(?:but|and|while|whereas|although|though|however)\b,?(?=\s)/g)) {
+    out.push(s.slice(from, m.index));
+    from = m.index + m[0].length;
+  }
+  out.push(s.slice(from));
+  return out.map((c) => c.trim()).filter(Boolean);
+};
+/**
+ * The words that may surround a checked value in a statement about one of the journey's actions
+ * (R6-6), besides the actions' own words and the names of the cited sources. Any other word
+ * ("no", "matching", "untracked") says something that the issue's values cannot show.
+ */
+const PLAIN_WORDS = new Set(`a an the this that these those it its their his her both which who whose
+  is are was were be been being has have had does do did will would should can could may might must
+  on in at by for of to from with as into under about per according and but while whereas although though however also so
+  still already currently now yet due date dated deadline set scheduled planned expected
+  issue record card task action item work ticket entry note marks marked lists listed shows says records recorded states
+  section heading checklist checkbox meeting board project`.split(/\s+/).filter(Boolean));
+const NEGATIVE_WORDS = new Set(["no", "not", "none", "never", "nothing", "nobody", "neither", "nor", "without", "cannot", "untracked", "missing", "lack", "lacks", "lacking", "absent"]);
+const wordsIn = (text) => String(text).toLowerCase().replace(/[’']s\b/g, "").match(/[a-z0-9]+(?:['’][a-z]+)*/g) ?? [];
+// Words of four or more letters also match by their content-word stem; shorter ones only as
+// written, so that "not" never matches "note".
+const stemOf = (w) => [...contentWords(w)][0] ?? w;
+const inWords = (list) => {
+  const exact = new Set(list);
+  const stems = new Set([...exact].filter((w) => w.length >= 4).map(stemOf));
+  return (w) => exact.has(w) || (w.length >= 4 && stems.has(stemOf(w)));
+};
+const isPlain = inWords(PLAIN_WORDS);
+/** The words of a statement that are not a stated value, a cited key, a plain word, or a word of `allowed`. */
+const uncheckedWords = (text, keys, allowed) => {
+  const isAllowed = inWords(allowed.flatMap(wordsIn));
+  const out = new Set();
+  for (const clause of clausesOf(text)) {
+    const { dates, statuses } = valuesIn(clause);
+    let rest = clause;
+    for (const v of [...dates, ...statuses]) rest = rest.slice(0, v.start) + " ".repeat(v.end - v.start) + rest.slice(v.end);
+    for (const key of keys) rest = rest.replace(new RegExp(`\\b${key.replace(/[^A-Za-z0-9]/g, "\\$&")}\\b`, "gi"), (m) => " ".repeat(m.length));
+    for (const w of wordsIn(rest)) if (NEGATIVE_WORDS.has(w) || (!isPlain(w) && !isAllowed(w))) out.add(w);
+  }
+  return [...out];
+};
+const namesKey = (text, key) => new RegExp(`\\b${key.replace(/[^A-Za-z0-9]/g, "\\$&")}\\b`, "i").test(String(text));
 const sameDate = (a, b) => a.month === b.month && a.day === b.day && (a.year === null || b.year === null || a.year === b.year);
 /** The dates a due value can be quoted as: its date, or a timed value's local and UTC dates. */
 const dueDates = (due) => {
@@ -194,37 +277,63 @@ export function evaluateTurn(message, turn, { actionsHeadingExists, existingIssu
   add("no confirmed entry contradicts these", contradictions.length === 0, contradictions.length ? describe(contradictions) : "none");
   /**
    * Why a recorded statement about an action is not an ordinary statement about the issue
-   * that tracks it, or null when it is. It must cite that issue and state at least one of its
-   * values as the record has it; a recorded fact must also contradict none of them (a date
-   * may instead be one in a cited note's name). A discrepancy may state the note's value too.
+   * that tracks it, or null when it is (R4-4, R5-3, R6-6). It must cite that issue, state at
+   * least one of its values as the record has it, and say nothing else than the values the
+   * issue can show: every other word must be a plain word, a word of the actions or a word of
+   * a cited source's name. Each clause is compared with the record it names (else the previous
+   * clause's, else the issue's). A recorded fact must contradict none of the values (a date may
+   * instead be one in a cited note's name); a negated date that is the due date contradicts it
+   * in a discrepancy too. A discrepancy may state the note's status.
    */
   const notOrdinary = (item, kind, issueKey) => {
     if (issueKey === null) return "only Nexus's own sentence may say whether this action has an issue";
     const sources = item.sources ?? [];
     if (!sources.some(isIssue(issueKey))) return `it does not cite ${issueKey}`;
-    const dates = datesIn(item.text);
-    const statuses = statusesIn(item.text);
-    // "Not done" fits two statuses, so it does not pin down a value of the record.
-    if (dates.length + statuses.filter((s) => !s.negated).length === 0) return `it states none of ${issueKey}'s values, so it can only restate or deny the tracking result`;
+    const clauses = clausesOf(item.text).map((text) => ({ text, ...valuesIn(text) }));
+    // "Not done" fits two statuses and "not due on 3 December" every other date, so neither
+    // pins down a value of the record.
+    if (!clauses.some((c) => c.dates.some((d) => !d.negated) || c.statuses.some((s) => !s.negated))) return `it states none of ${issueKey}'s values, so it can only restate or deny the tracking result`;
+    const citedKeys = sources.map((h) => cites[h]?.target?.kind === "issue" ? cites[h].target.key : null).filter(Boolean);
+    const allowed = [missing.action, tracked.action, ...entries.map((t) => t.action ?? ""), ...sources.flatMap((h) => [cites[h]?.label ?? "", cites[h]?.target?.path ?? "", cites[h]?.target?.headingText ?? ""])];
+    const extra = uncheckedWords(item.text, citedKeys, allowed);
+    if (extra.length) return `it says more than ${issueKey}'s values can show (“${extra.join("”, “")}”), so it can restate or deny the tracking result`;
     if (!records) return null;
     const rec = recordOf(issueKey);
     if (!rec) return `${issueKey} is not among the issue records`;
-    const dateOk = dates.map((d) => dueDates(rec.due).some((x) => sameDate(d, x)));
-    const statusOk = statuses.map((s) => (rec.status === s.status) !== s.negated);
     const asRecorded = `${issueKey} is ${STATUS_TEXT[rec.status] ?? rec.status}, ${rec.due ? `due ${rec.due.date ?? rec.due.dateTime}` : "with no due date"}`;
-    const pinned = [...dateOk, ...statuses.map((s, i) => statusOk[i] && !s.negated)];
-    if (!pinned.some(Boolean)) return `it states none of ${issueKey}'s values as the record has them (${asRecorded})`;
-    if (kind === "fact") {
-      const noteDates = sources.filter(isNote).flatMap((h) => datesIn(`${cites[h].target.path ?? ""} ${cites[h].label ?? ""}`));
-      if (dates.some((d, i) => !dateOk[i] && !noteDates.some((x) => sameDate(d, x))) || statusOk.includes(false)) return `it contradicts the record (${asRecorded})`;
+    const noteDates = sources.filter(isNote).flatMap((h) => datesIn(`${cites[h].target.path ?? ""} ${cites[h].label ?? ""}`));
+    let current = rec;
+    let pinned = false;
+    let contradicts = false;
+    let negatedDue = false;
+    for (const c of clauses) {
+      current = records.find((r) => namesKey(c.text, r.key)) ?? current;
+      for (const d of c.dates) {
+        const onDue = dueDates(current.due).some((x) => sameDate(d.date, x));
+        if (d.negated) { if (onDue) negatedDue = true; continue; }
+        if (onDue && current.key === issueKey) pinned = true;
+        if (!onDue && !noteDates.some((x) => sameDate(d.date, x))) contradicts = true;
+      }
+      for (const s of c.statuses) {
+        const holds = (current.status === s.status) !== s.negated;
+        if (holds && !s.negated && current.key === issueKey) pinned = true;
+        if (!holds) contradicts = true;
+      }
     }
+    if (negatedDue) return `it denies a due date that the record holds (${asRecorded})`;
+    if (!pinned) return `it states none of ${issueKey}'s values as the record has them (${asRecorded})`;
+    if (kind === "fact" && contradicts) return `it contradicts the record (${asRecorded})`;
     return null;
   };
   const stray = [];
   for (const [kind, list] of [["fact", facts], ["discrepancy", a.discrepancies ?? []]]) {
     for (const item of list) {
       for (const [action, issueKey, ok] of [[missing.action, missingIssue, okMissing], [tracked.action, tracked.issue, okTracked]]) {
-        if (!isAbout(item.text, action)) continue;
+        // A statement is about an action when it shares a word that identifies the action, or
+        // when it cites or names the issue that tracks it (R6-6: "It has no matching issue.
+        // NEX-1 is due on 5 December.").
+        const aboutIssue = issueKey !== null && (namesKey(item.text, issueKey) || (item.sources ?? []).some(isIssue(issueKey)));
+        if (!isAbout(item.text, action) && !aboutIssue) continue;
         if (kind === "fact" && ok.some((t) => sentenceFor(item.text, t, issueKey))) continue;
         const why = notOrdinary(item, kind, issueKey);
         if (why) stray.push(`${kind}: ${item.text} (${why})`);

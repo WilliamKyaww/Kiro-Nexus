@@ -3,16 +3,32 @@ import type { Due } from "@nexus/schema";
 
 export type CitationTarget =
   /**
-   * `excerpt` (since run 6) is the first line of text the run read in that section, so a link
-   * can find its section again when another heading of the same name is added (R5-10).
+   * `excerpt` (since run 6) is the text the run read at the start of that section, so a link
+   * can find its section again when another heading of the same name is added (R5-10). It is
+   * one line, or up to three joined by "\n" when the first is a short label (R6-10). Citations
+   * saved before R6-10 hold one line, and are read the same way.
    */
   | { kind: "note"; path: string; headingSlug: string | null; headingText: string | null; excerpt?: string | null }
   | { kind: "issue"; key: string };
 
-/** The first line of a section's text that is not blank or a heading, at most 120 characters. */
+const EXCERPT_LINES = 3;
+const EXCERPT_LINE_CHARS = 120;
+
+/**
+ * The first lines of a section's text that are not blank or a heading, each at most 120
+ * characters. One line is enough when it has two words of four or more letters, or 40
+ * characters; a shorter one ("Status", "TBC") is a label that other sections may start with
+ * too, so the next lines are added, up to three (R6-10).
+ */
 export function excerptOf(text: string): string | null {
-  const line = text.split(/\r?\n/).map((l) => l.trim()).find((l) => l !== "" && !/^#{1,6}(\s|$)/.test(l));
-  return line ? line.slice(0, 120) : null;
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !/^#{1,6}(\s|$)/.test(l));
+  const out: string[] = [];
+  for (const line of lines) {
+    out.push(line.slice(0, EXCERPT_LINE_CHARS));
+    const joined = out.join(" ");
+    if (out.length >= EXCERPT_LINES || joined.length >= 40 || (joined.match(/[A-Za-z0-9]{4,}/g) ?? []).length >= 2) break;
+  }
+  return out.length ? out.join("\n") : null;
 }
 
 export interface Citation { handle: string; label: string; target: CitationTarget }
