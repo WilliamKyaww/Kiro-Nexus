@@ -3,7 +3,7 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { _electron as electron, expect, test, type Page } from "@playwright/test";
-import { apiSession, launchUrl, startService, tempDir, type Service } from "./support";
+import { apiSession, launchUrl, startService, tempDir, thumbFailures, type Service } from "./support";
 
 let base: string;
 let svc: Service | null = null;
@@ -256,6 +256,14 @@ test("every palette can be chosen, says Selected in words, and meets the contras
   await page.keyboard.press("Tab");
   const outline = await switchOf(page).evaluate((el) => getComputedStyle(el).outlineStyle);
   expect(outline).not.toBe("none");
+});
+
+test("the scrollbar thumb meets 3:1 against every background that scrolls, in each palette (R6-17)", async ({ page }) => {
+  await open(page);
+  // Every background a scrolling element has in the app: the page, the rail, cards, the link
+  // suggestions and code blocks.
+  const failures = await page.evaluate(thumbFailures, ["canvas", "rail", "surface", "raised", "sunk"]);
+  expect(failures).toEqual([]);
 });
 
 test("evidence: screenshots of the main screens in both themes, at desktop and 390 px", async ({ page }) => {

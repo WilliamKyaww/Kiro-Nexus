@@ -3,6 +3,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { expect, test, type Page } from "@playwright/test";
+import { thumbFailures } from "./support";
 
 let server: ChildProcess;
 let base: string;
@@ -103,4 +104,10 @@ test("the review demo still works in the dark theme, and every wireframe palette
     return out;
   }, pairs);
   expect(failures).toEqual([]);
+});
+
+test("the wireframe's scrollbar thumb meets 3:1 against every background that scrolls, in each palette (R6-17)", async ({ page }) => {
+  await page.goto(base + "#/home");
+  // The sidebar and the board sit on the shell, the main panel on the panel, the palette list on raised.
+  expect(await page.evaluate(thumbFailures, ["shell", "panel", "raised", "sunk"])).toEqual([]);
 });

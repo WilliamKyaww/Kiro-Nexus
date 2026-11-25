@@ -339,7 +339,7 @@ Added in run 6 (PRD-081, DEC-028). The user chooses Light, Dark or Match system 
 - **Reading colour.** Dark text is off-white (#ededf0 in Graphite). On the Graphite panel, secondary text (#b6b8c0) is 8.9:1 and tertiary text (#9597a2) is 6.0:1.
 - **Amber in the dark.** Review Amber becomes a light amber (#f2b64e) on a dark amber wash (#2e2412), and it still means only "awaiting review". Citations stay in the accent, accepted in green and destructive in red, so the four states remain distinct in every palette.
 - **Review bar.** Review Night in the light themes; in the dark themes, the raised surface with a Strong Hairline edge and the palette's own pills.
-- **Contrast floor.** Every palette passes 4.5:1 for normal text on each surface, 3:1 for control boundaries, focus and status marks, and 4.5:1 for white on the accent and its hover. The browser and wireframe tests compute this from the real stylesheets.
+- **Contrast floor.** Every palette passes 4.5:1 for normal text on each surface, 3:1 for control boundaries, the scrollbar thumb (the control line colour), focus and status marks, and 4.5:1 for white on the accent and its hover. The browser and wireframe tests compute this from the real stylesheets.
 - **Native parts.** `color-scheme` follows the theme, so form controls, scrollbars and dialogs match. Selection, caret and focus colours come from the palette.
 
 ## Typography

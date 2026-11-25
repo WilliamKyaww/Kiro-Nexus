@@ -55,6 +55,8 @@
 :root, [data-theme] {
   --paper: var(--canvas); --panel: var(--surface); --ink-soft: var(--ink-2);
   --pending: var(--pend); --pending-bg: var(--pend-soft); --danger: var(--bad);
+  /* The scrollbar thumb is a control: at least 3:1 on every background that scrolls (R6-17). */
+  --scroll-thumb: var(--control-line);
 }
 :root {
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -63,7 +65,7 @@
   font: 16px/1.5 var(--font);
   color: var(--ink);
   background: var(--canvas);
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--scroll-thumb) transparent;
 }* { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { margin: 0; }

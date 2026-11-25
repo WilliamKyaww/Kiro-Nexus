@@ -64,7 +64,7 @@
   --faint: color-mix(in srgb, var(--ink-3) 55%, var(--panel));
   --out-day: color-mix(in srgb, var(--ink-3) 90%, var(--panel));
   --line-3: color-mix(in srgb, var(--line-2) 78%, var(--ink-3));
-  --scroll: color-mix(in srgb, var(--line-2) 80%, var(--ink-3));
+  --scroll: var(--control-line); /* a control: at least 3:1 on every background that scrolls (R6-17) */
   --cite-hover: color-mix(in srgb, var(--accent-soft) 70%, var(--accent-line));
   --ring-soft: color-mix(in srgb, var(--accent) 22%, var(--panel));
   --pend-wash: color-mix(in srgb, var(--pend-soft) 45%, var(--panel));
