@@ -603,7 +603,8 @@ status control.
 ## DEC-027: Identity is proved, not assumed, in review and reminders (run-5 review repairs)
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 1, under Will's overnight
   authorisation; awaiting human review). Refines DEC-012, DEC-022, DEC-024 and DEC-025.
-  Record: `docs/reviews/2026-11-25-run5-review.md`.
+  Record: `docs/reviews/2026-11-25-run5-review.md`. **Reviewed** by Astra 6.2 in run 6's
+  review: partly resolved; open findings R6-1, R6-2, R6-6, R6-8, R6-9 and R6-10.
 **Decision.**
 - **Spans.** A note change's span is its saved text plus at least one of its saved
   neighbouring lines. The same text elsewhere, with both neighbours different, is not the

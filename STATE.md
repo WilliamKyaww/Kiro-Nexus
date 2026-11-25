@@ -1,9 +1,10 @@
 # State
 
-- **Date updated:** 2026-11-25 (overnight run 6: all four stages delivered,
-  with the reviewer relay)
-- **Active phase:** none authorised. Run 6 is used up, and its relay is
-  ready for Will to send. Slice C's live check (task 5) is still waiting for Will's
+- **Date updated:** 2026-11-25 (Astra 6.2's review of run 6 recorded: not
+  ready for sign-off, R6-1 to R6-17)
+- **Active phase:** none authorised. Run 6 is used up, and its review is
+  recorded in `docs/reviews/2026-11-25-run6-review.md`. Repairs of R6-1 to
+  R6-17 wait for Will's authorisation. Slice C's live check (task 5) is still waiting for Will's
   free key.
 - **Last spec:** `.kiro/specs/backlinks-completion/` tasks 1 to 5 are done.
   Also in run 6: `.kiro/specs/appearance/` (tasks 1 to 7) and
@@ -276,6 +277,12 @@ code):**
 | 3. The J7 correction loop: Skip or a reason, a correction on the same target, supersede, Retry (DEC-029) | `37a0c55` | `.kiro/specs/edit-first-journey/tasks.md` task 5a. `correction.test.ts` (5), `correction-http.test.ts` (7, real service), `j7-correction.spec.ts` (2, Edge), all with the test double. Typecheck clean; 285 of 285 unit tests (40 files), twice; 59 of 59 E2E with 1 skipped; secret scan (336 files). Screenshots in `.tmp/j7-shots/` |
 | 4. B2 backlinks and `[[` completion (DEC-030, PRD-021) | `95816ac` | `.kiro/specs/backlinks-completion/tasks.md`. `links.test.ts` (5), `backlinks.test.ts` (3), `wikilinks.test.ts` (7), `b2-backlinks.spec.ts` (3, Edge, two fictional workspaces, an outside edit and a restart). Typecheck clean; 300 of 300 unit tests (43 files); 62 of 62 E2E with 2 screenshot runs skipped; secret scan (347 files). Screenshots in `.tmp/b2-shots/` |
 
+**Independent review (Astra 6.2, Codex, run by Will):** not ready for sign-off.
+Six high, nine medium and two low findings (R6-1 to R6-17). Of the R5 findings,
+R5-4, R5-5, R5-7 and R5-11 to R5-13 are resolved for the reported case, and R5-1 to
+R5-3, R5-6 and R5-8 to R5-10 are partly resolved. The record is
+`docs/reviews/2026-11-25-run6-review.md`. No R6 finding is reproduced or repaired yet.
+
 ## Wireframe overhaul (Will's request, 2026-11-25)
 
 Only `wireframe/` changed, plus the Impeccable records (`PRODUCT.md`,
@@ -414,14 +421,10 @@ Will ran. Its eleven findings were repaired in run 5
    - `npm test` runs only 13 tests;
    - `npm run test:review` and the review hooks find no tests;
    - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
-8. **Will: send the run-6 relay to Astra 6.2 in Codex.**
-   - The message is in `docs/reviews/relays/2026-11-25-run6.md` and covers
-     `5ce82b4..95816ac`: the R5 repairs, appearance, the correction loop,
-     and backlinks with completion. The run-5 relay was sent and reviewed
-     (`docs/reviews/2026-11-25-run5-review.md`).
-   - Paste the report back to Kiro. Kiro then reproduces each finding,
-     fixes it within the scope you authorise, and records the review in
-     `docs/reviews/`.
+8. **Will: authorise the R6 repairs, or choose which.** Astra 6.2 reviewed
+   run 6 (`docs/reviews/2026-11-25-run6-review.md`): not ready, R6-1 to
+   R6-17. Kiro reproduces each authorised finding first, then repairs and
+   records it.
 9. **Will: look at a real desktop reminder.** Run `npm run desktop`, open
    Notifications and select **Send test reminder**. Check that a Windows
    notification appears, and that clicking it opens NEX-1.
@@ -492,8 +495,8 @@ Will ran. Its eleven findings were repaired in run 5
     Appearance; the J7 correction with the provider double; backlinks and
     `[[` in a note (`docs/reviews/relays/2026-11-25-run6.md`, "Trying it by
     hand").
-  - Send the run-6 relay to Astra 6.2 in Codex, and paste the report
-    back to Kiro.
+  - Decide the scope of the R6 repairs (R6-1 to R6-17,
+    `docs/reviews/2026-11-25-run6-review.md`).
   - Try reminders (README, "Reminders"), including one in the desktop
     app.
   - Decide about `vitest.config.ts`.

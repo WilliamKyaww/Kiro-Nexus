@@ -503,7 +503,24 @@ open).
       the journal);
     - screenshots at 1360 × 900 and 390 × 844.
 
-### Run 6: run-5 repairs, light and dark appearance, the J7 correction loop, and backlinks (verified by Kiro, 2026-11-25; no human review yet)
+### Run 6: run-5 repairs, light and dark appearance, the J7 correction loop, and backlinks (verified by Kiro, 2026-11-25; independently reviewed: not ready)
+
+Astra 6.2 reviewed run 6 and found R6-1 to R6-17, which are open
+(`docs/reviews/2026-11-25-run6-review.md`). The claims below hold for the paths Kiro
+tested, and the reviewer confirmed the main paths. These do not hold yet:
+
+- **Edit and review:** a rejection can still rewrite another section, and recovery can
+  record an accepted note change that is gone (R6-1, R6-2).
+- **Ask:** a contradictory fact can pass when one value is right (R6-6).
+- **Corrections:** a failed write can leave a change superseded with nothing to review;
+  the note check is not exact; and the conversation's Retry Edit loses the binding
+  (R6-3 to R6-5, R6-7).
+- **Appearance:** an invalid `appearance.json` stops the desktop app, and two sessions'
+  palette choices can overwrite each other (R6-11, R6-12).
+- **Backlinks and completion:** a draft can shift the linked passage; the second of two
+  same-named headings opens the first; a selected suggestion can be out of view at 390 px;
+  and indented code gives false backlinks (R6-13 to R6-16).
+- The other findings are R6-8 to R6-10 and R6-17.
 
 - **Run-5 review repairs** (`e2dd950`, DEC-027). All thirteen findings from Astra 6.2's
   run-5 review are repaired, each with a test that failed first. The record is
