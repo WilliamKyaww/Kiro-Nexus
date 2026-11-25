@@ -1,9 +1,9 @@
 # State
 
-- **Date updated:** 2026-11-25 (overnight run 6: all four stages delivered;
-  the reviewer relay and the morning handoff follow)
-- **Active phase:** none authorised. Run 6 is used up once its relay is
-  written. Slice C's live check (task 5) is still waiting for Will's
+- **Date updated:** 2026-11-25 (overnight run 6: all four stages delivered,
+  with the reviewer relay)
+- **Active phase:** none authorised. Run 6 is used up, and its relay is
+  ready for Will to send. Slice C's live check (task 5) is still waiting for Will's
   free key.
 - **Last spec:** `.kiro/specs/backlinks-completion/` tasks 1 to 5 are done.
   Also in run 6: `.kiro/specs/appearance/` (tasks 1 to 7) and
@@ -34,9 +34,9 @@
     for Will to send to Astra 6.2 in the Codex extension (DEC-021,
     `AGENTS.md` "Reviews"). Minor changes and tweaks need none.
 - **Overnight run 6 (granted by Will on 2026-11-25, by sending
-  `.tmp/2026-11-25-kiro-overnight.md`): in progress.** Four stages, each
-  committed locally once verified; Kiro continues between milestones
-  without waiting.
+  `.tmp/2026-11-25-kiro-overnight.md`): used up.** All four stages are
+  delivered and committed (the run-6 milestone log below), and the relay is
+  `docs/reviews/relays/2026-11-25-run6.md`.
   1. **R5 repairs.** Reproduce, test and fix R5-1 to R5-13 from Astra 6.2's
      independent run-5 review (`.tmp/review-run5/2026-11-25-independent-review.md`),
      record it under DEC-021, and make the E2E suite portable to the Kiro
@@ -274,7 +274,7 @@ code):**
 | 1. R5-1 to R5-13 repaired; E2E portable to the Kiro IDE (DEC-027) | `e2dd950` | `docs/reviews/2026-11-25-run5-review.md`. Every new test failed on the unrepaired code first. 267 of 267 unit tests (37 files), 45 of 45 E2E, and the Electron specs pass 7 of 7 with `ELECTRON_RUN_AS_NODE=1` |
 | 2. Light and dark appearance in the app and the wireframe (DEC-028, PRD-081) | `c12dd03` | `.kiro/specs/appearance/tasks.md`. `appearance.test.ts` (6), `appearance.spec.ts` (8, Edge and Electron, plus a screenshot run), `appearance-conversation.spec.ts` (provider double), `wireframe-appearance.spec.ts` (3). Typecheck clean; 273 of 273 unit tests (38 files); 57 of 57 E2E with 1 skipped (the screenshot run); secret scan (332 files); `mcp:smoke` 6 of 6. Screenshots in `.tmp/appearance-shots/` (`before/` at `e2dd950`, `after/`, `wireframe/`) |
 | 3. The J7 correction loop: Skip or a reason, a correction on the same target, supersede, Retry (DEC-029) | `37a0c55` | `.kiro/specs/edit-first-journey/tasks.md` task 5a. `correction.test.ts` (5), `correction-http.test.ts` (7, real service), `j7-correction.spec.ts` (2, Edge), all with the test double. Typecheck clean; 285 of 285 unit tests (40 files), twice; 59 of 59 E2E with 1 skipped; secret scan (336 files). Screenshots in `.tmp/j7-shots/` |
-| 4. B2 backlinks and `[[` completion (DEC-030, PRD-021) | (this commit) | `.kiro/specs/backlinks-completion/tasks.md`. `links.test.ts` (5), `backlinks.test.ts` (3), `wikilinks.test.ts` (7), `b2-backlinks.spec.ts` (3, Edge, two fictional workspaces, an outside edit and a restart). Typecheck clean; 300 of 300 unit tests (43 files); 62 of 62 E2E with 2 screenshot runs skipped; secret scan (347 files). Screenshots in `.tmp/b2-shots/` |
+| 4. B2 backlinks and `[[` completion (DEC-030, PRD-021) | `95816ac` | `.kiro/specs/backlinks-completion/tasks.md`. `links.test.ts` (5), `backlinks.test.ts` (3), `wikilinks.test.ts` (7), `b2-backlinks.spec.ts` (3, Edge, two fictional workspaces, an outside edit and a restart). Typecheck clean; 300 of 300 unit tests (43 files); 62 of 62 E2E with 2 screenshot runs skipped; secret scan (347 files). Screenshots in `.tmp/b2-shots/` |
 
 ## Wireframe overhaul (Will's request, 2026-11-25)
 
@@ -414,9 +414,11 @@ Will ran. Its eleven findings were repaired in run 5
    - `npm test` runs only 13 tests;
    - `npm run test:review` and the review hooks find no tests;
    - the full suite needs `npx vitest run --config .tmp/vitest.config.ts`.
-8. **Will: send the run-5 relay to Astra 6.2 in Codex.**
-   - The message is in `docs/reviews/relays/2026-11-24-run5.md` and covers
-     `251188e..0c641a1`: the repairs and B4.
+8. **Will: send the run-6 relay to Astra 6.2 in Codex.**
+   - The message is in `docs/reviews/relays/2026-11-25-run6.md` and covers
+     `5ce82b4..95816ac`: the R5 repairs, appearance, the correction loop,
+     and backlinks with completion. The run-5 relay was sent and reviewed
+     (`docs/reviews/2026-11-25-run5-review.md`).
    - Paste the report back to Kiro. Kiro then reproduces each finding,
      fixes it within the scope you authorise, and records the review in
      `docs/reviews/`.
@@ -426,10 +428,12 @@ Will ran. Its eleven findings were repaired in run 5
 10. **Will, then Hein: review the wireframe proposal.** Open
     `wireframe/index.html` in a browser. If you adopt it, applying it to
     `apps/` needs its own authorisation (DEC-026).
-11. **Will: correct the path in `.kiro/steering/source-boundaries.md`.**
-    It names `Documents\Verdanta\Internal Tools`, but the apps are in
-    `Documents\Verdanta Internal Tools`. Kiro has not edited the steering
-    file.
+11. **Done in run 6:** `.kiro/steering/source-boundaries.md` now names both
+    spellings of the internal-tools folder, and the visual-reference
+    convention. Will: check the wording.
+12. **Hein: look at run 6's appearance and the wireframe's dark theme.** He
+    keeps the final identity, the calendar and agenda, and card ordering
+    (DEC-028).
 
 ## Assumptions to check
 
@@ -484,7 +488,11 @@ Will ran. Its eleven findings were repaired in run 5
 ## Next action
 
 - **Will:**
-  - Send the run-5 relay to Astra 6.2 in Codex, and paste the report
+  - Try the run-6 walkthrough: the Dark mode switch and Settings →
+    Appearance; the J7 correction with the provider double; backlinks and
+    `[[` in a note (`docs/reviews/relays/2026-11-25-run6.md`, "Trying it by
+    hand").
+  - Send the run-6 relay to Astra 6.2 in Codex, and paste the report
     back to Kiro.
   - Try reminders (README, "Reminders"), including one in the desktop
     app.
@@ -504,7 +512,7 @@ Will ran. Its eleven findings were repaired in run 5
 
 ### Continuation instruction for a fresh Kiro session
 
-> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 5's
+> Read `AGENTS.md`, this file, `BACKLOG.md` and `FEATURES.md`. Run 6's
 > authorisation is spent, so do not start a new slice until Will or Hein
 > names one. To check that everything still works, run:
 >
@@ -514,8 +522,8 @@ Will ran. Its eleven findings were repaired in run 5
 > - `npm run test:e2e`;
 > - `npm run scan:secrets`.
 >
-> The expected totals are 213 unit and integration tests and 41 browser
-> tests, all passing.
+> The expected totals are 300 unit and integration tests (43 files) and
+> 62 browser tests passing, with 2 screenshot runs skipped.
 >
 > If Will supplies a live-check result, record it in slice C task 5 and
 > in `docs/judge-ai-route.md`. Close Q1 only on exit 0 from a real free
