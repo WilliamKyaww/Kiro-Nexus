@@ -638,7 +638,8 @@ status control.
   authorisation; awaiting human review). Adds PRD-081. Spec: `.kiro/specs/appearance/`.
   Will approved the light direction of the wireframe at `5ce82b4` on 25 November 2026 and
   authorised its colours and the theme controls in the working app. Hein keeps the final
-  overall identity, the calendar and agenda, and card ordering (DEC-026).
+  overall identity, the calendar and agenda, and card ordering (DEC-026). **Reviewed** by
+  Astra 6.2 in run 6's review: open findings R6-11, R6-12 and R6-17.
 **Decision.**
 - **Choices.** Light, Dark or Match system, with Match system for a fresh profile. Each
   theme has three original palettes and remembers its own: Porcelain (the approved look,
@@ -671,7 +672,8 @@ status control.
 ## DEC-029: A reason corrects one rejected change, on its own target, once
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 3, under Will's overnight
   authorisation; awaiting human review). Implements PRD-064 and architecture 7.4.
-  Spec: `.kiro/specs/edit-first-journey/` Requirement 5 and task 5a.
+  Spec: `.kiro/specs/edit-first-journey/` Requirement 5 and task 5a. **Reviewed** by Astra
+  6.2 in run 6's review: open findings R6-3, R6-4, R6-5 and R6-7.
 **Decision.**
 - **Which changes.** A reason starts a correction run only for an Edit change to an issue
   field or to note lines. A fixed-demo change, a new issue or a new link keeps the reason
@@ -705,7 +707,8 @@ status control.
 ## DEC-030: One wikilink rule, which names ambiguous links rather than guessing
 - **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 4, under Will's overnight
   authorisation; awaiting human review). Refines architecture 6 and DEC-006.
-  Spec: `.kiro/specs/backlinks-completion/`.
+  Spec: `.kiro/specs/backlinks-completion/`. **Reviewed** by Astra 6.2 in run 6's review:
+  open findings R6-13 to R6-16.
 **Decision.**
 - **Resolution.** A target matches a note's path, or the end of one, case-insensitively,
   with or without `.md`. An exact path wins. Among several notes with the name, the one with
