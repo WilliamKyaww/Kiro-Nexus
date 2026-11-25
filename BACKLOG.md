@@ -32,10 +32,10 @@ pass on `e61a3d4` and run 4:
   proposal (25 November, DEC-026), waiting for Will and then Hein.
   Hein owns the final visual identity (PRD-010, PRD-080). Owner: Hein.
 - [~] **B2 Notes.** Done: section search, outside edits and draft
-  protection (`.kiro/specs/notes-search-watch/`). Remaining: rename, move
-  and delete in the UI, the CodeMirror editor, the backlinks panel and the
-  `[[wikilink]]` autocomplete (PRD-020, PRD-021). Owner: Will. Spec: not
-  yet written.
+  protection (`.kiro/specs/notes-search-watch/`), and in run 6 the
+  backlinks panel and `[[` completion (`.kiro/specs/backlinks-completion/`,
+  DEC-030). Remaining: rename, move and delete in the UI, and the CodeMirror
+  editor (PRD-020, PRD-021). Owner: Will.
 - [~] **B3 Board and calendar** (PRD-030 to PRD-033). Owner: Hein. Spec:
   `.kiro/specs/board-calendar/`. Done (by Kiro in run 4): tasks 1 to 3,
   the board, the backlog view, status moves and the month view of dated
@@ -50,8 +50,8 @@ pass on `e61a3d4` and run 4:
 - [~] **B5 Change journal.** Done: tasks 1 to 8 and 10 of
   `.kiro/specs/change-journal/`, and part of task 9 (`record.create`,
   `record.addLink` and the `dependsOn` cascade, in run 4). Remaining (the
-  rest of task 9, with slice D): `note.create`, correction runs and
-  "Restore original" for an ambiguous conflict.
+  rest of task 9, with slice D): `note.create` and "Restore original" for
+  an ambiguous conflict. Correction runs were built in run 6 (DEC-029).
 - [~] **C Provider settings and read-only AI** (PRD-050 to PRD-055, PRD-074
   to PRD-076). Owner: Will. Spec: `.kiro/specs/ask-readonly/`. Done:
   tasks 1 to 4 and 7 to 9, and the corrective task 6, verified against the
@@ -60,10 +60,10 @@ pass on `e61a3d4` and run 4:
   proposed in `docs/judge-ai-route.md` but not decided or built.
 - [~] **D Agent edits, correction and personalised reminders** (PRD-042,
   PRD-051, PRD-060 to PRD-066). Owner: Will. Started: the first Ask → Edit
-  → Review journey (`.kiro/specs/edit-first-journey/`, tasks 1 to 4),
-  verified against the test double only. Remaining: its task 5 (the
-  correction loop, new notes, "Restore original" and a live Edit check),
-  and personalised reminders. Not authorised yet.
+  → Review journey (`.kiro/specs/edit-first-journey/`, tasks 1 to 4), and
+  in run 6 the correction loop (task 5a, DEC-029), verified against the
+  test double only. Remaining: task 5 (new notes, "Restore original" and a
+  live Edit check), and personalised reminders. Not authorised yet.
 - [ ] **E Package, rehearse and submit** (PRD-073, PRD-090 to PRD-092, R-V1
   to R-V6). Owners: Will and Hein. Gate: `docs/submission-checklist.md`.
   This includes choosing an open-source licence.

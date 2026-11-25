@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import type { Issue, NoteView, WorkspaceView } from "@nexus/schema";
+import type { BacklinkView, Issue, NoteView, WorkspaceView } from "@nexus/schema";
 import { ApiError, api, notePathParam } from "../api";
 import { MarkdownPreview } from "../components/MarkdownPreview";
 import { ErrorNote } from "../components/ErrorNote";
@@ -9,6 +9,7 @@ import { extraNotes } from "../noteSlots";
 import { useOpenChanges } from "../review/review";
 import { NoteSearch } from "../components/NoteSearch";
 import { drafts } from "../notes/drafts";
+import { WikilinkEditor } from "../notes/WikilinkEditor";
 import { revealAboveBar } from "../review/reveal";
 import { BackToConversation } from "../ask/BackToConversation";
 import { checkCitedSection, resolveHeadingParam, type HeadingAlias, type HeadingRef } from "../notes/headings";
@@ -110,8 +111,10 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
   const stored = useSyncExternalStore(drafts.subscribe, () => drafts.get(wsId, path));
   const draft = stored?.text ?? null;
   const changeParam = params.get("change");
+  // A backlink opens its source at the line of the link (backlinks-completion 2.2).
+  const lineParam = /^\d{1,6}$/.test(params.get("line") ?? "") ? Number(params.get("line")) : null;
   const [mode, setMode] = useState<"preview" | "edit">(
-    (params.get("edit") === "1" || stored !== null) && !heading && !changeParam ? "edit" : "preview",
+    (params.get("edit") === "1" || stored !== null) && !heading && !changeParam && lineParam === null ? "edit" : "preview",
   );
   const [restored] = useState(stored !== null);
   const openChanges = useOpenChanges().filter((c) => c.kind === "note.replaceSpan" && c.file === path);
@@ -129,6 +132,7 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
       client.setQueryData(["note", path], saved);
       drafts.acknowledgeSave(wsId, path, submitted.content, saved.revision);
       setConflict(null);
+      void client.invalidateQueries({ queryKey: ["backlinks"] }); // this note's links may point elsewhere now
     },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "REVISION_MISMATCH") {
@@ -179,6 +183,18 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
     void el.offsetWidth;
     el.classList.add("flash");
   }, [targetSlug, mode, note.dataUpdatedAt]);
+
+  // Reaching a linked passage: the same, once per line asked for.
+  useEffect(() => { if (lineParam !== null) setMode("preview"); }, [lineParam]);
+  const revealedLine = useRef<string | null>(null);
+  useEffect(() => {
+    const key = lineParam === null ? null : `${path}:${lineParam}`;
+    if (mode !== "preview" || key === null || revealedLine.current === key) return;
+    const el = previewRef.current?.querySelector<HTMLElement>(".line-target");
+    if (!el) return;
+    revealedLine.current = key;
+    requestAnimationFrame(() => revealAboveBar(el));
+  }, [lineParam, path, mode, note.dataUpdatedAt]);
 
   // Reaching a change: switch to preview, scroll to and briefly highlight the exact block.
   useEffect(() => { if (changeParam) setMode("preview"); }, [changeParam]);
@@ -295,14 +311,14 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
         ) : null}
         {extraNotes.aboveContent.map((Slot, i) => <Slot key={i} path={n.path} />)}
         {mode === "edit" ? (
-          <label className="editor">
-            <span className="visually-hidden">Markdown for {n.path}</span>
-            <textarea value={text} spellCheck onChange={(e) => setText(e.target.value)} aria-describedby="save-help" />
-            <span id="save-help" className="muted">Ctrl+S saves. Nexus writes exactly this text to the .md file. Unsaved drafts stay in this tab when you switch pages.</span>
-          </label>
+          <div className="editor">
+            <label htmlFor="note-editor" className="visually-hidden">Markdown for {n.path}</label>
+            <WikilinkEditor id="note-editor" value={text} onChange={setText} notes={allNotes} path={n.path} describedBy="save-help" />
+            <span id="save-help" className="muted">Ctrl+S saves. Type [[ to link a note, then # for one of its headings. Nexus writes exactly this text to the .md file. Unsaved drafts stay in this tab when you switch pages.</span>
+          </div>
         ) : (
           <div ref={previewRef}>
-            <MarkdownPreview content={text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} pending={draft === null ? pendingBlocks : []} />
+            <MarkdownPreview content={text} notes={allNotes} issueKeys={issueKeys} targetSlug={targetSlug} pending={draft === null ? pendingBlocks : []} path={n.path} targetLine={lineParam} />
           </div>
         )}
         {save.error && !(save.error instanceof ApiError && save.error.code === "REVISION_MISMATCH") ? <ErrorNote error={save.error} /> : null}
@@ -329,7 +345,43 @@ function NoteEditor({ wsId, path, heading, allNotes }: { wsId: string; path: str
             ))}
           </ul>
         )}
+        <Backlinks path={n.path} />
       </aside>
     </>
+  );
+}
+
+const shortName = (p: string) => p.replace(/\.md$/i, "").split("/").pop() ?? p;
+
+/**
+ * Notes that link here, each with its section and line (backlinks-completion 2). A link opens
+ * the source at that passage. A missing heading and an ambiguous name are said, not hidden.
+ */
+function Backlinks({ path }: { path: string }) {
+  const q = useQuery({ queryKey: ["backlinks", path], queryFn: () => api.get<{ backlinks: BacklinkView[] }>(`/notes/backlinks?path=${encodeURIComponent(path)}`) });
+  const list = q.data?.backlinks ?? [];
+  return (
+    <section aria-labelledby="backlinks-h">
+      <h2 id="backlinks-h">Backlinks</h2>
+      {q.error ? <ErrorNote error={q.error} /> : q.isPending ? <p className="muted">Looking for links…</p> : list.length === 0 ? (
+        <p className="muted">No notes link here yet. Type [[ in a note to link this one.</p>
+      ) : (
+        <ul className="backlinks">
+          {list.map((b) => {
+            const others = b.candidates.filter((c) => c !== path).map(shortName);
+            return (
+              <li key={`${b.source}:${b.line}:${b.heading ?? ""}`}>
+                <Link to={`${notePathParam(b.source)}&line=${b.line}`} className="backlink-source">
+                  {shortName(b.source)}{b.sectionText ? <span className="muted"> › {b.sectionText}</span> : null}
+                </Link>
+                <p className="backlink-context">{b.context}</p>
+                {b.headingStatus === "missing" ? <p className="backlink-flag">It asks for the heading “{b.heading}”, which this note does not have.</p> : null}
+                {others.length ? <p className="backlink-flag">Ambiguous: {others.join(", ")} {others.length === 1 ? "has" : "have"} the same name, so the link may mean {others.length === 1 ? "that note" : "one of those"}.</p> : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

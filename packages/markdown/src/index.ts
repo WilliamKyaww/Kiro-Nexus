@@ -1,6 +1,8 @@
 // Shared Markdown helpers used by the service and the UI.
 import GithubSlugger from "github-slugger";
 
+export * from "./links";
+
 export interface Heading {
   depth: number;
   /** Plain text of the heading, inline markup removed. */

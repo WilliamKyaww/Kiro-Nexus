@@ -257,7 +257,12 @@ Hein's fixtures use these exact strings.
 - **Wikilinks** `[[Name]]`, `[[Name#Heading]]` and `[[Name|alias]]` resolve
   by case-insensitive file name, preferring the closest path when several
   match. Text matching a project key pattern (`NEX-12`) renders as an issue
-  link and is indexed as a backlink to that issue.
+  link and is indexed as a backlink to that issue. As built in run 6
+  (DEC-030, `packages/markdown/src/links.ts`): a path, or the end of one,
+  matches first; "closest" means the most shared leading folders, then the
+  fewest folders; equally close notes make the link ambiguous, and Nexus
+  names them instead of choosing. Links in code are ignored. Note backlinks
+  are computed from the files on request (`GET /notes/backlinks?path=`).
 - **Search** uses an in-memory full-text index over note sections (heading
   path + body) and issue titles and descriptions. It is rebuilt at start and
   updated from watcher events. Exact facts (status, due date, priority) come

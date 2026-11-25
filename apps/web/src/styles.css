@@ -131,14 +131,33 @@ main:focus { outline: none; }
 .segmented button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
 .segmented button[aria-pressed="true"] { background: var(--accent-soft); font-weight: 600; }
 .save-state { font-size: 0.85rem; color: var(--ink-soft); }
-.editor { font-weight: 400; }
+.editor { font-weight: 400; display: grid; gap: 0.35rem; }
 .editor textarea { width: 100%; min-height: 60vh; font-family: ui-monospace, Consolas, monospace; font-size: 0.95rem; line-height: 1.55; resize: vertical; }
+/* [[ completion: a list at the caret, inside the editor (backlinks-completion 3). */
+.wikilink-editor { position: relative; }
+.link-suggest { position: absolute; z-index: 5; width: min(22rem, 100%); max-height: 16rem; overflow: auto; padding: 0.25rem; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--raised); box-shadow: var(--shadow); }
+.link-suggest ul { list-style: none; margin: 0; padding: 0; }
+.link-suggest li { display: flex; gap: 0.5rem; align-items: baseline; justify-content: space-between; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; }
+.link-suggest li[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.link-suggest-label { font-weight: 600; overflow-wrap: anywhere; }
+.link-suggest-detail { flex: none; font-size: 0.8rem; color: var(--ink-2); }
+.link-suggest li[aria-selected="true"] .link-suggest-detail { color: var(--accent-ink); }
+.link-suggest-status { margin: 0; padding: 0.35rem 0.5rem; font-size: 0.875rem; color: var(--ink-2); }
 .preview { max-width: 72ch; }
 .preview h1, .preview h2, .preview h3 { scroll-margin-top: 1rem; }
 .preview ul.contains-task-list { list-style: none; padding-left: 0.5rem; }
 .heading-target { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
-.target-label { margin-left: 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--accent); vertical-align: middle; }
+.target-label { margin-left: 0.75rem; font-size: 0.75rem; font-weight: 600; color: var(--accent-ink); vertical-align: middle; }
 .broken-link { color: var(--danger); text-decoration: underline dotted; }
+/* Backlinks (B2): the passage a backlink opens, and links that resolve to more than one note. */
+.line-target { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.ambiguous-link .link-flag { font-size: 0.8em; font-weight: 600; }
+.backlinks { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+.backlinks li { display: grid; gap: 0.15rem; }
+.backlink-source { font-weight: 600; overflow-wrap: anywhere; }
+.backlink-context, .backlink-flag { margin: 0; font-size: 0.85rem; overflow-wrap: anywhere; }
+.backlink-context { color: var(--ink-2); }
+.backlink-flag { color: var(--danger); }
 .issue-mention { font-weight: 600; }
 .note-side { font-size: 0.92rem; }
 .note-side h2:first-child { margin-top: 0; }

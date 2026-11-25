@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import type { FSWatcher } from "chokidar";
 import { NexusError } from "../errors";
 import type { AppState } from "../state";
+import { backlinksTo } from "./backlinks";
 import { SearchIndex } from "./search";
 import { startWatcher } from "./watcher";
 
@@ -30,6 +31,12 @@ export function searchIndexFor(state: AppState): SearchIndex {
 
 export function notesRoutes(state: AppState) {
   return (app: FastifyInstance) => {
+    // GET /notes/{path}/backlinks in architecture 4.1, in the query form the notes API uses.
+    app.get("/api/v1/notes/backlinks", async (request) => {
+      const path = String((request.query as { path?: string }).path ?? "");
+      if (!path) throw new NexusError("VALIDATION", "path is required");
+      return { backlinks: await backlinksTo(state.requireService(), path) };
+    });
     app.get("/api/v1/search", async (request) => {
       const q = String((request.query as { q?: string }).q ?? "").slice(0, 200);
       const index = indexes.get(state);

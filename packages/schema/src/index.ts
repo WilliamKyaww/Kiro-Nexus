@@ -140,6 +140,25 @@ export interface NoteView {
   headings: HeadingInfo[];
   linkedIssues: Array<{ key: string; title: string; status: IssueStatus; headingSlug: string | null; headingText: string | null; linkStatus: LinkStatus }>;
 }
+/** A [[link]] in some note that resolves to the note asked about (B2, PRD-021). */
+export interface BacklinkView {
+  /** The linking note, and the zero-based line of the link in it. */
+  source: string;
+  line: number;
+  /** That line as the preview shows it, as plain text. */
+  context: string;
+  /** The section of the linking note the link is in (null: before the first heading). */
+  sectionSlug: string | null;
+  sectionText: string | null;
+  /** The heading the link asks for in this note, if any, and whether it exists. */
+  heading: string | null;
+  headingStatus: "none" | "ok" | "missing";
+  headingSlug: string | null;
+  alias: string | null;
+  /** For an ambiguous name: every note the link could mean (this one included); otherwise empty. */
+  candidates: string[];
+}
+
 export interface WorkspaceView {
   workspace: null | { root: string; name: string; workspaceId: string; timeZone: string };
   recent: Array<{ path: string; openedAt: string }>;

@@ -503,7 +503,7 @@ open).
       the journal);
     - screenshots at 1360 × 900 and 390 × 844.
 
-### Run 6: run-5 repairs, light and dark appearance, and the J7 correction loop (verified by Kiro, 2026-11-25; no human review yet)
+### Run 6: run-5 repairs, light and dark appearance, the J7 correction loop, and backlinks (verified by Kiro, 2026-11-25; no human review yet)
 
 - **Run-5 review repairs** (`e2dd950`, DEC-027). All thirteen findings from Astra 6.2's
   run-5 review are repaired, each with a test that failed first. The record is
@@ -547,7 +547,20 @@ open).
     changes, and under the test clock the date reminds once and opens NEX-1.
   - Evidence: `correction.test.ts` (5 tests), `correction-http.test.ts` (7) and
     `j7-correction.spec.ts` (2).
-## Engineering foundations
+- **Backlinks and `[[` completion** (DEC-030, PRD-021). They work with AI off.
+  - The note page lists the notes that link to it, each with its section and the line, as
+    the preview shows it. Selecting one opens the source note at that passage, focused and
+    marked "Linked passage".
+  - A link to a heading the note does not have says so. A name that two notes share equally
+    is marked ambiguous in the preview and on both panels, and is not followed.
+  - The panel follows edits made in Nexus or outside it within seconds, is the same after a
+    restart, and shows only the open workspace.
+  - In the editor, `[[` suggests notes, and `#` after a name suggests its headings. Arrow
+    keys, Enter or Tab, and Escape work, Undo restores the typing, and an alias and the text
+    around the link are kept. Shared names show their folders and insert the path.
+  - Completion changes only the unsaved draft, which survives navigation until it is saved.
+  - Evidence: `links.test.ts` (5 tests), `backlinks.test.ts` (3), `wikilinks.test.ts` (7)
+    and `b2-backlinks.spec.ts` (3, in two fictional workspaces).## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,
   `.kiro/steering/workflow.md` and `.kiro/steering/source-boundaries.md`

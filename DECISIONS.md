@@ -700,3 +700,29 @@ status control.
   correction, and their dependents' review, which is more than this stage.
 - *Moving on to the next change at once after a rejection.* The next page took focus from
   the reason box, and the correction would land on a page the user had left.
+
+## DEC-030: One wikilink rule, which names ambiguous links rather than guessing
+- **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 4, under Will's overnight
+  authorisation; awaiting human review). Refines architecture 6 and DEC-006.
+  Spec: `.kiro/specs/backlinks-completion/`.
+**Decision.**
+- **Resolution.** A target matches a note's path, or the end of one, case-insensitively,
+  with or without `.md`. An exact path wins. Among several notes with the name, the one with
+  the most leading folders in common with the linking note wins, then the one with the
+  fewest folders. If two are still equal, the link is ambiguous: the preview shows it as
+  such with the candidates, and it is a backlink of each, marked.
+- **One rule everywhere.** The preview, the backlinks and completion share
+  `packages/markdown/src/links.ts`. Links in fenced code and inline code are ignored.
+- **Completion writes unambiguous links.** It inserts the file name, or the path when
+  another note has the same name.
+- **Backlinks from the files.** They are computed on request through `WorkspaceService`,
+  with no index, so outside edits, restarts and workspace switches are right by
+  construction. The notes are small; an index can come later if a workspace grows.
+- **Completion edits like typing.** It inserts through the browser's text input, so Undo
+  and the draft store treat it as an ordinary edit, and nothing is saved until the user
+  saves.
+**Alternatives.**
+- *Pick the first match, as the preview did.* With two notes of the same name it silently
+  chose one, which hid the problem.
+- *A backlink index kept by the watcher.* More state to keep right, for no measured need.
+- *Setting the textarea's value directly.* It loses the browser's undo history.

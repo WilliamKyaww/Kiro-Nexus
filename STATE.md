@@ -1,11 +1,13 @@
 # State
 
-- **Date updated:** 2026-11-25 (overnight run 6: stages 1 to 3 delivered;
-  stage 4, B2 backlinks and wikilink completion, is next)
-- **Active phase:** overnight run 6, stage 4. Slice C's live check (task 5)
-  is still waiting for Will's free key.
-- **Last spec:** `.kiro/specs/edit-first-journey/` task 5a (the correction
-  loop) is done; `.kiro/specs/appearance/` tasks 1 to 7 are done.
+- **Date updated:** 2026-11-25 (overnight run 6: all four stages delivered;
+  the reviewer relay and the morning handoff follow)
+- **Active phase:** none authorised. Run 6 is used up once its relay is
+  written. Slice C's live check (task 5) is still waiting for Will's
+  free key.
+- **Last spec:** `.kiro/specs/backlinks-completion/` tasks 1 to 5 are done.
+  Also in run 6: `.kiro/specs/appearance/` (tasks 1 to 7) and
+  `.kiro/specs/edit-first-journey/` task 5a.
   `.kiro/specs/reminders/` task 6 (event writing and click-through on a real
   event) is still Hein's.
 - **Also touched in run 5:**
@@ -271,7 +273,8 @@ code):**
 | --- | --- | --- |
 | 1. R5-1 to R5-13 repaired; E2E portable to the Kiro IDE (DEC-027) | `e2dd950` | `docs/reviews/2026-11-25-run5-review.md`. Every new test failed on the unrepaired code first. 267 of 267 unit tests (37 files), 45 of 45 E2E, and the Electron specs pass 7 of 7 with `ELECTRON_RUN_AS_NODE=1` |
 | 2. Light and dark appearance in the app and the wireframe (DEC-028, PRD-081) | `c12dd03` | `.kiro/specs/appearance/tasks.md`. `appearance.test.ts` (6), `appearance.spec.ts` (8, Edge and Electron, plus a screenshot run), `appearance-conversation.spec.ts` (provider double), `wireframe-appearance.spec.ts` (3). Typecheck clean; 273 of 273 unit tests (38 files); 57 of 57 E2E with 1 skipped (the screenshot run); secret scan (332 files); `mcp:smoke` 6 of 6. Screenshots in `.tmp/appearance-shots/` (`before/` at `e2dd950`, `after/`, `wireframe/`) |
-| 3. The J7 correction loop: Skip or a reason, a correction on the same target, supersede, Retry (DEC-029) | (this commit) | `.kiro/specs/edit-first-journey/tasks.md` task 5a. `correction.test.ts` (5), `correction-http.test.ts` (7, real service), `j7-correction.spec.ts` (2, Edge), all with the test double. Typecheck clean; 285 of 285 unit tests (40 files), twice; 59 of 59 E2E with 1 skipped; secret scan (336 files). Screenshots in `.tmp/j7-shots/` |
+| 3. The J7 correction loop: Skip or a reason, a correction on the same target, supersede, Retry (DEC-029) | `37a0c55` | `.kiro/specs/edit-first-journey/tasks.md` task 5a. `correction.test.ts` (5), `correction-http.test.ts` (7, real service), `j7-correction.spec.ts` (2, Edge), all with the test double. Typecheck clean; 285 of 285 unit tests (40 files), twice; 59 of 59 E2E with 1 skipped; secret scan (336 files). Screenshots in `.tmp/j7-shots/` |
+| 4. B2 backlinks and `[[` completion (DEC-030, PRD-021) | (this commit) | `.kiro/specs/backlinks-completion/tasks.md`. `links.test.ts` (5), `backlinks.test.ts` (3), `wikilinks.test.ts` (7), `b2-backlinks.spec.ts` (3, Edge, two fictional workspaces, an outside edit and a restart). Typecheck clean; 300 of 300 unit tests (43 files); 62 of 62 E2E with 2 screenshot runs skipped; secret scan (347 files). Screenshots in `.tmp/b2-shots/` |
 
 ## Wireframe overhaul (Will's request, 2026-11-25)
 

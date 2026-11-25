@@ -79,6 +79,7 @@ function useLiveUpdates(): boolean {
         void client.invalidateQueries({ queryKey: ["notes"] });
         void client.invalidateQueries({ queryKey: ["note", event.path] });
         void client.invalidateQueries({ queryKey: ["search"] });
+        void client.invalidateQueries({ queryKey: ["backlinks"] }); // any note's links may point at the open one
       }
       void client.invalidateQueries({ queryKey: ["review"] }); // pending markers follow the new content
     }
