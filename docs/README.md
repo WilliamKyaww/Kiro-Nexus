@@ -20,3 +20,7 @@
 | What was the reviewer asked to check? | `docs/reviews/relays/YYYY-MM-DD-topic.md` |
 | What did an independent reviewer find? | `docs/reviews/YYYY-MM-DD-topic.md` |
 | Which third-party work is incorporated? | `docs/licences.md` (created with the first dependency) |
+| Who is the product for, as Impeccable records it? | `PRODUCT.md` |
+| What does the proposed visual system look like? | `DESIGN.md` and `.impeccable/design.json` (a proposal from the wireframe, DEC-026) |
+| What is the wireframe's design brief? | `.impeccable/surfaces/wireframe-index-html.md` |
+| Which UI references were used? | `docs/design/references/README.md` (local only, ignored by Git) |

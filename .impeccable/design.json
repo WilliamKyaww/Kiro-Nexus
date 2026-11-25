@@ -1,0 +1,739 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-25T02:53:23.203Z",
+  "title": "Design System: Nexus",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Iris",
+        "canonical": "#4a52cf",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Deep Iris",
+        "canonical": "#3a41b0",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Iris Mist",
+        "canonical": "#eef0fd",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "accent-line": {
+        "role": "primary",
+        "displayName": "Iris Hairline",
+        "canonical": "#c8ccf6",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "accent-on-dark": {
+        "role": "primary",
+        "displayName": "Lit Iris",
+        "canonical": "#5058d8",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "focus-on-dark": {
+        "role": "primary",
+        "displayName": "Pale Iris",
+        "canonical": "#aab0ff",
+        "tonalRamp": [
+          "#2d3488",
+          "#3a41b0",
+          "#4a52cf",
+          "#5058d8",
+          "#aab0ff",
+          "#c8ccf6",
+          "#d9dcfb",
+          "#eef0fd"
+        ]
+      },
+      "pend": {
+        "role": "secondary",
+        "displayName": "Review Amber",
+        "canonical": "#8f5200",
+        "tonalRamp": [
+          "#4b3a10",
+          "#8f5200",
+          "#f2b13a",
+          "#ecc06a",
+          "#ffd98c",
+          "#ffe4a0",
+          "#fff4d8",
+          "#fffcf3"
+        ]
+      },
+      "pend-soft": {
+        "role": "secondary",
+        "displayName": "Amber Wash",
+        "canonical": "#fff4d8",
+        "tonalRamp": [
+          "#4b3a10",
+          "#8f5200",
+          "#f2b13a",
+          "#ecc06a",
+          "#ffd98c",
+          "#ffe4a0",
+          "#fff4d8",
+          "#fffcf3"
+        ]
+      },
+      "pend-line": {
+        "role": "secondary",
+        "displayName": "Amber Hairline",
+        "canonical": "#ecc06a",
+        "tonalRamp": [
+          "#4b3a10",
+          "#8f5200",
+          "#f2b13a",
+          "#ecc06a",
+          "#ffd98c",
+          "#ffe4a0",
+          "#fff4d8",
+          "#fffcf3"
+        ]
+      },
+      "pend-wash": {
+        "role": "secondary",
+        "displayName": "Amber Paper",
+        "canonical": "#fffcf3",
+        "tonalRamp": [
+          "#4b3a10",
+          "#8f5200",
+          "#f2b13a",
+          "#ecc06a",
+          "#ffd98c",
+          "#ffe4a0",
+          "#fff4d8",
+          "#fffcf3"
+        ]
+      },
+      "st-todo": {
+        "role": "tertiary",
+        "displayName": "Pebble",
+        "canonical": "#8a8a95",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "st-progress": {
+        "role": "tertiary",
+        "displayName": "Ember",
+        "canonical": "#c96f00",
+        "tonalRamp": [
+          "#120903",
+          "#3a1d02",
+          "#633403",
+          "#8f4e05",
+          "#be6a07",
+          "#e38e41",
+          "#feb880",
+          "#ffeadb"
+        ]
+      },
+      "st-done": {
+        "role": "tertiary",
+        "displayName": "Fern",
+        "canonical": "#2b9a68",
+        "tonalRamp": [
+          "#050e08",
+          "#052d1b",
+          "#034f31",
+          "#047449",
+          "#299967",
+          "#5dbb8b",
+          "#95dcb4",
+          "#d4f9e3"
+        ]
+      },
+      "bad": {
+        "role": "tertiary",
+        "displayName": "Brick",
+        "canonical": "#be3220",
+        "tonalRamp": [
+          "#150705",
+          "#44110a",
+          "#7a160a",
+          "#ad2a1a",
+          "#d94c38",
+          "#fc7762",
+          "#ffb3a5",
+          "#fee9e5"
+        ]
+      },
+      "teal": {
+        "role": "tertiary",
+        "displayName": "Lagoon",
+        "canonical": "#0f8f80",
+        "tonalRamp": [
+          "#050d0c",
+          "#032c27",
+          "#044d45",
+          "#067165",
+          "#1e9687",
+          "#57b9a9",
+          "#92d9cd",
+          "#d2f8f0"
+        ]
+      },
+      "violet": {
+        "role": "tertiary",
+        "displayName": "Heather",
+        "canonical": "#7552cc",
+        "tonalRamp": [
+          "#0c0916",
+          "#271b48",
+          "#472d83",
+          "#6746b7",
+          "#8867e3",
+          "#a990ff",
+          "#cabffe",
+          "#eeecff"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#17171c",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Slate",
+        "canonical": "#474751",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Zinc",
+        "canonical": "#686873",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "line-2": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#d3d3db",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e4e4ea",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Grey",
+        "canonical": "#e8e8ed",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "shell": {
+        "role": "neutral",
+        "displayName": "Shell",
+        "canonical": "#f2f2f5",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "sunk": {
+        "role": "neutral",
+        "displayName": "Well",
+        "canonical": "#f7f7f9",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#17171c",
+          "#474751",
+          "#686873",
+          "#8a8a95",
+          "#d3d3db",
+          "#e4e4ea",
+          "#f2f2f5",
+          "#ffffff"
+        ]
+      },
+      "review-night": {
+        "role": "neutral",
+        "displayName": "Review Night",
+        "canonical": "#1b1b21",
+        "tonalRamp": [
+          "#1b1b21",
+          "#25252c",
+          "#2b2b33",
+          "#34343e",
+          "#3b3b45",
+          "#46464f",
+          "#a3a3ae",
+          "#cdcdd6"
+        ]
+      },
+      "review-control": {
+        "role": "neutral",
+        "displayName": "Night Control",
+        "canonical": "#2b2b33",
+        "tonalRamp": [
+          "#1b1b21",
+          "#25252c",
+          "#2b2b33",
+          "#34343e",
+          "#3b3b45",
+          "#46464f",
+          "#a3a3ae",
+          "#cdcdd6"
+        ]
+      },
+      "review-control-line": {
+        "role": "neutral",
+        "displayName": "Night Hairline",
+        "canonical": "#3b3b45",
+        "tonalRamp": [
+          "#1b1b21",
+          "#25252c",
+          "#2b2b33",
+          "#34343e",
+          "#3b3b45",
+          "#46464f",
+          "#a3a3ae",
+          "#cdcdd6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Note titles; the Home greeting at 30px."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "View titles; the issue title at 26px and the calendar month at 22px."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Headings inside a note, such as Decisions and Actions."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Section headings in the interface, such as a settings group."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All interface text."
+      },
+      "body-reading": {
+        "displayName": "Body reading",
+        "purpose": "Note bodies at a 68ch measure."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, tabs, segmented controls, links and the file tree."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Dates, meta lines, counts and calendar entries, with tabular figures."
+      },
+      "tag": {
+        "displayName": "Tag",
+        "purpose": "Pending tags and review states."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Markdown source, code and file paths only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "rise",
+        "value": "0 1px 2px rgb(18 18 28 / .06)",
+        "purpose": "Resting board cards, the workspace switcher and the current sidebar item (with a 1px Hairline ring)."
+      },
+      {
+        "name": "panel-whisper",
+        "value": "0 1px 3px rgb(18 18 28 / .04)",
+        "purpose": "The work panel on the shell."
+      },
+      {
+        "name": "lift",
+        "value": "0 6px 14px -8px rgb(18 18 28 / .24)",
+        "purpose": "A board card under the pointer, showing it can be dragged."
+      },
+      {
+        "name": "composer",
+        "value": "0 8px 22px -12px rgb(18 18 28 / .22), 0 1px 2px rgb(18 18 28 / .05)",
+        "purpose": "The Ask composer at rest."
+      },
+      {
+        "name": "composer-focus",
+        "value": "0 0 0 3px #eef0fd, 0 8px 22px -12px rgb(18 18 28 / .22)",
+        "purpose": "The Ask composer while focus is inside it."
+      },
+      {
+        "name": "segment-selected",
+        "value": "0 0 0 1px #e4e4ea, 0 1px 2px rgb(18 18 28 / .08)",
+        "purpose": "The selected segment of a segmented control."
+      },
+      {
+        "name": "pop",
+        "value": "0 14px 36px -10px rgb(18 18 28 / .26), 0 2px 8px rgb(18 18 28 / .08)",
+        "purpose": "Floating overlays: the review bar, command palette, tooltip, toast and phone drawer."
+      },
+      {
+        "name": "scrim",
+        "value": "rgb(18 18 28 / .28)",
+        "purpose": "Background (not a shadow) behind the command palette and the phone drawer."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "The one easing curve, an ease-out, for every transition and the glow."
+      },
+      {
+        "name": "duration-hover",
+        "value": "120ms",
+        "purpose": "Colour and background changes on hover: buttons, rows, chips, citations, cards."
+      },
+      {
+        "name": "duration-border",
+        "value": "150ms",
+        "purpose": "Border and focus-ring changes, column drop targets and graph highlighting."
+      },
+      {
+        "name": "duration-tooltip",
+        "value": "160ms",
+        "purpose": "The data-dot tooltip fading in and rising 4px."
+      },
+      {
+        "name": "duration-drawer",
+        "value": "220ms",
+        "purpose": "The phone sidebar sliding in."
+      },
+      {
+        "name": "duration-panel",
+        "value": "250ms",
+        "purpose": "The panel's bottom margin growing when the review bar opens."
+      },
+      {
+        "name": "duration-checklist",
+        "value": "300ms",
+        "purpose": "A checklist row taking or losing its pending fill."
+      },
+      {
+        "name": "glow",
+        "value": "glow 1.9s cubic-bezier(.16, 1, .3, 1) both; from { outline: 3px solid #f2b13a; outline-offset: 5px; background-color: #ffe4a0 } to { outline: 3px solid rgb(242 177 58 / 0); outline-offset: 0 }",
+        "purpose": "The one authored animation: a change's target glows amber once when the review bar moves to it, then keeps its pending marker."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none; animation: none; glow target: outline 2px solid #8f5200, outline-offset 3px",
+        "purpose": "Under prefers-reduced-motion every transition and animation is off, and the glow becomes a static Review Amber outline."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "notes-details-below",
+        "value": "1180px"
+      },
+      {
+        "name": "drawer",
+        "value": "900px"
+      },
+      {
+        "name": "phone",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Iris button for creating and sending (New, Send).",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg><span>New</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--accent, #4a52cf); border-radius: 7px; background: var(--accent, #4a52cf); color: #fff; font: 550 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s; } .ds-btn-primary svg { flex: none; } .ds-btn-primary:hover { background: var(--accent-ink, #3a41b0); border-color: var(--accent-ink, #3a41b0); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: .45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "White outlined button for every other action, such as Apply fixed demo changes, Today and Send test reminder.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Apply fixed demo changes</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line-2, #d3d3db); border-radius: 7px; background: #fff; color: var(--ink, #17171c); font: 550 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s, color .12s; } .ds-btn-secondary:hover { background: var(--sunk, #f7f7f9); border-color: #c4c4cd; } .ds-btn-secondary:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-btn-secondary:disabled { opacity: .45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Search Trigger",
+      "kind": "input",
+      "refersTo": "search-trigger",
+      "description": "Top-bar field that opens the command palette, with Ctrl K keycaps.",
+      "html": "<button class=\"ds-search\" type=\"button\" aria-keyshortcuts=\"Control+K\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"m20 20-4.2-4.2\"/></svg><span class=\"ds-search-text\">Search notes and issues</span><span class=\"ds-search-keys\" aria-hidden=\"true\"><kbd class=\"ds-kbd\">Ctrl</kbd><kbd class=\"ds-kbd\">K</kbd></span></button>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; width: 360px; max-width: 100%; height: 34px; padding: 0 6px 0 11px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; color: var(--ink-3, #686873); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); text-align: left; cursor: pointer; transition: border-color .15s; } .ds-search svg { flex: none; } .ds-search:hover { border-color: var(--line-2, #d3d3db); } .ds-search:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-search-text { flex: 1; } .ds-search-keys { display: flex; gap: 3px; } .ds-kbd { padding: 2px 5px; border: 1px solid var(--line-2, #d3d3db); border-bottom-width: 2px; border-radius: 4px; background: #fff; color: var(--ink-3, #686873); font: 550 11px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); }"
+    },
+    {
+      "name": "Ask Composer",
+      "kind": "input",
+      "refersTo": "composer",
+      "description": "The centred Home composer with the Ask and Edit modes, context chips and Send, shown with AI off.",
+      "html": "<form class=\"ds-composer\"><textarea class=\"ds-composer-text\" rows=\"3\" aria-label=\"Ask Nexus about your notes and board\" placeholder=\"What did we agree, what is on the board, and what is still missing?\"></textarea><div class=\"ds-composer-bar\"><span class=\"ds-composer-seg\" role=\"group\" aria-label=\"Mode\"><button type=\"button\" aria-pressed=\"true\">Ask</button><button type=\"button\" aria-pressed=\"false\">Edit</button></span><span class=\"ds-composer-chip\"><span class=\"ds-composer-dot\" aria-hidden=\"true\"></span>AI is off</span><button class=\"ds-composer-send\" type=\"submit\" disabled><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 19V5M6 11l6-6 6 6\"/></svg><span>Send</span></button></div></form>",
+      "css": ".ds-composer { width: 560px; max-width: 100%; padding: 14px 14px 10px; border: 1px solid var(--line-2, #d3d3db); border-radius: 14px; background: #fff; color: var(--ink, #17171c); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); box-shadow: 0 8px 22px -12px rgb(18 18 28 / .22), 0 1px 2px rgb(18 18 28 / .05); transition: border-color .15s, box-shadow .15s; } .ds-composer:focus-within { border-color: var(--accent-line, #c8ccf6); box-shadow: 0 0 0 3px var(--accent-soft, #eef0fd), 0 8px 22px -12px rgb(18 18 28 / .22); } .ds-composer-text { display: block; width: 100%; padding: 2px 2px 10px; border: 0; outline: none; resize: none; background: transparent; color: inherit; font: 400 15px/1.55 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); caret-color: var(--accent, #4a52cf); } .ds-composer-text::placeholder { color: var(--ink-3, #686873); } .ds-composer-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-composer-seg { display: inline-flex; padding: 2px; border: 1px solid var(--line, #e4e4ea); border-radius: 8px; background: var(--sunk, #f7f7f9); } .ds-composer-seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3, #686873); font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-seg button[aria-pressed='true'] { background: #fff; color: var(--ink, #17171c); box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .08); } .ds-composer-seg button:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 1px; } .ds-composer-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--line, #e4e4ea); border-radius: 7px; background: var(--sunk, #f7f7f9); color: var(--ink-2, #474751); font: 500 12.5px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-composer-dot { width: 7px; height: 7px; border-radius: 50%; background: #9e9ea8; } .ds-composer-send { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--accent, #4a52cf); border-radius: 7px; background: var(--accent, #4a52cf); color: #fff; font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); cursor: pointer; } .ds-composer-send:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-composer-send:disabled { opacity: .45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Section list on the shell; the current item lifts to white with an iris icon.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Sections\"><a href=\"#\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z\"/></svg>Home</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5h7l4.5 4.5V20a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zM13.5 3.5v5h5M9.5 12.5h5M9.5 16h4\"/></svg>Notes</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M9.5 4.5v15M15 4.5v15\"/></svg>Projects</a><a href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14zM10 20.5a2 2 0 0 0 4 0\"/></svg>Notifications<span class=\"ds-nav-badge\">1</span></a></nav>",
+      "css": ".ds-nav { display: grid; gap: 1px; width: 216px; padding: 10px; background: var(--shell, #f2f2f5); font: 500 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-nav a { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px; border-radius: 7px; color: var(--ink-2, #474751); text-decoration: none; transition: background-color .12s, color .12s; } .ds-nav a svg { width: 16px; height: 16px; flex: none; color: var(--ink-3, #686873); } .ds-nav a:hover { background: var(--hover, #e8e8ed); color: var(--ink, #17171c); } .ds-nav a:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; } .ds-nav a[aria-current='page'] { background: #fff; color: var(--ink, #17171c); font-weight: 600; box-shadow: 0 0 0 1px var(--line, #e4e4ea), 0 1px 2px rgb(18 18 28 / .06); } .ds-nav a[aria-current='page'] svg { color: var(--accent, #4a52cf); } .ds-nav-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent, #4a52cf); color: #fff; font-size: 11px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; }"
+    },
+    {
+      "name": "Citation Chip",
+      "kind": "chip",
+      "refersTo": "citation",
+      "description": "Inline source chip in an Ask answer; it opens the exact heading or issue.",
+      "html": "<p class=\"ds-cite-line\">Hein builds the calendar view. NEX-1 tracks it: in progress, due 5 December. <a class=\"ds-cite\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M7 3.5h7l4.5 4.5V20a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zM13.5 3.5v5h5M9.5 12.5h5M9.5 16h4\"/></svg>Kickoff › Actions</a> <a class=\"ds-cite\" href=\"#\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"4.5\" width=\"17\" height=\"15\" rx=\"2\"/><path d=\"M9.5 4.5v15M15 4.5v15\"/></svg>NEX-1</a></p>",
+      "css": ".ds-cite-line { max-width: 560px; margin: 0; color: var(--ink, #17171c); font: 400 14px/1.7 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-cite { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; margin: 0 1px; border: 1px solid var(--accent-line, #c8ccf6); border-radius: 6px; background: var(--accent-soft, #eef0fd); color: var(--accent-ink, #3a41b0); font: 550 12px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); text-decoration: none; vertical-align: 1px; transition: background-color .12s; } .ds-cite svg { width: 12px; height: 12px; flex: none; } .ds-cite:hover { background: #e1e4fc; } .ds-cite:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 2px; }"
+    },
+    {
+      "name": "Pending Value",
+      "kind": "chip",
+      "refersTo": "pending-tag",
+      "description": "A proposed value awaiting review: dashed amber date chip, the struck-through old value and the Pending review tag.",
+      "html": "<div class=\"ds-pending\"><span class=\"ds-pending-date\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec 2026<span class=\"ds-sr\"> (pending review)</span></span><span class=\"ds-pending-was\">was 5 Dec 2026</span><span class=\"ds-pending-tag\">Pending review</span></div>",
+      "css": ".ds-pending { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 400 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-pending-date { display: inline-flex; align-items: center; gap: 4px; padding: 0 5px; border: 1px dashed var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-pending-date svg { width: 13px; height: 13px; flex: none; } .ds-pending-was { color: var(--ink-3, #686873); font-size: 12px; text-decoration: line-through; } .ds-pending-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 11.5px; font-weight: 650; white-space: nowrap; } .ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }"
+    },
+    {
+      "name": "Board Card",
+      "kind": "card",
+      "refersTo": "board-card",
+      "description": "Issue card in a board column, at rest and with a pending due-date change.",
+      "html": "<ul class=\"ds-col\"><li class=\"ds-card\"><div class=\"ds-card-top\"><span class=\"ds-card-key\">NEX-3</span><span class=\"ds-av\" aria-label=\"Will\">W</span></div><a class=\"ds-card-title\" href=\"#\">Record the demo video</a><div class=\"ds-card-meta\"><span class=\"ds-prio ds-prio-medium\" aria-label=\"Medium priority\"><i></i><i></i><i></i></span><span class=\"ds-due\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec</span></div></li><li class=\"ds-card\" data-state=\"pending\"><div class=\"ds-card-top\"><span class=\"ds-card-key\">NEX-1</span><span class=\"ds-av ds-av-hein\" aria-label=\"Hein\">H</span></div><a class=\"ds-card-title\" href=\"#\">Build calendar view</a><div class=\"ds-card-meta\"><span class=\"ds-prio ds-prio-high\" aria-label=\"High priority\"><i></i><i></i><i></i></span><span class=\"ds-due\" data-state=\"pending\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"15.5\" rx=\"2\"/><path d=\"M3.5 10h17M8 3v4M16 3v4\"/></svg>3 Dec</span><span class=\"ds-card-tag\">Pending</span><span class=\"ds-card-note\" title=\"Linked to Kickoff › Actions\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10.5 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1M13.5 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1\"/></svg></span></div></li></ul>",
+      "css": ".ds-col { list-style: none; display: grid; gap: 8px; width: 280px; margin: 0; padding: 8px; border: 1px solid var(--line, #e4e4ea); border-radius: 12px; background: var(--sunk, #f7f7f9); font: 400 14px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); color: var(--ink, #17171c); } .ds-card { padding: 10px 12px; border: 1px solid var(--line, #e4e4ea); border-radius: 9px; background: #fff; box-shadow: 0 1px 2px rgb(18 18 28 / .06); cursor: grab; transition: border-color .12s, box-shadow .12s; } .ds-card:hover { border-color: var(--line-2, #d3d3db); box-shadow: 0 6px 14px -8px rgb(18 18 28 / .24); } .ds-card[data-state='pending'] { border-color: var(--pend-line, #ecc06a); background: #fffcf3; } .ds-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 12px; } .ds-card-key { color: var(--ink-3, #686873); font-weight: 500; font-variant-numeric: tabular-nums; } .ds-av { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; background: #6a58cf; color: #fff; font-size: 10.5px; font-weight: 700; } .ds-av-hein { background: #0f8574; } .ds-card-title { display: block; margin-bottom: 10px; color: var(--ink, #17171c); font-weight: 550; line-height: 1.4; text-decoration: none; } .ds-card-title:hover { text-decoration: underline; text-decoration-color: var(--line-2, #d3d3db); text-underline-offset: 3px; } .ds-card-title:focus-visible { outline: 2px solid var(--accent, #4a52cf); outline-offset: 4px; border-radius: 3px; } .ds-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-prio { display: inline-flex; align-items: flex-end; gap: 1.5px; width: 14px; height: 12px; flex: none; } .ds-prio i { width: 3px; border-radius: 1px; background: var(--line-2, #d3d3db); } .ds-prio i:nth-child(1) { height: 5px; } .ds-prio i:nth-child(2) { height: 8px; } .ds-prio i:nth-child(3) { height: 12px; } .ds-prio-medium i:nth-child(-n+2), .ds-prio-high i { background: var(--ink-2, #474751); } .ds-due { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-3, #686873); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-due svg { width: 13px; height: 13px; } .ds-due[data-state='pending'] { padding: 0 5px; border: 1px dashed var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); } .ds-card-tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--pend-line, #ecc06a); border-radius: 5px; background: var(--pend-soft, #fff4d8); color: var(--pend, #8f5200); font-size: 11.5px; font-weight: 650; } .ds-card-note { display: inline-flex; margin-left: auto; color: var(--ink-3, #686873); } .ds-card-note svg { width: 14px; height: 14px; }"
+    },
+    {
+      "name": "Status Rings",
+      "kind": "custom",
+      "description": "Drawn status glyphs: an empty ring for To do, a half-filled ring for In progress and a filled ring with a check for Done.",
+      "html": "<ul class=\"ds-status\"><li><svg class=\"ds-st ds-st-todo\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"7\" stroke-width=\"2\"/></svg>To do</li><li><svg class=\"ds-st ds-st-progress\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"7\" stroke-width=\"2\"/><path d=\"M12 8.5a3.5 3.5 0 0 1 0 7z\" fill=\"currentColor\" stroke=\"none\"/></svg>In progress</li><li><svg class=\"ds-st ds-st-done\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8\" fill=\"currentColor\" stroke=\"none\"/><path d=\"m8.6 12.2 2.3 2.3 4.5-4.7\" stroke=\"#fff\" stroke-width=\"2\"/></svg>Done</li></ul>",
+      "css": ".ds-status { list-style: none; display: flex; gap: 18px; margin: 0; padding: 0; color: var(--ink, #17171c); font: 550 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); } .ds-status li { display: inline-flex; align-items: center; gap: 7px; } .ds-st { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; } .ds-st-todo { color: var(--st-todo, #8a8a95); } .ds-st-progress { color: var(--st-progress, #c96f00); } .ds-st-done { color: var(--st-done, #2b9a68); }"
+    },
+    {
+      "name": "Review Bar",
+      "kind": "custom",
+      "refersTo": "review-bar",
+      "description": "The floating dark bar for stepping through changes and accepting or rejecting each one where it applies.",
+      "html": "<div class=\"ds-review\" role=\"region\" aria-label=\"Changes awaiting review\"><p class=\"ds-review-status\"><strong>Change 1 of 2</strong> <span class=\"ds-review-what\">Kickoff › Actions: tick “Hein builds the calendar view”</span> <span class=\"ds-review-state\">Pending</span> <span class=\"ds-review-open\">2 awaiting review</span></p><div class=\"ds-review-actions\"><button class=\"ds-review-btn\" type=\"button\">Previous</button><button class=\"ds-review-btn\" type=\"button\">Next</button><button class=\"ds-review-btn\" type=\"button\">Reject</button><button class=\"ds-review-btn ds-review-accept\" type=\"button\">Accept</button></div></div>",
+      "css": ".ds-review { display: flex; align-items: center; gap: 14px; width: 760px; max-width: 100%; padding: 10px 10px 10px 18px; border-radius: 14px; background: #1b1b21; color: #f2f2f5; font: 400 13px/1.5 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); box-shadow: 0 14px 36px -10px rgb(18 18 28 / .26), 0 2px 8px rgb(18 18 28 / .08); } .ds-review-status { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 0; } .ds-review-status strong { font-weight: 650; } .ds-review-what { color: #cdcdd6; } .ds-review-state { padding: 1px 7px; border-radius: 5px; background: #4b3a10; color: #ffd98c; font-size: 11.5px; font-weight: 650; } .ds-review-open { color: #a3a3ae; font-size: 12px; } .ds-review-actions { display: flex; gap: 6px; } .ds-review-btn { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid #3b3b45; border-radius: 7px; background: #2b2b33; color: #f2f2f5; font: 550 13px/1 var(--font, 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif); white-space: nowrap; cursor: pointer; transition: background-color .12s, border-color .12s; } .ds-review-btn:hover { background: #373741; border-color: #4b4b56; } .ds-review-btn:focus-visible { outline: 2px solid #aab0ff; outline-offset: 2px; } .ds-review-accept { background: #5058d8; border-color: #5058d8; color: #fff; } .ds-review-accept:hover { background: #5f67e0; border-color: #5f67e0; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Decision Desk",
+    "overview": "Nexus is a desk for a small team's meetings and work. A cool zinc-grey shell holds one floating white work panel, and inside it a note and the issue it mentions sit one click apart. Everything at rest is quiet: hairline borders, small radii, the platform's own type and a single iris-blue accent for what the user can act on or where they are. The one warm colour is amber, and it is lit only while an agent change waits for the user to accept or reject it. When the review is finished, the amber goes out.\n\nThis is a dense working surface in the manner of Linear for the board, Notion or Obsidian for notes and Temporal for the calendar and shell, borrowing their behaviours and none of their branding. Density comes from 13px controls and 14px text on a fixed ramp; calm comes from tonal layering and restraint rather than decoration. The AI is treated like any other part of the workspace: an answer sits on the same white panel, in the same type, with its citations as small iris chips that open the exact heading or issue. Nexus refuses novelty chrome and dark \"AI\" styling.\n\nThis system is a proposal for Will first and then Hein, who owns Nexus's final visual identity, and it can change until both agree. It is recorded from the static wireframe in `wireframe/` (`index.html`, `wireframe.css` and `wireframe.js`), whose `:root` custom properties are the source of the tokens above. It has not yet been applied to the real app in `apps/`. A few values are literals in the stylesheet rather than custom properties (Amber Paper, Lit Iris, Pale Iris and the Review Night set); they are recorded as tokens so the app can adopt them as such. Dark mode is not designed.",
+    "keyCharacteristics": [
+      "A cool zinc shell with one floating white work panel and 1px hairline borders.",
+      "One accent, iris, for actions, selection, links and citations.",
+      "Amber means \"waiting for your decision\" and nothing else.",
+      "Status reads by glyph shape first and colour second.",
+      "The platform system stack in half-step weights, with tabular figures for dates and keys.",
+      "Flat at rest; shadows only on things that float or can be picked up.",
+      "One authored motion: the amber glow when a change lands."
+    ],
+    "rules": [
+      {
+        "name": "The Amber Lamp Rule",
+        "body": "Amber is lit only while a change awaits review. It never marks a warning, a priority, a highlight, a hover or the brand. When the last change is accepted or rejected, no amber remains on the screen.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Iris Rule",
+        "body": "Iris is the only accent. It marks what acts (primary buttons, the Ask tag), where the user is (the current item, today, the selected result) and what opens elsewhere (links, citations, calendar issue entries). Nothing is iris for decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Glyph-First Status Rule",
+        "body": "Pebble, Ember and Fern appear only inside small drawn marks: the status ring, a calendar dot or an answer's section marker. They never fill a card, tint a column or colour text. This is what keeps Ember from reading as Review Amber, because the two share a hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Operate Stack Rule",
+        "body": "Screens people work in, the app and this wireframe, use the platform stack above and ship no web font. This rule does not extend to a landing page, the submission video or any other brand surface, which should source its own display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Half-Step Weight Rule",
+        "body": "Hierarchy moves in half steps: 400 for reading, 500 for sidebar labels and chips, 550 for controls and emphasis, 600 for section headings and the current sidebar item, and 650 for titles, keys and tags. 700 appears only on the letter inside a tile or an avatar.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Dates, times, counts and issue keys use tabular figures, so columns of dates and keys line up.",
+        "section": "typography"
+      },
+      {
+        "name": "The Bar Never Covers Rule",
+        "body": "While a review is open, the panel's bottom margin grows by the review bar's measured height plus 20px, and the month grid shrinks its rows to match, so the review bar never covers content.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline First Rule",
+        "body": "Separate with a Hairline border or a step to the Well before reaching for a shadow. A shadow means the thing floats or moves.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Night Overlay Rule",
+        "body": "Dark surfaces are for things that float above the work and then leave: the review bar in Review Night, and the tooltip and toast in Graphite. The work panel and everything on it stay light.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Glow Rule",
+        "body": "The glow is the only authored animation. Everything else is a state change of 120–250ms on the ease-out curve.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "**Do** mark every pending value in three ways: an Amber Wash fill with an Amber Hairline border, a \"Pending review\" or \"Pending\" tag, and screen-reader text. Show the value it replaces beside it, struck through.",
+      "**Do** show one pending change everywhere its item appears (the note, the issue, the board card and the calendar entry), so the user can decide where it applies.",
+      "**Do** pair each status colour with its ring shape (empty, half-filled, filled with a check), so status reads without colour.",
+      "**Do** separate with a 1px Hairline (#e4e4ea) or the Well (#f7f7f9) before using a shadow.",
+      "**Do** give every interactive element a 2px Iris outline at a 2px offset on focus, and Pale Iris (#aab0ff) on the review bar.",
+      "**Do** keep notes and issue descriptions to a 68ch measure, and check every view at 390px.",
+      "**Do** draw icons as SVG on a 24px grid with a 1.75 stroke and round caps and joins."
+    ],
+    "donts": [
+      "**Don't** use amber for anything except a change awaiting review (not for warnings, priority, highlights or hover), and don't let Ember leave the In progress ring.",
+      "**Don't** give the AI its own look. Ask answers get no dark panels, gradients, glows, sparkles or special type; they sit on the white panel like a note.",
+      "**Don't** add novelty chrome: gradient text, glass or blur, ornament or decorative illustration. The graph's dot grid is the one patterned surface, because it is a canvas for placed nodes.",
+      "**Don't** add a second accent, or use Lagoon or Heather for actions; they name events and projects only.",
+      "**Don't** fill cards, columns or rows with a status colour; status lives in the ring.",
+      "**Don't** use monospace except for Markdown source, code and file paths.",
+      "**Don't** put a label or eyebrow above a heading, or use Unicode glyphs or emoji as icons.",
+      "**Don't** make the work panel dark or derive a dark theme by inverting these tokens; dark mode is not designed yet."
+    ]
+  }
+}

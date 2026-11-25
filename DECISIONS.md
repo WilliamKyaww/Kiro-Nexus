@@ -573,3 +573,27 @@ status control.
   then trigger or suppress reminders.
 - *Delivering missed reminders on start.* After a long absence that would flood
   the user, and it would show a reminder whose time had passed as if it were new.
+
+## DEC-026: The wireframe proposes the category-standard look, with Impeccable's records at the repo root
+- **Status:** Proposed (Will chose the direction on 2026-11-25; Hein has not
+  seen it). Adoption by the app needs Will's go-ahead and Hein's agreement,
+  because Hein owns the final visual identity.
+**Decision.**
+- **Look.** The wireframe uses the category standard: a cool grey shell with
+  a floating white panel, one iris accent, amber only for changes awaiting
+  review, and system UI type. The craft bar is Linear (board and issues),
+  Notion or Obsidian (notes) and Temporal (calendar and shell), borrowing
+  behaviours and no branding.
+- **Records.** `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json` and
+  `.impeccable/surfaces/` are committed at the repository root, as Will
+  asked. Impeccable's working folders (questions, mocks, review, shots)
+  ignore themselves.
+- **References.** The UI reference screenshots stay local in
+  `docs/design/references/`, which Git ignores. The repository will be
+  public, and some images are other companies' or come from Will's own
+  apps.
+**Alternatives.**
+- *Impeccable's assigned roll ("Public-service plain") or its pick ("Galley
+  proof").* Will preferred the familiar standard.
+- *Committing the screenshots.* That would make them public permanently,
+  because history is never rewritten here.

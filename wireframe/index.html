@@ -3,110 +3,404 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Nexus wireframe (fictional data)</title>
+  <title>Nexus wireframe</title>
   <link rel="stylesheet" href="wireframe.css">
   <script src="wireframe.js" defer></script>
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M7 3.5h7l4.5 4.5V20a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5zM13.5 3.5v5h5M9.5 12.5h5M9.5 16h4"/></symbol>
+    <symbol id="i-graph" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="8" r="2.2"/><circle cx="9" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M8.2 6.4l7.6 1.2M6.5 8.1l1.9 7.8M18 10.2v5.6M11.2 18h4.6"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15M15 4.5v15"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14zM10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m10 7 5 5-5 5"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a1 1 0 0 1 1-1h4.6l2 2h8.4a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M5 5.5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-8.5L6 20v-3.5H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10.5 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1M13.5 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4.5l3 1.5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-urgent" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="3.5" fill="currentColor" stroke="none"/><path d="M8 4.3v4.4M8 11.4v.4" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-st-todo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" stroke-width="2"/></symbol>
+    <symbol id="i-st-progress" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" stroke-width="2"/><path d="M12 8.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-st-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor" stroke="none"/><path d="m8.6 12.2 2.3 2.3 4.5-4.7" stroke="#fff" stroke-width="2"/></symbol>
+  </svg>
+
   <a class="skip" href="#main">Skip to content</a>
-  <div class="proto-banner" role="note">Wireframe prototype. Fictional data, fixed demo changes, no AI.</div>
-  <div class="shell">
-    <nav class="rail" aria-label="Sections">
-      <p class="brand">Nexus</p>
-      <ul>
-        <li><a href="#/home" data-nav="home">Home</a></li>
-        <li><a href="#/note" data-nav="note">Notes</a></li>
-        <li><a href="#/issue" data-nav="issue">Projects</a></li>
-        <li><a href="#/calendar" data-nav="calendar">Calendar</a></li>
-        <li><a href="#/notifications" data-nav="notifications">Notifications</a></li>
-        <li><a href="#/settings" data-nav="settings">Settings</a></li>
+
+  <div class="app">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg></button>
+      <a class="brand" href="#/home"><span class="brand-mark" aria-hidden="true"></span>Nexus</a>
+      <button class="search" type="button" data-palette aria-keyshortcuts="Control+K">
+        <svg class="i"><use href="#i-search"/></svg><span class="search-text">Search notes and issues</span>
+        <span class="keys" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+      </button>
+      <div class="top-actions">
+        <span class="proto">
+          <button class="proto-dot" type="button" aria-label="Wireframe prototype: about this data" aria-describedby="proto-tip" aria-expanded="false"></button>
+          <span class="proto-tip" id="proto-tip" role="tooltip">Wireframe prototype. Every name, note, issue and date is fictional sample data. The two review changes are fixed, and no AI runs here.</span>
+        </span>
+        <button class="btn btn-primary" type="button" data-toast="New: in the app this opens a menu for a note, an issue or an event."><svg class="i"><use href="#i-plus"/></svg><span>New</span></button>
+      </div>
+    </header>
+
+    <nav class="sidebar" id="sidebar" aria-label="Sections">
+      <button class="workspace" type="button" data-toast="Switch workspace: in the app this lists your workspace folders.">
+        <span class="ws-tile" aria-hidden="true">K</span>
+        <span class="ws-text"><small>Workspace</small><strong>Kickoff sample</strong></span>
+        <svg class="i"><use href="#i-chevron-down"/></svg>
+      </button>
+      <ul class="nav">
+        <li><a href="#/home" data-nav="home"><svg class="i"><use href="#i-home"/></svg>Home</a></li>
+        <li><a href="#/note" data-nav="note"><svg class="i"><use href="#i-note"/></svg>Notes</a></li>
+        <li><a href="#/graph" data-nav="graph"><svg class="i"><use href="#i-graph"/></svg>Graph</a></li>
+        <li><a href="#/board" data-nav="board"><svg class="i"><use href="#i-board"/></svg>Projects</a></li>
+        <li><a href="#/calendar" data-nav="calendar"><svg class="i"><use href="#i-calendar"/></svg>Calendar</a></li>
+        <li><a href="#/notifications" data-nav="notifications"><svg class="i"><use href="#i-bell"/></svg>Notifications<span class="badge"><span class="sr-only">, </span>1<span class="sr-only"> new</span></span></a></li>
       </ul>
-      <p class="workspace">Workspace: <strong>Kickoff sample</strong></p>
+      <p class="nav-group" id="grp-projects">Projects</p>
+      <ul class="nav nav-sub" aria-labelledby="grp-projects">
+        <li><a href="#/board"><span class="proj-dot" aria-hidden="true"></span>Nexus hackathon<span class="nav-key">NEX</span></a></li>
+      </ul>
+      <p class="nav-group" id="grp-recent">Recent notes</p>
+      <ul class="nav nav-sub" aria-labelledby="grp-recent">
+        <li><a href="#/note"><svg class="i"><use href="#i-note"/></svg>Kickoff, 24 November</a></li>
+        <li><a href="#/note/demo-script"><svg class="i"><use href="#i-note"/></svg>Demo script</a></li>
+        <li><a href="#/note/weekly-sync"><svg class="i"><use href="#i-note"/></svg>Weekly sync, 1 December</a></li>
+      </ul>
+      <ul class="nav nav-foot">
+        <li><a href="#/settings" data-nav="settings"><svg class="i"><use href="#i-settings"/></svg>Settings</a></li>
+      </ul>
     </nav>
 
-    <main id="main" tabindex="-1">
-      <section data-view="home" aria-labelledby="home-h">
-        <h1 id="home-h">What do you need?</h1>
-        <form class="composer" onsubmit="return false">
-          <label for="ask">Message</label>
-          <textarea id="ask" rows="3" placeholder="What did we agree, what is on the board, what is missing?"></textarea>
-          <div class="composer-row">
-            <span class="chip">Context: Kickoff sample</span>
-            <span class="chip chip-off">AI is off</span>
-            <a href="#/settings">Set up a provider</a>
+    <main id="main" class="panel" tabindex="-1">
+      <!-- Home -->
+      <section class="view home" data-view="home" aria-labelledby="home-h">
+        <div class="home-inner">
+          <h1 id="home-h">Good afternoon, Will</h1>
+          <p class="lede">Tuesday 24 November 2026 · <span data-bind="open-count">4</span> open issues, <span data-bind="week-count">3</span> due by 5 December</p>
+          <form class="composer" data-composer>
+            <label class="sr-only" for="ask">Ask Nexus about your notes and board</label>
+            <textarea id="ask" rows="3" placeholder="What did we agree, what is on the board, and what is still missing?"></textarea>
+            <div class="composer-bar">
+              <fieldset class="seg">
+                <legend class="sr-only">Mode</legend>
+                <input type="radio" name="mode" id="mode-ask" checked><label for="mode-ask">Ask</label>
+                <input type="radio" name="mode" id="mode-edit"><label for="mode-edit">Edit</label>
+              </fieldset>
+              <span class="chip"><svg class="i"><use href="#i-folder"/></svg>Kickoff sample</span>
+              <span class="chip chip-off"><span class="off-dot" aria-hidden="true"></span>AI is off</span>
+              <a class="link" href="#/settings">Set up a provider</a>
+              <button class="btn btn-primary btn-send" type="submit" disabled><svg class="i"><use href="#i-send"/></svg><span>Send</span></button>
+            </div>
+          </form>
+          <div class="home-grid">
+            <section aria-labelledby="recent-h">
+              <h2 id="recent-h">Recent conversations</h2>
+              <ul class="rows">
+                <li><a class="row" href="#/conversation"><svg class="i row-icon"><use href="#i-message"/></svg>
+                  <span class="row-main"><strong>What is outstanding from the kickoff?</strong><small>Ask · 3 sources · today, 14:05</small></span>
+                  <svg class="i row-go"><use href="#i-chevron-right"/></svg></a></li>
+              </ul>
+            </section>
+            <section aria-labelledby="due-h">
+              <h2 id="due-h">Due soon</h2>
+              <ul class="rows" data-render="due-soon"></ul>
+            </section>
           </div>
-        </form>
-        <p class="hint">Notes, Projects and Calendar work without AI. To try the review flow, use the fixed demo changes below.</p>
-        <button type="button" id="run-demo">Apply fixed demo changes (not AI)</button>
-        <h2>Recent conversations</h2>
-        <ul class="plain"><li>Outstanding actions from the kickoff (fictional)</li></ul>
-      </section>
-
-      <section data-view="note" aria-labelledby="note-h" hidden>
-        <div class="page-grid">
-          <article class="doc">
-            <p class="path">meetings / 2026-11-24 kickoff.md</p>
-            <h1 id="note-h">Kickoff, 24 November</h1>
-            <h2 id="decisions">Decisions</h2>
-            <p>We build one local workspace for notes and issues.</p>
-            <h2 id="actions" tabindex="-1">Actions</h2>
-            <ul class="checklist">
-              <li data-target="chg-note">
-                <span class="check" data-checked="false" aria-hidden="true"></span>
-                <span class="text">Hein builds the calendar view</span>
-              </li>
-              <li>
-                <span class="check" data-checked="false" aria-hidden="true"></span>
-                <span class="text">Will writes the judge instructions</span>
-              </li>
-            </ul>
-          </article>
-          <aside class="side" aria-label="Linked issues">
-            <h2>Linked issues</h2>
-            <ul class="plain">
-              <li><a href="#/issue">NEX-1 Build calendar view</a> <span class="muted">to Actions</span></li>
-            </ul>
-          </aside>
+          <section class="try" aria-labelledby="try-h">
+            <div>
+              <h2 id="try-h">Try the review flow</h2>
+              <p>Load two fixed changes, one to the kickoff note and one to NEX-1, then accept or reject each one where it applies.</p>
+            </div>
+            <button type="button" id="run-demo" class="btn">Apply fixed demo changes</button>
+          </section>
         </div>
       </section>
 
-      <section data-view="issue" aria-labelledby="issue-h" hidden>
-        <p class="path">Projects / NEX</p>
-        <h1 id="issue-h">NEX-1 Build calendar view</h1>
-        <dl class="fields">
-          <dt>Status</dt><dd>In progress</dd>
-          <dt>Priority</dt><dd>High</dd>
-          <dt>Due date</dt><dd data-target="chg-issue"><span class="value">5 Dec 2026</span></dd>
-          <dt>Linked note</dt><dd><a href="#/note" data-anchor="actions">Kickoff, 24 November › Actions</a></dd>
-        </dl>
+      <!-- Conversation -->
+      <section class="view convo" data-view="conversation" aria-labelledby="convo-h" hidden>
+        <div class="convo-inner">
+          <p class="crumbs"><a href="#/home">Home</a><svg class="i"><use href="#i-chevron-right"/></svg>Conversation</p>
+          <h1 id="convo-h">What is outstanding from the kickoff?</h1>
+          <div class="msg-user"><p>What did we agree, what is on the board, and what is still missing?</p></div>
+          <article class="answer" aria-labelledby="answer-h">
+            <h2 class="sr-only" id="answer-h">Answer</h2>
+            <p class="answer-meta"><span class="ask-tag">Ask</span>Read 1 note and all 6 NEX issues · today, 14:05</p>
+            <h3>Recorded facts</h3>
+            <ul>
+              <li>Hein builds the calendar view. NEX-1 tracks it: in progress, due 5 December. <a class="cite" href="#/note" data-anchor="actions"><svg class="i"><use href="#i-note"/></svg>Kickoff › Actions</a> <a class="cite" href="#/issue/NEX-1"><svg class="i"><use href="#i-board"/></svg>NEX-1</a></li>
+              <li>Nexus ships as a web app with a desktop wrapper. <a class="cite" href="#/note" data-anchor="decisions"><svg class="i"><use href="#i-note"/></svg>Kickoff › Decisions</a></li>
+            </ul>
+            <h3>Discrepancies</h3>
+            <ul>
+              <li>“Will writes the judge instructions” is agreed, but no issue tracks it. <a class="cite" href="#/note" data-anchor="actions"><svg class="i"><use href="#i-note"/></svg>Kickoff › Actions</a></li>
+            </ul>
+            <h3>Suggestions</h3>
+            <ul>
+              <li>Create an issue for the judge instructions and link it to Kickoff › Actions. Switch to Edit and Nexus will propose it for review.</li>
+            </ul>
+          </article>
+          <form class="composer composer-compact" data-composer>
+            <label class="sr-only" for="follow">Ask a follow-up</label>
+            <textarea id="follow" rows="1" placeholder="Ask a follow-up"></textarea>
+            <div class="composer-bar">
+              <span class="chip chip-off"><span class="off-dot" aria-hidden="true"></span>AI is off</span>
+              <button class="btn btn-primary btn-send" type="submit" disabled><svg class="i"><use href="#i-send"/></svg><span>Send</span></button>
+            </div>
+          </form>
+        </div>
       </section>
 
-      <section data-view="calendar" aria-labelledby="cal-h" hidden>
-        <h1 id="cal-h">Calendar</h1><p>Hein owns this view (B3). Not part of this wireframe.</p>
+      <!-- Notes -->
+      <section class="view notes" data-view="note" aria-label="Notes" hidden>
+        <nav class="files" aria-label="Files">
+          <p class="pane-title">Files</p>
+          <ul class="tree" data-render="tree"></ul>
+        </nav>
+        <div class="note-main">
+          <div class="note-bar">
+            <p class="crumbs" data-render="note-path"></p>
+            <span class="saved" data-render="note-saved"></span>
+            <div class="seg seg-buttons" role="group" aria-label="View">
+              <button type="button" data-mode="edit" aria-pressed="false">Source</button>
+              <button type="button" data-mode="preview" aria-pressed="true">Preview</button>
+            </div>
+          </div>
+          <div class="doc-wrap">
+            <article class="doc" data-note="kickoff">
+              <h1 id="note-h">Kickoff, 24 November 2026</h1>
+              <p class="doc-meta">Will and Hein · 24 November 2026, 14:00</p>
+              <h2 id="decisions" tabindex="-1">Decisions</h2>
+              <ul>
+                <li>Nexus ships as a web app with a desktop wrapper.</li>
+                <li>Notes and issues live in one local workspace folder.</li>
+                <li>Hein owns the calendar view; Will owns the judge instructions.</li>
+              </ul>
+              <h2 id="actions" tabindex="-1">Actions</h2>
+              <ul class="checklist">
+                <li data-target="chg-note">
+                  <span class="check" data-checked="false" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>
+                  <span class="text">Hein builds the calendar view</span>
+                  <a class="mention" href="#/issue/NEX-1">NEX-1</a>
+                  <span class="pending-tag">Pending review</span>
+                </li>
+                <li>
+                  <span class="check" data-checked="false" aria-hidden="true"><svg class="i"><use href="#i-check"/></svg></span>
+                  <span class="text">Will writes the judge instructions</span>
+                </li>
+              </ul>
+              <h2 id="questions" tabindex="-1">Open questions</h2>
+              <p>Which free provider should judges use? The options are in <a class="wikilink" href="#/note/demo-script">Demo script</a>.</p>
+              <p>We review progress at the <a class="wikilink" href="#/note/weekly-sync">Weekly sync, 1 December</a>.</p>
+            </article>
+            <article class="doc" data-note="weekly-sync" hidden>
+              <h1>Weekly sync, 1 December 2026</h1>
+              <p class="doc-meta">Will and Hein · 1 December 2026, 10:00</p>
+              <h2>Agenda</h2>
+              <ul>
+                <li>Progress on the actions from the <a class="wikilink" href="#/note">Kickoff, 24 November</a>.</li>
+                <li>Watch the first cut of the demo video, <a class="mention" href="#/issue/NEX-3">NEX-3</a>.</li>
+                <li>Agree the feature freeze for 2 December.</li>
+              </ul>
+              <h2>Notes</h2>
+              <p>To be written during the meeting.</p>
+            </article>
+            <article class="doc" data-note="demo-script" hidden>
+              <h1>Demo script</h1>
+              <p class="doc-meta">Will · edited 23 November 2026</p>
+              <h2>Story</h2>
+              <p>Open the <a class="wikilink" href="#/note/sample-workspace">Sample workspace</a>, ask what is outstanding from the <a class="wikilink" href="#/note">Kickoff, 24 November</a>, then fix it in Edit mode and review each change.</p>
+              <h2>Provider options</h2>
+              <ul>
+                <li>A free hosted model with the judge's own key.</li>
+                <li>A team relay with a strict quota (still open).</li>
+              </ul>
+              <p>Recording is tracked in <a class="mention" href="#/issue/NEX-3">NEX-3</a>.</p>
+            </article>
+            <article class="doc" data-note="sample-workspace" hidden>
+              <h1>Sample workspace</h1>
+              <p class="doc-meta">Hein · edited 22 November 2026</p>
+              <p>A fictional team workspace for judges: one meeting note, one project and a handful of issues. Everything in it is made up.</p>
+              <p>Used by the <a class="wikilink" href="#/note/demo-script">Demo script</a>. Built in <a class="mention" href="#/issue/NEX-6">NEX-6</a>.</p>
+            </article>
+            <article class="doc" data-note="graph-idea" hidden>
+              <h1>Graph view idea</h1>
+              <p class="doc-meta">Will · edited 24 November 2026</p>
+              <p>Show notes and issues as one network, so an unlinked note stands out. Nothing links here yet, which is why it floats alone in the graph.</p>
+            </article>
+            <div class="source" hidden>
+              <label class="source-label" for="source">Markdown source <span>read-only in the wireframe</span></label>
+              <textarea id="source" readonly spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
+        <aside class="details" aria-label="Note details" data-render="note-details"></aside>
       </section>
-      <section data-view="notifications" aria-labelledby="not-h" hidden>
-        <h1 id="not-h">Notifications</h1><p>Reminders arrive in B4. Pending dates never trigger a reminder.</p>
+
+      <!-- Graph -->
+      <section class="view graph" data-view="graph" aria-labelledby="graph-h" hidden>
+        <header class="view-head">
+          <div>
+            <h1 id="graph-h">Graph</h1>
+            <p class="sub" data-render="graph-summary"></p>
+          </div>
+          <div class="graph-filters">
+            <label class="toggle"><input type="checkbox" data-graph="issues" checked><span>Issues</span></label>
+            <label class="toggle"><input type="checkbox" data-graph="orphans" checked><span>Unlinked notes</span></label>
+          </div>
+        </header>
+        <div class="graph-body">
+          <div class="graph-canvas"><svg class="graph-svg" viewBox="0 0 880 540" role="group" aria-label="Notes and issues, connected by links" data-render="graph"></svg></div>
+          <aside class="graph-side" aria-live="polite" data-render="graph-side"></aside>
+        </div>
       </section>
-      <section data-view="settings" aria-labelledby="set-h" hidden>
-        <h1 id="set-h">Settings</h1><p>Provider profiles arrive in slice C. No key is needed for notes or projects.</p>
+
+      <!-- Projects: board and backlog -->
+      <section class="view board" data-view="board" aria-labelledby="board-h" hidden>
+        <header class="view-head">
+          <div class="title-row">
+            <span class="proj-tile" aria-hidden="true">N</span>
+            <h1 id="board-h">Nexus hackathon</h1><span class="key-chip">NEX</span>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Project views">
+            <button type="button" role="tab" id="tab-board" aria-controls="panel-board" aria-selected="true">Board</button>
+            <button type="button" role="tab" id="tab-backlog" aria-controls="panel-backlog" aria-selected="false" tabindex="-1">Backlog</button>
+          </div>
+        </header>
+        <p class="board-hint">Drag a card to change its status, or focus it and press Alt with the left or right arrow.</p>
+        <div class="columns" id="panel-board" role="tabpanel" aria-labelledby="tab-board" data-render="board"></div>
+        <div class="backlog" id="panel-backlog" role="tabpanel" aria-labelledby="tab-backlog" data-render="backlog" hidden></div>
+        <p class="sr-only" aria-live="polite" data-render="board-live"></p>
+      </section>
+
+      <!-- Issue -->
+      <section class="view issue" data-view="issue" aria-labelledby="issue-h" hidden data-render="issue"></section>
+
+      <!-- Calendar -->
+      <section class="view calendar" data-view="calendar" aria-labelledby="cal-h" hidden>
+        <header class="view-head cal-head">
+          <div class="cal-nav">
+            <button class="icon-btn icon-btn-line" type="button" data-cal="-1" aria-label="Show earlier month"><svg class="i"><use href="#i-chevron-left"/></svg></button>
+            <button class="btn btn-line" type="button" data-cal="today">Today</button>
+            <button class="icon-btn icon-btn-line" type="button" data-cal="1" aria-label="Show later month"><svg class="i"><use href="#i-chevron-right"/></svg></button>
+            <h1 id="cal-h" data-render="cal-title">November 2026</h1>
+          </div>
+          <div class="cal-tools">
+            <div class="cal-legend" aria-label="Legend"><span class="lg lg-issue">Issue due</span><span class="lg lg-event">Event</span><span class="lg lg-deadline">Deadline</span></div>
+            <div class="seg seg-buttons" role="group" aria-label="Calendar view">
+              <button type="button" data-calview="month" aria-pressed="true">Month</button>
+              <button type="button" data-calview="agenda" aria-pressed="false">Agenda</button>
+            </div>
+          </div>
+        </header>
+        <div class="month" data-render="month"></div>
+        <div class="agenda" data-render="agenda" hidden></div>
+      </section>
+
+      <!-- Notifications -->
+      <section class="view list-view" data-view="notifications" aria-labelledby="not-h" hidden>
+        <header class="view-head">
+          <div><h1 id="not-h">Notifications</h1><p class="sub">Reminders for issues and events in this workspace</p></div>
+          <button class="btn btn-line" type="button" data-toast="Test reminder. This is how a reminder looks when it fires.">Send test reminder</button>
+        </header>
+        <h2 class="group-h">Today</h2>
+        <ul class="rows rows-boxed">
+          <li><a class="row" href="#/issue/NEX-5"><span class="unread" aria-hidden="true"></span><svg class="i row-icon"><use href="#i-bell"/></svg>
+            <span class="row-main"><strong>NEX-5 Package the Windows zip is due on 2 December</strong><small>Reminder · delivered at 09:00</small></span><span class="row-meta">New</span></a></li>
+          <li><a class="row" href="#/note"><svg class="i row-icon"><use href="#i-calendar"/></svg>
+            <span class="row-main"><strong>Kickoff meeting starts at 14:00</strong><small>Event reminder · delivered at 13:45</small></span></a></li>
+        </ul>
+        <h2 class="group-h">Missed while Nexus was closed</h2>
+        <ul class="rows rows-boxed">
+          <li><a class="row" href="#/calendar"><svg class="i row-icon"><use href="#i-clock"/></svg>
+            <span class="row-main"><strong>Design review started at 16:00 on 23 November</strong><small>Missed reminder · shown when you reopened Nexus</small></span></a></li>
+        </ul>
+        <h2 class="group-h">Scheduled</h2>
+        <ul class="rows rows-boxed">
+          <li><div class="row"><svg class="i row-icon"><use href="#i-clock"/></svg>
+            <span class="row-main"><strong>Weekly sync, 1 December at 10:00</strong><small>Reminder at 09:45 on 1 December</small></span></div></li>
+          <li><div class="row" data-render="nex1-reminder"></div></li>
+        </ul>
+      </section>
+
+      <!-- Settings -->
+      <section class="view list-view settings" data-view="settings" aria-labelledby="set-h" hidden>
+        <header class="view-head"><div><h1 id="set-h">Settings</h1><p class="sub">Kickoff sample workspace</p></div></header>
+        <section class="set-group" aria-labelledby="set-ws">
+          <h2 id="set-ws">Workspace</h2>
+          <dl class="set-list">
+            <div><dt>Folder</dt><dd><code>D:\Nexus\kickoff-sample</code></dd></div>
+            <div><dt>Time zone</dt><dd>Europe/London (GMT)</dd></div>
+            <div><dt>Open in</dt><dd>This window only. A second window opens the workspace read-only.</dd></div>
+          </dl>
+        </section>
+        <section class="set-group" aria-labelledby="set-ai">
+          <h2 id="set-ai">AI providers</h2>
+          <div class="empty">
+            <p><strong>No provider set up.</strong> Notes, projects, the calendar and reminders all work without one.</p>
+            <button class="btn btn-line" type="button" data-toast="Add provider: in the app this opens the provider form, with a masked key field.">Add provider</button>
+          </div>
+        </section>
+        <section class="set-group" aria-labelledby="set-rem">
+          <h2 id="set-rem">Reminders</h2>
+          <div class="set-form">
+            <label for="rem-default">Default reminder</label>
+            <select id="rem-default"><option>On the due date at 09:00</option><option>One day before at 09:00</option><option>None</option></select>
+            <label class="check-row"><input type="checkbox" disabled><span>Personalised wording <small>Needs an AI provider</small></span></label>
+          </div>
+        </section>
+        <section class="set-group" aria-labelledby="set-about">
+          <h2 id="set-about">About</h2>
+          <dl class="set-list">
+            <div><dt>Version</dt><dd>Wireframe, 25 November 2026</dd></div>
+            <div><dt>Licences</dt><dd>No third-party code or assets in the wireframe</dd></div>
+          </dl>
+        </section>
       </section>
     </main>
   </div>
 
   <div class="review-bar" role="region" aria-label="Changes awaiting review" hidden>
-    <p class="review-status" aria-live="polite"></p>
-    <div class="review-actions">
-      <button type="button" data-act="prev">Previous</button>
-      <button type="button" data-act="next">Next</button>
-      <button type="button" data-act="accept" class="primary">Accept</button>
-      <button type="button" data-act="reject">Reject</button>
+    <div class="review-main">
+      <p class="review-status" aria-live="polite"></p>
+      <div class="review-actions">
+        <button type="button" class="btn btn-dark" data-act="prev">Previous</button>
+        <button type="button" class="btn btn-dark" data-act="next">Next</button>
+        <button type="button" class="btn btn-dark" data-act="reject">Reject</button>
+        <button type="button" class="btn btn-accept" data-act="accept">Accept</button>
+        <button type="button" class="btn btn-dark" data-act="done" hidden>Done</button>
+      </div>
     </div>
-    <form class="feedback" hidden onsubmit="return false">
+    <form class="feedback" hidden>
       <label for="why">Rejected. What was wrong, or what should be kept?</label>
-      <input id="why" type="text">
-      <button type="button" data-act="send">Send correction</button>
-      <button type="button" data-act="skip">Skip</button>
+      <div class="feedback-row">
+        <input id="why" type="text" autocomplete="off">
+        <button type="button" class="btn btn-accept" data-act="send">Send correction</button>
+        <button type="button" class="btn btn-dark" data-act="skip">Skip</button>
+      </div>
     </form>
   </div>
+
+  <dialog class="palette" aria-label="Search notes, issues and views">
+    <div class="palette-field">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input type="text" role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" aria-label="Search notes, issues and views" placeholder="Search notes, issues and views" autocomplete="off">
+      <kbd>Esc</kbd>
+    </div>
+    <ul id="palette-list" role="listbox" aria-label="Results"></ul>
+  </dialog>
+
+  <div class="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>

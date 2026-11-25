@@ -10,5 +10,7 @@ out/
 test-results/
 playwright-report/
 *.log
+# UI reference screenshots stay local: other products' images and Will's own apps (Will, 25 Nov 2026)
+docs/design/references/
 
 # Never ignore .kiro/ (Kiroween rule): specs, steering, hooks and skills are committed.

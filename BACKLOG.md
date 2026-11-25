@@ -28,7 +28,8 @@ pass on `e61a3d4` and run 4:
   Remaining: a human must register Playwright MCP in Kiro
   (`docs/tooling.md`), then confirm that Kiro discovers it and run one tool
   call. Owner: Will.
-- [ ] **A Wireframe, final design.** A brief prototype is in `wireframe/`.
+- [ ] **A Wireframe, final design.** `wireframe/` now holds Kiro's design
+  proposal (25 November, DEC-026), waiting for Will and then Hein.
   Hein owns the final visual identity (PRD-010, PRD-080). Owner: Hein.
 - [~] **B2 Notes.** Done: section search, outside edits and draft
   protection (`.kiro/specs/notes-search-watch/`). Remaining: rename, move

@@ -1,7 +1,7 @@
 # State
 
-- **Date updated:** 2026-11-24 (run 5 delivered: the run-4 repairs and B4
-  ordinary reminders)
+- **Date updated:** 2026-11-25 (wireframe overhaul delivered as a design
+  proposal; run 5 delivered on 2026-11-24)
 - **Active phase:** none authorised. Run 5 is used up, and its review relay
   is ready for Will to send. Slice C's live check (task 5) is still waiting
   for Will's free key.
@@ -239,6 +239,21 @@ code):**
 
 **No human has reviewed the corrective pass yet.**
 
+## Wireframe overhaul (Will's request, 2026-11-25)
+
+Only `wireframe/` changed, plus the Impeccable records (`PRODUCT.md`,
+`DESIGN.md`, `.impeccable/design.json`, the surface brief) and
+`.gitignore`. The details and evidence are in `docs/journal/2026-11-25.md`
+and DEC-026.
+
+- **Result:** every view is rebuilt with fictional data, including a new
+  graph, month calendar, board, cited Ask answer and Ctrl K search.
+- **Checks:** `npm run mcp:smoke` passed 6 of 6, and Impeccable's
+  first-viewport check passed at 1440 and 390 px. The finish review ran in
+  fresh sub-agents: one review and two verdict passes. Its last two small
+  items were fixed but not re-scored.
+- **Not yet:** seen by Will or Hein, or applied to `apps/`.
+
 ## Milestone log (run 5)
 
 | Milestone | Commit | Evidence |
@@ -365,6 +380,13 @@ Will ran. Its eleven findings were repaired in run 5
 9. **Will: look at a real desktop reminder.** Run `npm run desktop`, open
    Notifications and select **Send test reminder**. Check that a Windows
    notification appears, and that clicking it opens NEX-1.
+10. **Will, then Hein: review the wireframe proposal.** Open
+    `wireframe/index.html` in a browser. If you adopt it, applying it to
+    `apps/` needs its own authorisation (DEC-026).
+11. **Will: correct the path in `.kiro/steering/source-boundaries.md`.**
+    It names `Documents\Verdanta\Internal Tools`, but the apps are in
+    `Documents\Verdanta Internal Tools`. Kiro has not edited the steering
+    file.
 
 ## Assumptions to check
 
