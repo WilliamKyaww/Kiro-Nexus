@@ -135,3 +135,104 @@ fixed demo.
 - `tests/e2e/c5-edit-journey.spec.ts` (browser):
   - the full journey with Accept both, then a read-only Ask;
   - rejection with confirmation after a restart, keeping a manual edit.
+
+## The correction loop (Requirement 5, run 6 stage 3)
+
+```
+Reject ─► review bar: "What was wrong, or what should be kept?"  Skip │ Send reason
+                                                                       ▼
+POST /review/changes/:id/feedback { text }   (server/src/ask/correction.ts)
+  1. engine.feedback: the reason is saved in the journal
+  2. not correctable (demo, new issue, new link) ─► done: "reason saved"
+  3. engine.beginCorrection(changeId, askRunId): correction.state = running   (once only)
+  4. startRun(mode edit, correction): the visible question and the correction prompt
+       propose ─► scope check (same target) ─► engine.propose(…, { supersedes })
+                    new run journaled with supersedes ─► old change superseded
+  5. no proposal ─► correction.state = no-change; failure ─► failed (reason kept)
+```
+
+### Data
+
+- `ChangeRecord.correction` (optional, so older journals load):
+  `{ state: running | proposed | no-change | failed | dropped, askRunId, conversationId, at, message }`.
+  It lives on the rejected change, in its own journal, so the reason and the state survive a
+  restart together.
+- `ChangeView` adds `supersedes`, `supersededBy`, `correctable`, `conversationId` and
+  `correction`. `GET /review/changes?state=corrections` lists rejected changes whose
+  correction is running, failed or proposed nothing.
+- A change is **correctable** when its run came from an Edit conversation and it is a field
+  change or a note-lines change. New issues and links keep the reason only: their correction
+  would need a new issue or a new link, which is a later slice.
+
+### Engine
+
+- `feedback` saves the reason. While a correction is running or proposed, it changes nothing,
+  so a second send cannot swap the reason under a running correction.
+- `beginCorrection` starts a correction only for a rejected change with a reason and no
+  running or proposed correction. It is the single point that prevents duplicates; the route
+  also holds a synchronous per-change admission set, so two simultaneous sends cannot both
+  reach it.
+- `propose(…, { supersedes, correctionRunId })` refuses unless that change is still rejected
+  and its running correction is this run. Every new change carries `supersedes`. After the
+  new run's journal is written and applied, the old change becomes `superseded` and its
+  correction `proposed`, in its own journal.
+- `endCorrection` records `no-change` or `failed` with the message, only for the same run.
+  `dropCorrection` ("Keep it rejected") closes a failed or empty correction.
+- **Recovery:** a rejected change that a written change supersedes becomes `superseded` (a
+  crash between the two journal writes). A correction still `running` after a restart becomes
+  `failed`: "Nexus stopped before the correction finished".
+
+### The correction run
+
+- It runs in the rejected change's conversation, in Edit mode, with the normal limits, and
+  takes that conversation's one-question slot. A busy conversation records a failed
+  correction with a reason to retry.
+- The conversation shows "Correct “<summary>”: <reason>". The model receives the summary,
+  the reason as the user's own words, the target, its current value, and a
+  `CORRECTION_REQUEST_JSON` block with the same facts.
+- **Scope.** Before anything reaches the engine, every operation must target:
+  - for a field change, the same field of the same issue (`record.updateField`);
+  - for a note change, the same note, on lines that overlap where the rejected change's
+    original lines now are. If those lines cannot be found, the correction is refused.
+  A refusal goes back to the model as a tool error, and nothing is written.
+- Base values come from the workspace, as for every Edit, so a manual edit or an accepted
+  change made since is the correction's `before`.
+- The workspace binding of Edit (R4-6) applies unchanged.
+
+### Review UI
+
+- After a rejection the bar stays on the rejected change's page until the reason is sent or
+  skipped, so the next change's page does not take focus from the question. Skip, or a
+  reason that starts no correction, then moves on to the next change. A rejected new issue
+  still opens its project's board, because its page is gone.
+- After **Send reason**, the bar says Nexus is preparing a corrected change. When a change
+  that supersedes it appears, the tab that sent the reason opens it on its target,
+  highlighted, once.
+- The bar lists corrections that are running, failed or empty, with **Retry correction**
+  (`POST /review/changes/:id/correction`, using the saved reason) and **Keep it rejected**
+  (`POST /review/changes/:id/correction/drop`). After a restart they are listed the same way.
+- A correction in the bar is labelled "Correction" next to its summary.
+
+### Provider double (a labelled fixture, not AI)
+
+- Edit: a question that names an issue and a due date ("set NEX-1 due on 3 December") adds
+  that `update_issue` to the fixed plan.
+- Correction: the double reads `CORRECTION_REQUEST_JSON`. For a due date it looks the issue
+  up, takes the date the reason names, proposes it and answers citing the issue. If the reason
+  names no date it proposes nothing and says so. `nexus-test-double-stray` proposes a
+  different field, to prove the scope check.
+
+### Testing
+
+- `server/src/review/correction.test.ts` (engine): supersede only after the new journal,
+  recovery after a crash between the two writes, running becomes failed after a restart,
+  `beginCorrection` once only, the reason kept.
+- `server/src/ask/correction-http.test.ts` (real service, double): a corrected date and its
+  binding; two simultaneous sends start one run; a second rejection and a second correction;
+  the provider down, then **Retry**; a stray proposal refused with nothing written; a demo
+  change keeps the reason only.
+- `tests/e2e/j7-correction.spec.ts` (browser): Ask, then Edit with a date; accept the new
+  task, reject the date, send a reason; the corrected date opens on NEX-1; restart; accept;
+  the files on disk; one reminder at 09:00 under the test clock, which opens NEX-1. A second
+  test covers Skip, a failed correction after a restart, and **Retry correction**.
+- Live Edit, including corrections, still needs its own run against a real free provider.

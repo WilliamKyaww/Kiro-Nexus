@@ -31,6 +31,29 @@ const busy = new Set<string>();
 
 const busyError = () => new NexusError("CONFLICT", "This conversation is already answering a question. Wait for the answer, or cancel it, then send again.", { reason: "busy" });
 
+/** Take a conversation's one-question slot synchronously, for a run started elsewhere (a correction). */
+export function admitConversation(conversationId: string): boolean {
+  if (busy.has(conversationId)) return false;
+  busy.add(conversationId);
+  return true;
+}
+export function releaseConversation(conversationId: string): void {
+  busy.delete(conversationId);
+}
+
+/**
+ * A correction run (PRD-064, architecture 7.4): the rejected change it corrects, the prompt the
+ * model receives (the conversation shows the shorter question), and the check that keeps every
+ * proposed operation on the disputed target.
+ */
+export interface CorrectionRun {
+  changeId: string;
+  modelQuestion: string;
+  checkScope: (operations: ProposedOperation[]) => Promise<string | null>;
+  /** How the run ended without a proposal: recorded on the rejected change. */
+  onEnd: (askRunId: string, outcome: { state: "no-change" | "failed"; message: string }) => Promise<void>;
+}
+
 export function askAvailability(state: AppState) {
   const ctx = aiContext(state);
   const p = ctx.registry.selected();
@@ -90,7 +113,7 @@ export function askRoutes(state: AppState) {
  * the conversation's slot in `busy`; once this returns, the background task owns it and
  * releases it only after the answer has been written.
  */
-async function startRun(state: AppState, service: WorkspaceService, conversationId: string, question: string, authority: "ask" | "edit"): Promise<{ runId: string; conversationId: string }> {
+export async function startRun(state: AppState, service: WorkspaceService, conversationId: string, question: string, authority: "ask" | "edit", extra: { runId?: string; correction?: CorrectionRun } = {}): Promise<{ runId: string; conversationId: string }> {
   const conversations = new ConversationStore(service);
   const availability = askAvailability(state);
   if (!availability.available) throw new NexusError("VALIDATION", availability.message, { reason: availability.reason });
@@ -99,7 +122,8 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
   // Pin the profile and model for this run.
   const profile = structuredClone(ctx.registry.selected()!);
   const key = ctx.keys.reveal(profile.id)!;
-  const runId = newId("run");
+  const runId = extra.runId ?? newId("run");
+  const correction = extra.correction;
   const at = new Date().toISOString();
   const pending = { id: newId("msg"), role: "assistant" as const, at, runId, text: null, status: "running" as const, answer: null, meta: null, error: null, authority };
   let history: PriorTurn[] = [];
@@ -121,16 +145,22 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
   // fails is still recorded on the answer, because its changes await review.
   // The engine is the one of the workspace this run started in. If that workspace has been
   // closed or replaced meanwhile, the proposal is refused rather than written elsewhere (R4-6).
-  let proposed: EditOutcome | null = null;
+  const made: { outcome: EditOutcome | null } = { outcome: null };
   const propose = authority === "edit"
     ? async (operations: ProposedOperation[]) => {
       await faultDelay("ask:before-propose");
       if (state.service !== service) {
         throw new NexusError("CONFLICT", "The workspace this question was asked in was closed or switched, so Nexus wrote nothing. Open it again and ask again.", { reason: "workspace-changed" });
       }
+      // A correction may change only the disputed target; anything else goes back to the model.
+      const outOfScope = correction ? await correction.checkScope(operations) : null;
+      if (outOfScope) throw new NexusError("VALIDATION", outOfScope, { reason: "out-of-scope" });
       const fixtureLabel = profile.capabilities.fixture ? " (test double, not AI)" : "";
-      const outcome = await engine.propose({ kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent");
-      proposed = editOutcome(outcome);
+      const outcome = await engine.propose(
+        { kind: "agent", label: `Edit by ${profile.model}${fixtureLabel}`, conversationId, model: profile.model }, operations, "agent",
+        correction ? { supersedes: correction.changeId, correctionRunId: runId } : {},
+      );
+      made.outcome = editOutcome(outcome);
       return outcome;
     }
     : undefined;
@@ -139,7 +169,7 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
     let update: Partial<Conversation["messages"][number]>;
     try {
       const result = await runAsk({
-        workspace, question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal, history,
+        workspace, question: correction?.modelQuestion ?? question, profile, key, receivingHost: receivingHost(profile.baseUrl), signal: controller.signal, history,
         authority, propose, opPrefix: `op-${runId}`,
         onProgress: (p) => { state.publish({ type: "ask.progress", runId, conversationId, activity: p.activity }); },
       });
@@ -149,10 +179,17 @@ async function startRun(state: AppState, service: WorkspaceService, conversation
       };
     } catch (e) {
       const err = e instanceof NexusError ? { code: e.code, message: e.message } : describeProviderError(e, ctx);
-      update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err, edit: proposed };
+      update = { status: err.code === "CANCELLED" ? "cancelled" : "failed", error: err.code === "CANCELLED" ? { code: "CANCELLED", message: "You cancelled this question." } : err, edit: made.outcome };
       state.log(`ask: run ${update.status} (${err.code})`);
     } finally {
       runs.delete(runId);
+    }
+    // A correction that ended without a proposal says so on the rejected change; its reason stays.
+    if (correction && !made.outcome) {
+      const outcome = update.status === "complete"
+        ? { state: "no-change" as const, message: update.answer?.insufficientReason ?? "Nexus finished without proposing a corrected change." }
+        : { state: "failed" as const, message: update.status === "cancelled" ? "You cancelled the correction." : update.error?.message ?? "The correction run failed." };
+      try { await correction.onEnd(runId, outcome); } catch (e) { state.log(`ask: could not record the correction outcome: ${(e as Error).message.slice(0, 120)}`); }
     }
     try {
       await conversations.update(conversationId, async (latest) => {

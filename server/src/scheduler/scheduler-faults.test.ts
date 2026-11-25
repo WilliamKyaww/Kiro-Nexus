@@ -101,7 +101,14 @@ describe("R5-5: a damaged delivery log is never taken for a new one", () => {
     // Fixed by hand, in one step: a plain write truncates first, and a tick could read the empty
     // file in between (a different cause, which is logged once more).
     await writeFile(stateFile("deliveries.json.repair"), JSON.stringify({ schemaVersion: 1, seenUpTo: null, deliveries: [] }));
-    await rename(stateFile("deliveries.json.repair"), stateFile("deliveries.json"));
+    // On Windows a rename over a file that a tick is reading fails with EPERM for a moment;
+    // the product's atomic write retries, so the hand repair does too.
+    for (let attempt = 0; ; attempt++) {
+      try { await rename(stateFile("deliveries.json.repair"), stateFile("deliveries.json")); break; } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "EPERM" || attempt >= 20) throw e;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+    }
     // The next periodic tick finishes the start-up first: the boundary moves to 08:30.
     expect(await until(async () => JSON.parse(await readFile(stateFile("scheduler.json"), "utf8")).lastTickAt === "2026-12-05T08:30:00.000Z")).toBe(true);
     clock.set(new Date("2026-12-05T09:00:30.000Z"));

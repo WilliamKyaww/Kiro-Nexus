@@ -1,6 +1,6 @@
 // Wires the review engine into the service lifecycle and HTTP API.
 import type { FastifyInstance } from "fastify";
-import { FeedbackRequest, type ProposedOperation } from "@nexus/schema";
+import type { ProposedOperation } from "@nexus/schema";
 import type { RouteContext } from "../app";
 import { NexusError } from "../errors";
 import { dueReminders, effectiveAcceptedIssues } from "../scheduler/reminders";
@@ -47,7 +47,8 @@ export async function demoOperations(service: WorkspaceService): Promise<Propose
 export function reviewRoutes(state: AppState) {
   return (app: FastifyInstance, ctx: RouteContext) => {
     app.get("/api/v1/review/changes", async (request) => {
-      const filter = (request.query as { state?: string }).state === "all" ? "all" : "open";
+      const asked = (request.query as { state?: string }).state;
+      const filter = asked === "all" || asked === "corrections" ? asked : "open";
       return { changes: await requireEngine(state).views(filter) };
     });
     app.post("/api/v1/review/demo", async () => {
@@ -76,10 +77,7 @@ export function reviewRoutes(state: AppState) {
     app.post("/api/v1/review/changes/:id/accept", async (request) => requireEngine(state).accept(id(request), { withDependencies: flag(request, "withDependencies") }));
     app.post("/api/v1/review/changes/:id/reject", async (request) => requireEngine(state).reject(id(request), { withDependents: flag(request, "withDependents") }));
     app.post("/api/v1/review/changes/:id/keep-current", async (request) => requireEngine(state).keepCurrent(id(request)));
-    app.post("/api/v1/review/changes/:id/feedback", async (request) => {
-      const { text } = ctx.parse(FeedbackRequest, request.body);
-      return requireEngine(state).feedback(id(request), text);
-    });
+    // POST /review/changes/:id/feedback is in ask/correction.ts: a reason can start a correction run.
     // Read-only preview of which reminders would fire at a time (B4 seam; proves PRD-066).
     app.get("/api/v1/reminders/due", async (request) => {
       const service = state.requireService();

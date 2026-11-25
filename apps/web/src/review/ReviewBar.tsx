@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { changeUrl, setReviewUi, useIncompleteRuns, useOpenChanges, useReviewActions, useReviewUi } from "./review";
+import { changeUrl, setReviewUi, useCorrections, useIncompleteRuns, useOpenChanges, useReviewActions, useReviewUi } from "./review";
 
 /** Persistent bar for moving between changes on different pages (PRD-061, PRD-062). */
 export function ReviewBar() {
   const changes = useOpenChanges();
-  const { feedbackFor, message, confirm } = useReviewUi();
-  const { decide, feedback, runAction } = useReviewActions();
+  const corrections = useCorrections();
+  const { feedbackFor, message, confirm, correctionFor } = useReviewUi();
+  const { decide, feedback, runAction, correction, moveOn } = useReviewActions();
   // Focus the confirmation once its button is enabled (the refused request has settled).
   const confirmButton = useRef<HTMLButtonElement>(null);
   useEffect(() => { if (confirm && !decide.isPending && !runAction.isPending) confirmButton.current?.focus(); }, [confirm, decide.isPending, runAction.isPending]);
@@ -17,6 +18,17 @@ export function ReviewBar() {
   const feedbackInput = useRef<HTMLTextAreaElement>(null);
   const barRef = useRef<HTMLElement>(null);
   useEffect(() => { if (feedbackFor) feedbackInput.current?.focus(); }, [feedbackFor]);
+  // The corrected change opens on its target, highlighted, once, in the tab that sent the reason.
+  useEffect(() => {
+    if (!correctionFor) return;
+    const corrected = changes.find((c) => c.supersedes === correctionFor);
+    if (corrected) {
+      setReviewUi({ correctionFor: null, message: "Nexus proposed a corrected change. Accept or reject it." });
+      navigate(changeUrl(corrected));
+    } else if (corrections.some((c) => c.changeId === correctionFor && c.correction?.state !== "running")) {
+      setReviewUi({ correctionFor: null, message: null }); // it ended without a proposal: the list below says why
+    }
+  }, [correctionFor, changes, corrections, navigate]);
   // Publish the bar height so pages reserve space beneath their content for it.
   useEffect(() => {
     const el = barRef.current;
@@ -29,7 +41,7 @@ export function ReviewBar() {
     return () => { ro.disconnect(); root.style.setProperty("--review-bar-h", "0px"); };
   });
 
-  if (changes.length === 0 && !feedbackFor && !message && !confirm && incomplete.length === 0) return null;
+  if (changes.length === 0 && !feedbackFor && !message && !confirm && incomplete.length === 0 && corrections.length === 0) return null;
   const focused = new URLSearchParams(location.search).get("change");
   const found = changes.findIndex((c) => c.changeId === focused);
   const index = found >= 0 ? found : 0;
@@ -49,6 +61,7 @@ export function ReviewBar() {
           <p className="review-status">
             <strong>Change {index + 1} of {changes.length}</strong>
             <span className="review-summary"> · {current.summary}</span>
+            {current.supersedes ? <span className="correction-tag"> · Correction of a change you rejected</span> : null}
             {current.state === "prepared" ? <span className="conflict-tag"> · Not written: {current.fileError ?? "the write did not happen"}</span> : null}
             {current.state === "conflicted" ? <span className="conflict-tag"> · Conflict: {current.conflictReason === "ambiguous" ? "the text appears more than once" : current.file === ".nexus/issues.json" ? "the issue was edited after the change" : "the text was edited after the change"}</span> : null}
           </p>
@@ -79,6 +92,24 @@ export function ReviewBar() {
             <button type="button" className="primary" disabled={runAction.isPending} onClick={() => runAction.mutate({ runId: run.runId!, action: "retry" })}>Retry writing</button>
             <button type="button" disabled={runAction.isPending} onClick={() => runAction.mutate({ runId: run.runId!, action: "discard" })}>Discard unwritten changes</button>
           </div>
+        </div>
+      ))}
+      {corrections.map((c) => (
+        <div key={c.changeId} className="correction-run" role="group" aria-label="Correction of a rejected change">
+          {c.correction?.state === "running" ? (
+            <p role="status"><strong>Preparing a correction</strong> of {c.summary}, from your reason: “{c.feedback}”</p>
+          ) : (
+            <>
+              <p>
+                <strong>{c.correction?.state === "no-change" ? "No correction proposed" : "The correction did not finish"}</strong> for {c.summary}.{" "}
+                {c.correction?.message ?? ""} Your reason is saved: “{c.feedback}”
+              </p>
+              <div className="review-actions">
+                <button type="button" className="primary" disabled={correction.isPending} onClick={() => correction.mutate({ change: c, action: "retry" })}>Retry correction</button>
+                <button type="button" disabled={correction.isPending} onClick={() => correction.mutate({ change: c, action: "drop" })}>Keep it rejected</button>
+              </div>
+            </>
+          )}
         </div>
       ))}
       {confirm ? (
@@ -119,7 +150,7 @@ export function ReviewBar() {
           <textarea id="review-reason" ref={feedbackInput} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="review-actions">
             <button type="submit" disabled={!reason.trim() || feedback.isPending}>Send reason</button>
-            <button type="button" onClick={() => setReviewUi({ feedbackFor: null })}>Skip</button>
+            <button type="button" onClick={() => { setReviewUi({ feedbackFor: null }); moveOn(); }}>Skip</button>
           </div>
         </form>
       ) : null}

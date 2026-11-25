@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   ISSUE_REF, Issue, IssuesFile, OPEN_STATES, ProposedOperation, ReviewRun, serialise,
-  type ChangeRecord, type ChangeView, type FileEntry, type IssuesFile as IssuesFileT, type NoteLink, type RunOutcome,
+  type ChangeRecord, type ChangeView, type Correction, type FileEntry, type IssuesFile as IssuesFileT, type NoteLink, type RunOutcome,
 } from "@nexus/schema";
 import { parseHeadings } from "@nexus/markdown";
 import { NexusError } from "../errors";
@@ -31,6 +31,19 @@ export interface HeadingAlias {
 export interface Source { kind: "agent" | "fixed-demo"; label: string; conversationId?: string | null; model?: string | null }
 const ISSUES = ".nexus/issues.json";
 const now = () => new Date().toISOString();
+/** Corrections the review bar still lists, with Retry and Keep it rejected. */
+const OUTSTANDING_CORRECTION: readonly Correction["state"][] = ["running", "failed", "no-change"];
+/**
+ * A reason can start a correction run for an Edit change to an issue field or to note lines.
+ * A new issue or link would need a new issue or link as its correction, which is a later slice.
+ */
+const correctable = (run: ReviewRun, change: ChangeRecord) =>
+  run.source.kind === "agent" && !!run.source.conversationId && (change.kind === "record.updateField" || change.kind === "note.replaceSpan");
+export interface ProposeOptions {
+  /** The rejected change this proposal corrects, and the correction run proposing it. */
+  supersedes?: string;
+  correctionRunId?: string;
+}
 
 export class ReviewEngine {
   private readonly runs = new Map<string, ReviewRun>();
@@ -139,8 +152,12 @@ export class ReviewEngine {
     return { key, title: (change.after as { title?: string })?.title ?? "", state: change.state, at: change.history[change.history.length - 1]?.at ?? run.createdAt, source: run.source.label, reusedBy };
   }
 
-  async views(filter: "open" | "all"): Promise<ChangeView[]> {
-    const items = this.allChanges().filter(({ change }) => filter === "all" || OPEN_STATES.includes(change.state));
+  /** "corrections": rejected changes whose correction is running, failed or proposed nothing. */
+  async views(filter: "open" | "all" | "corrections"): Promise<ChangeView[]> {
+    const items = this.allChanges().filter(({ change }) => filter === "all"
+      || (filter === "open" ? OPEN_STATES.includes(change.state) : change.state === "rejected" && OUTSTANDING_CORRECTION.includes(change.correction?.state ?? "dropped")));
+    const supersededBy = new Map<string, string[]>();
+    for (const { change } of this.allChanges()) if (change.supersedes) supersededBy.set(change.supersedes, [...(supersededBy.get(change.supersedes) ?? []), change.changeId]);
     const out: ChangeView[] = [];
     const notes = new Map<string, string | null>();
     for (const { run, change } of items) {
@@ -167,9 +184,20 @@ export class ReviewEngine {
         runPhase: run.phase,
         dependsOn: change.dependsOn,
         dependents: run.changes.filter((c) => c.dependsOn.includes(change.changeId)).map((c) => c.changeId),
+        supersedes: change.supersedes,
+        supersededBy: supersededBy.get(change.changeId) ?? [],
+        correctable: correctable(run, change),
+        conversationId: run.source.conversationId,
+        correction: change.correction ?? null,
       });
     }
     return out;
+  }
+
+  /** The rejected change and its run, for a correction (PRD-064). */
+  correctionTarget(changeId: string): { run: ReviewRun; change: ChangeRecord } {
+    const found = this.find(changeId);
+    return { run: structuredClone(found.run), change: structuredClone(found.change) };
   }
 
   // ---------------- Propose and apply ----------------
@@ -193,13 +221,22 @@ export class ReviewEngine {
     return out;
   }
 
-  async propose(source: Source, operations: unknown[], by: Actor): Promise<RunOutcome> {
+  async propose(source: Source, operations: unknown[], by: Actor, opts: ProposeOptions = {}): Promise<RunOutcome> {
     return this.service.exclusive(async () => {
       const ops = operations.map((o, i) => {
         const r = ProposedOperation.safeParse(o);
         if (!r.success) throw new NexusError("VALIDATION", `Operation ${i + 1} is not valid.`, r.error.issues.slice(0, 3).map((x) => `${x.path.join(".")}: ${x.message}`));
         return r.data;
       });
+      // A correction is bound to the rejected change and to the correction run it started: it is
+      // refused once that change was corrected, its correction dropped, or another run took over.
+      const corrected = opts.supersedes ? this.find(opts.supersedes) : null;
+      if (corrected) {
+        const c = corrected.change;
+        if (c.state !== "rejected" || c.correction?.state !== "running" || c.correction.askRunId !== (opts.correctionRunId ?? null)) {
+          throw new NexusError("CONFLICT", "This correction is no longer wanted: the rejected change was corrected or kept rejected meanwhile. Nothing was written.", { reason: "correction-closed" });
+        }
+      }
       const known = new Map(this.allChanges().map(({ change }) => [change.opId, change.changeId]));
       const duplicates = ops.filter((o) => known.has(o.opId)).map((o) => o.opId);
       const fresh = ops.filter((o) => !known.has(o.opId));
@@ -218,7 +255,7 @@ export class ReviewEngine {
       const mkChange = (op: ProposedOperation, extra: Partial<ChangeRecord>): ChangeRecord => ({
         changeId: newId("chg"), opId: op.opId, kind: op.kind, file: op.file,
         target: { recordId: null, recordKey: null, field: null }, baseRevision: "baseRevision" in op && op.baseRevision !== undefined ? op.baseRevision : 0,
-        before: "before" in op ? op.before : null, after: "after" in op ? op.after : null, context: null, dependsOn: [], supersedes: null,
+        before: "before" in op ? op.before : null, after: "after" in op ? op.after : null, context: null, dependsOn: [], supersedes: opts.supersedes ?? null,
         state: "prepared", conflictReason: null, reversal: null, feedback: null,
         history: [{ state: "prepared", at: createdAt, by, note: null }], ...extra,
       });
@@ -400,9 +437,21 @@ export class ReviewEngine {
       await this.persist(run); // the journal exists before any workspace file is touched (R-C1)
       faultPoint("review:after-journal");
       await this.applyRun(run, by);
+      // Only now that the correction exists in its own journal is the rejected change superseded
+      // (architecture 7.4). A crash in between is completed by recovery.
+      if (corrected) {
+        faultPoint("review:before-supersede");
+        this.supersede(corrected.run, corrected.change, run.changes.map((c) => c.changeId));
+        await this.persist(corrected.run);
+      }
       this.publish({ type: "review.updated" });
       return this.outcome(run, duplicates);
     });
+  }
+
+  private supersede(run: ReviewRun, change: ChangeRecord, by: string[]): void {
+    this.mark(run, change, "superseded", "agent", `corrected by ${by.join(", ")}`);
+    change.correction = { state: "proposed", askRunId: change.correction?.askRunId ?? null, conversationId: change.correction?.conversationId ?? null, at: now(), message: null };
   }
 
   private async persist(run: ReviewRun): Promise<void> {
@@ -796,9 +845,62 @@ export class ReviewEngine {
     return this.service.exclusive(async () => {
       const { run, change } = this.find(changeId);
       if (change.state !== "rejected" && change.state !== "superseded") throw new NexusError("CONFLICT", "Feedback is for rejected changes.");
+      // A running or finished correction keeps the reason it was given; a second send of the
+      // same reason, or a send from another tab, changes nothing (PRD-064).
+      if (change.correction && (change.correction.state === "running" || change.correction.state === "proposed")) return this.viewOf(changeId);
       change.feedback = { text, at: now() };
       await this.persist(run);
       this.publish({ type: "review.updated" });
+      return this.viewOf(changeId);
+    });
+  }
+
+  /**
+   * Start the correction of a rejected change, once. Refused (started: false) unless the change
+   * is rejected, has a reason, and has no running or proposed correction.
+   */
+  async beginCorrection(changeId: string, askRunId: string, conversationId: string | null): Promise<{ started: boolean; view: ChangeView }> {
+    return this.service.exclusive(async () => {
+      const { run, change } = this.find(changeId);
+      const busy = change.correction?.state === "running" || change.correction?.state === "proposed";
+      if (change.state !== "rejected" || !change.feedback || busy || !correctable(run, change)) return { started: false, view: await this.viewOf(changeId) };
+      change.correction = { state: "running", askRunId, conversationId, at: now(), message: null };
+      await this.persist(run);
+      this.publish({ type: "review.updated" });
+      return { started: true, view: await this.viewOf(changeId) };
+    });
+  }
+
+  /**
+   * Record how a correction ended without a proposal: no-change or failed. Only the run that
+   * holds the correction may end it; askRunId null records a correction that could not start.
+   */
+  async endCorrection(changeId: string, askRunId: string | null, outcome: { state: "no-change" | "failed"; message: string }): Promise<ChangeView> {
+    return this.service.exclusive(async () => {
+      const { run, change } = this.find(changeId);
+      const c = change.correction;
+      const holds = askRunId === null ? !(c && (c.state === "running" || c.state === "proposed")) : c?.state === "running" && c.askRunId === askRunId;
+      if (change.state === "rejected" && holds) {
+        change.correction = { state: outcome.state, askRunId, conversationId: c?.conversationId ?? run.source.conversationId, at: now(), message: outcome.message.slice(0, 500) };
+        await this.persist(run);
+        this.publish({ type: "review.updated" });
+      }
+      return this.viewOf(changeId);
+    });
+  }
+
+  /** "Keep it rejected": close a correction that failed or proposed nothing. The reason stays. */
+  async dropCorrection(changeId: string): Promise<ChangeView> {
+    return this.service.exclusive(async () => {
+      const { run, change } = this.find(changeId);
+      const c = change.correction;
+      if (c && (c.state === "failed" || c.state === "no-change")) {
+        change.correction = { ...c, state: "dropped", at: now() };
+        await this.persist(run);
+        this.publish({ type: "review.updated" });
+      } else if (c?.state === "running") {
+        throw new NexusError("CONFLICT", "The correction is still running. Wait for it, or cancel it in the conversation.", { reason: "correction-running" });
+      }
       return this.viewOf(changeId);
     });
   }
@@ -953,6 +1055,24 @@ export class ReviewEngine {
           await this.persist(run);
           this.log(`review: recovered run ${run.runId.slice(0, 12)}…`);
         }
+      }
+      // A correction journaled while the change it corrects was not yet superseded (a crash
+      // between the two journal writes): supersede it now. A correction still running belongs to
+      // a process that stopped: it failed, and its reason stays for Retry (PRD-064).
+      const byId = new Map(this.allChanges().map((x) => [x.change.changeId, x]));
+      const corrections = new Map<string, string[]>();
+      for (const { change } of this.allChanges()) if (change.supersedes) corrections.set(change.supersedes, [...(corrections.get(change.supersedes) ?? []), change.changeId]);
+      for (const [oldId, by] of corrections) {
+        const old = byId.get(oldId);
+        if (old?.change.state !== "rejected") continue;
+        this.supersede(old.run, old.change, by);
+        await this.persist(old.run);
+        this.log("review: recovered a correction that was written before its change was marked superseded");
+      }
+      for (const { run, change } of this.allChanges()) {
+        if (change.correction?.state !== "running") continue;
+        change.correction = { ...change.correction, state: "failed", at: now(), message: "Nexus stopped before the correction finished." };
+        await this.persist(run);
       }
       // A group decision the user confirmed, interrupted part-way: finish it in its saved order.
       // A member that cannot be undone any more becomes a conflict, which explains what is

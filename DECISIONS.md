@@ -666,3 +666,37 @@ status control.
   shown.
 - *Inverting the light tokens for dark.* It breaks the contrast floor and the meaning of
   amber.
+
+## DEC-029: A reason corrects one rejected change, on its own target, once
+- **Status:** Accepted (Kiro, 2026-11-25, run 6 stage 3, under Will's overnight
+  authorisation; awaiting human review). Implements PRD-064 and architecture 7.4.
+  Spec: `.kiro/specs/edit-first-journey/` Requirement 5 and task 5a.
+**Decision.**
+- **Which changes.** A reason starts a correction run only for an Edit change to an issue
+  field or to note lines. A fixed-demo change, a new issue or a new link keeps the reason
+  and says so.
+- **Durability.** The reason is the change's `feedback`, saved before anything else. The
+  run's progress is the change's `correction`, in the same journal: `running`, `proposed`,
+  `no-change`, `failed` or `dropped`.
+- **Once only.** A synchronous admission set in the route and `beginCorrection` in the
+  engine each stop a second run. While one is running or proposed, a new reason changes
+  nothing.
+- **Binding.** The run uses the change's conversation, is bound to the change through
+  `correctionRunId`, and may propose only one operation on the same target: the same field
+  of the same issue, or note lines that overlap the rejected change's original lines. Other
+  proposals go back to the model as an error, and nothing is written.
+- **Supersede last.** The rejected change becomes `superseded` only after the correction's
+  journal is written and applied. Recovery completes a crash between the two, and marks a
+  correction left `running` as `failed`.
+- **Review bar.** After a rejection the bar stays on that change's page until the reason is
+  sent or skipped. It lists running, failed and empty corrections with **Retry correction**
+  and **Keep it rejected**, and opens the corrected change on its target once.
+**Alternatives.**
+- *A new conversation for each correction.* The user's context, and the original request,
+  are in the change's conversation.
+- *Supersede when the reason is sent.* A failed run would then leave the change marked as
+  corrected with no correction.
+- *Corrections of new issues and links now.* They need a new issue or link as the
+  correction, and their dependents' review, which is more than this stage.
+- *Moving on to the next change at once after a rejection.* The next page took focus from
+  the reason box, and the correction would land on a page the user had left.

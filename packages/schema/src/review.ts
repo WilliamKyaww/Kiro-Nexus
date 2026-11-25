@@ -32,6 +32,20 @@ export const Scope = z.strictObject({
   lines: z.strictObject({ from: z.number().int().min(0), count: z.number().int().min(1) }).optional(),
 });
 
+/**
+ * running: a correction run is answering. proposed: it wrote a change that supersedes this one.
+ * no-change: it finished without proposing. failed: it could not run or stopped. dropped: the
+ * user kept the change rejected. The reason itself is the change's `feedback`.
+ */
+export const CorrectionState = z.enum(["running", "proposed", "no-change", "failed", "dropped"]);
+export const Correction = z.strictObject({
+  state: CorrectionState,
+  askRunId: z.string().max(60).nullable(),
+  conversationId: z.string().max(60).nullable(),
+  at: IsoInstant,
+  message: z.string().max(500).nullable(),
+});
+
 export const ChangeRecord = z.strictObject({
   changeId: z.string().regex(/^chg_[0-9A-HJKMNP-TV-Z]{26}$/),
   opId: z.string().min(1).max(120),
@@ -63,6 +77,9 @@ export const ChangeRecord = z.strictObject({
     at: IsoInstant,
     moves: z.array(z.strictObject({ from: z.string(), to: z.string(), toText: z.string() })),
   }).nullable().optional(),
+  // Added in run 6. Older journals have none.
+  /** The correction run a rejected change's reason started, and how it ended (PRD-064). */
+  correction: Correction.nullable().optional(),
 });
 
 export const FileEntry = z.strictObject({
@@ -141,6 +158,7 @@ export const ProposedOperation = z.discriminatedUnion("kind", [
 export const FeedbackRequest = z.strictObject({ text: z.string().trim().min(1).max(2000) });
 
 export type ChangeState = z.infer<typeof ChangeState>;
+export type Correction = z.infer<typeof Correction>;
 export type ChangeRecord = z.infer<typeof ChangeRecord>;
 export type FileEntry = z.infer<typeof FileEntry>;
 export type ReviewRun = z.infer<typeof ReviewRun>;
@@ -175,6 +193,13 @@ export interface ChangeView {
   /** Changes this one needs (for example the issue a link points to), and those that need it. */
   dependsOn: string[];
   dependents: string[];
+  /** The rejected change this one corrects, and the corrections of this one (PRD-064). */
+  supersedes: string | null;
+  supersededBy: string[];
+  /** Whether a reason for this change can start a correction run: an Edit change to a field or to note lines. */
+  correctable: boolean;
+  conversationId: string | null;
+  correction: Correction | null;
 }
 
 /** What a proposal or retry actually did, file by file. */

@@ -18,6 +18,10 @@
 // Every variant uses records Nexus supplies when it answers "not accepted yet" to final_answer.
 // Edit mode (propose_changes offered): for each untracked action, one fixed proposal of a new
 // issue (owner dropped: "Write the judge instructions"), its heading link and the note line.
+// A question such as "set NEX-1 due on 3 December" also proposes that due date.
+// Corrections (CORRECTION_REQUEST_JSON in the question): the date or quoted line the reason
+// names, on the same target, or nothing when it names none.
+//   nexus-test-double-stray       corrects a different field, which Nexus refuses
 //   nexus-test-double-401 / -429 / -slow   failure modes
 // Usage: node tools/provider-double/server.mjs [port]
 import { createServer } from "node:http";
@@ -149,6 +153,8 @@ function agentStep(body, variant) {
   if (variant === "writer" && !calls.some((c) => c.function?.name === "propose_changes")) {
     return { tool_calls: [toolCall("propose_changes", { operations: [] }, n)] };
   }
+  const correction = correctionRequest(asked);
+  if (correction && editMode(body)) return correctionStep(correction, resultOf, variant, n);
   const search = resultOf("search_notes");
   if (search === undefined) {
     const query = words(question).slice(0, 6).join(" ") || question.slice(0, 60);
@@ -191,9 +197,13 @@ function agentStep(body, variant) {
     // Edit mode (the user chose Edit): propose the fixed plan once, then report what it did.
     const proposal = resultOf("propose_changes");
     const untracked = answer.tracking.filter((t) => t.status === "untracked");
-    if (proposal === undefined && sectionOk && untracked.length) {
+    const dated = datedUpdates(asked, issues);
+    if (proposal === undefined && sectionOk && (untracked.length || dated.length)) {
       const project = pages[0]?.projectsInWorkspace?.[0] ?? issues[0]?.key?.split("-")[0] ?? "NEX";
-      return { tool_calls: [toolCall("propose_changes", editPlan(sectionOk, untracked, project), n)] };
+      const plan = editPlan(sectionOk, untracked, project);
+      plan.operations.push(...dated);
+      if (dated.length) plan.summary = `${plan.summary} Set ${dated.map((d) => `${d.issue} due ${d.value.date}`).join(", ")}.`;
+      return { tool_calls: [toolCall("propose_changes", plan, n)] };
     }
     return { tool_calls: [toolCall("final_answer", editAnswer(answer, proposal, sectionOk), n)] };
   }
@@ -224,6 +234,76 @@ function editPlan(section, untracked, project) {
     if (line) operations.push({ op: "edit_note", note: section.path, heading: section.headingSlug ?? null, before: line, after: `${line.trimEnd()} ({{issue:${ref}}})` });
   });
   return { operations, summary: `Track ${untracked.length} untracked action${untracked.length === 1 ? "" : "s"} from ${section.headingPath.join(" › ")}.` };
+}
+
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const DAY_MONTH = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MONTHS.join("|")})\\b`, "i");
+
+/** A date named in text, "2026-12-08" or "8 December" (the year from `year`), as { date }. */
+export function dateIn(text, year = 2026) {
+  const iso = String(text ?? "").match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) return { date: `${iso[1]}-${iso[2]}-${iso[3]}` };
+  const dm = String(text ?? "").match(DAY_MONTH);
+  if (!dm) return null;
+  const month = MONTHS.indexOf(dm[2].toLowerCase()) + 1;
+  return { date: `${year}-${String(month).padStart(2, "0")}-${String(Number(dm[1])).padStart(2, "0")}` };
+}
+const yearOf = (due) => Number(String(due?.date ?? due?.dateTime ?? "").slice(0, 4)) || 2026;
+
+/** Edit: "set NEX-1 due on 3 December" names an existing issue and a date: propose that date. */
+function datedUpdates(question, issues) {
+  const out = [];
+  for (const m of String(question ?? "").matchAll(/\b([A-Z][A-Z0-9]{1,9}-\d+)\b([^.]*?)\bdue\b([^.]*)/g)) {
+    const issue = (issues ?? []).find((i) => i.key === m[1]);
+    const value = issue ? dateIn(m[3], yearOf(issue.due)) : null;
+    if (value) out.push({ op: "update_issue", issue: issue.key, field: "due", value });
+  }
+  return out;
+}
+
+/** The correction request Nexus sends after the user rejects a change and gives a reason. */
+function correctionRequest(text) {
+  const m = String(text ?? "").match(/^CORRECTION_REQUEST_JSON: (.+)$/m);
+  return m ? parseJson(m[1]) : null;
+}
+
+const answerOf = ({ suggestions = [], insufficientReason = null }) => ({
+  facts: [], discrepancies: [], suggestions, tracking: [], insufficientEvidence: insufficientReason !== null, insufficientReason,
+});
+
+/**
+ * The fixed correction rule: look the target up, then propose the value the reason names (a
+ * date for a due field, or a quoted line for note lines). With no such value, propose nothing
+ * and say so. -stray proposes a different field, which Nexus must refuse.
+ */
+function correctionStep(req, resultOf, variant, n) {
+  const t = req.target ?? {};
+  const proposal = resultOf("propose_changes");
+  let sources = [];
+  if (t.kind === "field") {
+    const looked = resultOf("query_issues");
+    if (looked === undefined) return { tool_calls: [toolCall("query_issues", { keys: [t.issue] }, n)] };
+    const issue = (looked?.issues ?? []).find((i) => i.key === t.issue);
+    sources = issue ? [issue.handle] : [];
+    if (proposal === undefined) {
+      if (variant === "stray") return { tool_calls: [toolCall("propose_changes", { operations: [{ op: "update_issue", issue: t.issue, field: "priority", value: "low" }] }, n)] };
+      const value = t.field === "due" ? dateIn(req.reason, yearOf(req.current ?? req.rejected?.after)) : null;
+      if (value) return { tool_calls: [toolCall("propose_changes", { operations: [{ op: "update_issue", issue: t.issue, field: "due", value }], summary: `Use the date the reason gives for ${t.issue}.` }, n)] };
+      return { tool_calls: [toolCall("final_answer", answerOf({ insufficientReason: "The reason does not name a date, so the test double proposed no change. Say which date to use." }), n)] };
+    }
+  } else if (t.kind === "note") {
+    const section = resultOf("read_note_section");
+    if (section === undefined) return { tool_calls: [toolCall("read_note_section", { path: t.note, headingSlug: t.heading ?? undefined }, n)] };
+    sources = section?.handle ? [section.handle] : [];
+    if (proposal === undefined) {
+      const quoted = String(req.reason ?? "").match(/[“"]([^”"]+)[”"]/)?.[1];
+      if (quoted && !section?.error) return { tool_calls: [toolCall("propose_changes", { operations: [{ op: "edit_note", note: t.note, heading: t.heading ?? null, before: t.lines, after: quoted }] }, n)] };
+      return { tool_calls: [toolCall("final_answer", answerOf({ insufficientReason: "The reason does not quote the text to use, so the test double proposed no change." }), n)] };
+    }
+  }
+  if (proposal === undefined) return { tool_calls: [toolCall("final_answer", answerOf({ insufficientReason: "The test double does not correct this kind of change." }), n)] };
+  if (proposal?.error) return { tool_calls: [toolCall("final_answer", answerOf({ insufficientReason: `Nexus refused the correction: ${proposal.error}` }), n)] };
+  return { tool_calls: [toolCall("final_answer", answerOf({ suggestions: (proposal?.changes ?? []).map((c) => ({ text: `Proposed for your review: ${c.summary}.`, sources })) }), n)] };
 }
 
 /** The answer after proposing: the grounded tracking, plus what was proposed (never "done"). */

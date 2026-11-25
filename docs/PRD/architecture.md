@@ -1,7 +1,8 @@
 # Nexus PRD: architecture
 
 - **Status:** Approved by Will at `7b775cd` (2026-11-24); amendments 1-4 applied (DEC-011 to DEC-014)
-- **Last updated:** 2026-11-25 (appearance preference in the profile, DEC-028)
+- **Last updated:** 2026-11-25 (appearance preference in the profile, DEC-028;
+  the correction loop as built, DEC-029)
 - **Traces to:** `structure.md` (PRD-xxx); intake R-*/D-*; decisions
   DEC-005 to DEC-014.
 
@@ -146,7 +147,7 @@ The session model below implements amendment 1 (DEC-011).
 | Calendar | `GET /calendar?from&to` (events + dated issues), `POST/PATCH/DELETE /events/{id}` |
 | Reminders | `GET/PUT /reminders/settings`, `POST /reminders/test`, `GET /notifications` |
 | Agent | `POST /conversations`, `POST /conversations/{id}/messages` (`mode: ask|edit`), `GET /conversations` |
-| Review | `GET /reviews?state=pending`, `POST /changes/{id}/accept`, `POST /changes/{id}/reject`, `POST /changes/{id}/feedback`, `POST /changes/{id}/resolve-conflict` |
+| Review | `GET /reviews?state=pending`, `POST /changes/{id}/accept`, `POST /changes/{id}/reject`, `POST /changes/{id}/feedback`, `POST /changes/{id}/correction` (retry) and `/correction/drop`, `POST /changes/{id}/resolve-conflict` |
 | Providers | `GET/POST/DELETE /providers`, `POST /providers/{id}/test`, `PUT /providers/{id}/session-key` (browser only) |
 | Appearance | `GET/PUT /appearance` (profile preference; publishes `appearance.changed`) |
 | Events | `GET /events` (SSE): `file.changed`, `review.updated`, `notification`, `run.progress` |
@@ -441,7 +442,19 @@ never built.)
   Edit mode scoped to the disputed target, with the rejected change and the
   reason in context. Its new change carries `supersedes`, and the rejected
   change becomes `superseded`. Accepted changes are never touched by a
-  correction. Rounds repeat without limit.
+  correction. Rounds repeat without limit. As built in run 6 (DEC-029,
+  `.kiro/specs/edit-first-journey/` Requirement 5):
+  - The reason is saved as the change's `feedback` before anything else, and
+    the run's progress is the change's `correction`
+    (`running | proposed | no-change | failed | dropped`), in the same
+    journal, so both survive a restart.
+  - Only Edit changes to an issue field or to note lines start a run. A
+    fixed-demo change, a new issue or a new link keeps the reason only.
+  - The run takes the change's conversation, is bound to that change and its
+    target, and is refused any other operation. A change becomes
+    `superseded` only after its correction's journal is written; recovery
+    completes a crash in between, and turns a `running` correction into
+    `failed`, with Retry.
 
 ### 7.5 Recovery and retries (R-C5)
 

@@ -12,6 +12,12 @@ export function useOpenChanges(): ChangeView[] {
   return q.data?.changes ?? [];
 }
 
+/** Rejected changes whose correction is running, failed or proposed nothing (PRD-064). */
+export function useCorrections(): ChangeView[] {
+  const q = useQuery({ queryKey: ["review", "corrections"], queryFn: () => api.get<{ changes: ChangeView[] }>("/review/changes?state=corrections") });
+  return q.data?.changes ?? [];
+}
+
 export const incompleteRunsKey = ["review", "incomplete"] as const;
 
 export function useIncompleteRuns(): RunOutcome[] {
@@ -48,8 +54,10 @@ export type DecisionConfirm =
 
 // --- Tiny store: which rejected change is waiting for optional feedback, the last message, and
 // a decision waiting for confirmation because related changes would be decided with it. ---
-interface ReviewUiState { feedbackFor: ChangeView | null; message: string | null; confirm: DecisionConfirm | null }
-let uiState: ReviewUiState = { feedbackFor: null, message: null, confirm: null };
+// `correctionFor`: the rejected change whose correction this tab started; its corrected change
+// opens on its target once, when it appears.
+interface ReviewUiState { feedbackFor: ChangeView | null; message: string | null; confirm: DecisionConfirm | null; correctionFor: string | null }
+let uiState: ReviewUiState = { feedbackFor: null, message: null, confirm: null, correctionFor: null };
 const listeners = new Set<() => void>();
 export function setReviewUi(patch: Partial<ReviewUiState>): void {
   uiState = { ...uiState, ...patch };
@@ -84,6 +92,12 @@ export function useReviewActions() {
     // A rejected new issue no longer exists, so leave its page for the project's board.
     else if (action === "reject" && after.kind === "record.create" && after.recordKey) navigate(`/projects/${encodeURIComponent(after.recordKey.split("-")[0]!)}`);
   };
+  /** After the reason is sent or skipped: on to the next change awaiting review, if any. */
+  const moveOn = () => {
+    const open = client.getQueryData<{ changes: ChangeView[] }>(openChangesKey)?.changes ?? [];
+    const next = open.find((c) => c.state === "pending") ?? open[0];
+    if (next) navigate(changeUrl(next));
+  };
   const decide = useMutation({
     // `together` confirms that related changes are decided with this one: the changes it needs
     // when accepting, or the changes that need it when rejecting.
@@ -105,7 +119,12 @@ export function useReviewActions() {
             : "This text was edited after the change, so Nexus kept the newer version and changed nothing.", feedbackFor: null, confirm: null });
       }
       await refresh();
-      if (result.state !== "conflicted") await goNext(change, action);
+      // A rejection asks why. Stay on its target until the reason is sent or skipped, so the
+      // next change's page does not take focus from the question, and a correction lands here.
+      // A rejected new issue no longer has a page, so its board opens instead.
+      const asksWhy = action === "reject" && result.state === "rejected";
+      if (asksWhy && change.kind === "record.create" && change.recordKey) navigate(`/projects/${encodeURIComponent(change.recordKey.split("-")[0]!)}`);
+      else if (result.state !== "conflicted" && !asksWhy) await goNext(change, action);
     },
     onError: (e, { change, action }) => {
       const details = e instanceof ApiError ? (e.details as { reason?: string; changes?: Array<{ changeId: string; summary: string }> } | undefined) : undefined;
@@ -117,9 +136,34 @@ export function useReviewActions() {
       setReviewUi({ message: (e as Error).message, confirm: null });
     },
   });
+  // A reason is saved first. For an Edit change to a field or note lines it also starts a
+  // correction run, whose change opens here when it is proposed (PRD-064).
   const feedback = useMutation({
     mutationFn: ({ change, text }: { change: ChangeView; text: string }) => api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/feedback`, { text }),
-    onSuccess: () => setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change." }),
+    onSuccess: async (result) => {
+      const c = result.correction;
+      if (c?.state === "running") setReviewUi({ feedbackFor: null, correctionFor: result.changeId, message: "Your reason is saved. Nexus is preparing a corrected change from it." });
+      else if (c?.state === "proposed") setReviewUi({ feedbackFor: null, message: "A corrected change was already proposed for this one." });
+      else if (c?.state === "failed") setReviewUi({ feedbackFor: null, message: `Your reason is saved, but the correction did not start: ${c.message ?? "unknown error"}` });
+      else if (result.sourceKind === "agent" && !result.correctable) setReviewUi({ feedbackFor: null, message: "Your reason is saved with the rejected change. Nexus corrects changes to an issue field or to note lines; for a new issue or link, ask again in Edit." });
+      else setReviewUi({ feedbackFor: null, message: "Thanks. Your reason is saved with the rejected change." });
+      await refresh();
+      // A correction opens here when it is proposed; otherwise move on to the next change.
+      if (c?.state !== "running") moveOn();
+    },
+    onError: (e) => setReviewUi({ message: (e as Error).message }),
+  });
+  // Retry a correction from the saved reason, or keep the change rejected.
+  const correction = useMutation({
+    mutationFn: ({ change, action }: { change: ChangeView; action: "retry" | "drop" }) =>
+      api.post<ChangeView>(`/review/changes/${encodeURIComponent(change.changeId)}/correction${action === "drop" ? "/drop" : ""}`),
+    onSuccess: async (result, { action }) => {
+      if (action === "drop") setReviewUi({ message: `Kept rejected: ${result.summary}`, correctionFor: null });
+      else if (result.correction?.state === "running") setReviewUi({ correctionFor: result.changeId, message: "Nexus is preparing a corrected change from your reason." });
+      else setReviewUi({ message: result.correction?.message ?? "The correction did not start." });
+      await refresh();
+    },
+    onError: (e) => setReviewUi({ message: (e as Error).message }),
   });
   const runAction = useMutation({
     mutationFn: ({ runId, action, together = false }: { runId: string; action: "retry" | "discard"; together?: boolean }) =>
@@ -152,5 +196,5 @@ export function useReviewActions() {
       setReviewUi({ message: (e as Error).message, confirm: null });
     },
   });
-  return { decide, feedback, runAction };
+  return { decide, feedback, runAction, correction, moveOn };
 }

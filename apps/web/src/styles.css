@@ -285,6 +285,11 @@ a.button.primary:hover { background: var(--accent-hover); }
 .confirm-related { background: var(--pending-bg); border: 1px solid var(--pending); border-radius: 8px; padding: 0.5rem 0.75rem; }
 .confirm-related p { margin: 0 0 0.3rem; }
 .confirm-related ul { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
+/* A correction run started from a rejected change's reason (PRD-064). Not amber: nothing awaits review yet. */
+.correction-run { background: var(--sunk); border: 1px solid var(--line-strong); border-radius: 8px; padding: 0.5rem 0.75rem; overflow-wrap: anywhere; }
+.correction-run p { margin: 0 0 0.4rem; }
+.correction-run p:last-child { margin-bottom: 0; }
+.correction-tag { color: var(--accent-ink); font-weight: 600; }
 .cal-time { font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--ink-soft); }
 
 /* Reminders (B4). Placeholder styling: Hein owns the final design. */

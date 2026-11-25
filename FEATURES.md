@@ -503,7 +503,7 @@ open).
       the journal);
     - screenshots at 1360 × 900 and 390 × 844.
 
-### Run 6: run-5 repairs and light and dark appearance (verified by Kiro, 2026-11-25; no human review yet)
+### Run 6: run-5 repairs, light and dark appearance, and the J7 correction loop (verified by Kiro, 2026-11-25; no human review yet)
 
 - **Run-5 review repairs** (`e2dd950`, DEC-027). All thirteen findings from Astra 6.2's
   run-5 review are repaired, each with a test that failed first. The record is
@@ -529,7 +529,24 @@ open).
     `appearance-conversation.spec.ts` (the provider double, not AI),
     `wireframe-appearance.spec.ts` (3 tests), `appearance.test.ts` (6 tests) and
     screenshots of both themes at desktop and 390 px.
-
+- **The J7 correction loop** (DEC-029, PRD-064). Proved with the test double only, not a
+  live model.
+  - After a rejection, the review bar asks "What was wrong, or what should be kept?". Skip
+    changes nothing more.
+  - A reason for an Edit change to an issue field or to note lines starts a correction run in
+    the same conversation. The corrected change opens on the same target, highlighted, and
+    is accepted or rejected as usual. Rejecting it asks again, without limit.
+  - The correction may change only that target. Base values come from the workspace, so
+    accepted changes and manual edits stand.
+  - Sending the reason twice starts one run. A failed, interrupted or empty correction keeps
+    the reason, is listed in the bar after a restart, and offers **Retry correction** and
+    **Keep it rejected**.
+  - A demo change, a new issue or a new link keeps the reason only.
+  - Journey in Edge: Ask, Edit with a date, accept the new task, reject the date, send a
+    reason, restart, accept the corrected date. The files then hold exactly the accepted
+    changes, and under the test clock the date reminds once and opens NEX-1.
+  - Evidence: `correction.test.ts` (5 tests), `correction-http.test.ts` (7) and
+    `j7-correction.spec.ts` (2).
 ## Engineering foundations
 
 - **Workflow documents and steering** (Kiro, 2026-11-24). `AGENTS.md`,

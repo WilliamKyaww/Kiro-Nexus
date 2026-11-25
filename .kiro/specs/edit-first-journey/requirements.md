@@ -10,9 +10,9 @@ each one, with dependencies respected, and the files end up holding
 exactly what was accepted.
 
 This is the first slice of slice D (agent edits). Will authorised it on
-2026-11-24 as milestone 5 of run 4. Correction runs (feedback leading to a
-`supersedes` change), new notes, block insertions and "Restore original"
-are not in this slice.
+2026-11-24 as milestone 5 of run 4. New notes, block insertions and
+"Restore original" are not in this slice. Will authorised the correction
+loop (Requirement 5) on 2026-11-25 as stage 3 of overnight run 6.
 
 - **Traces to:**
   - J7 (structure section 4), in part: the checklist edit and the new
@@ -89,3 +89,30 @@ are not in this slice.
 2. Test-double runs SHALL NOT be presented as evidence of live model
    behaviour. Live Edit behaviour stays unverified until a real free
    provider has run it.
+
+### Requirement 5: The correction loop (run 6, stage 3; PRD-064, architecture 7.4)
+
+**User story:** As a user who rejected one change, I want to say what was wrong and get a
+corrected change on the same target, so that I can fix it without starting again.
+
+1. WHEN the user rejects a change, THEN the review bar SHALL ask "What was wrong, or what
+   should be kept?" with **Send reason** and **Skip**. Skip SHALL change nothing more.
+2. WHEN the user sends a reason for a rejected Edit change to an issue field or to note
+   lines, THEN Nexus SHALL save the reason in the journal before anything else, and start a
+   correction run in Edit mode, in the change's conversation. The run SHALL be given the
+   rejected change, its target and the reason.
+3. The correction run SHALL be bound to the workspace it started in, to the rejected change
+   and to its target: the same field of the same issue, or the note lines the rejected change
+   covered. Nexus SHALL refuse any other operation, and write nothing for it.
+4. The new change SHALL carry `supersedes` with the rejected change's ID, and the rejected
+   change SHALL become `superseded`, only once the new proposal is written to the journal.
+   The new change SHALL appear on the disputed target for an ordinary Accept or Reject.
+5. Accepted changes and manual edits SHALL be kept: the correction's base value is the
+   target's current value.
+6. Sending the same reason twice, or from two tabs, SHALL start at most one correction run.
+7. WHEN the correction run fails, is interrupted by a restart, or proposes nothing, THEN the
+   reason SHALL stay saved, the review bar SHALL say what happened, and offer **Retry
+   correction** and **Keep it rejected**.
+8. Rejecting a correction SHALL start the loop again, without limit.
+9. A rejected fixed-demo change, new issue or new link SHALL keep its reason only. Nexus
+   SHALL say that it saved the reason.

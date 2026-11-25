@@ -1,8 +1,8 @@
 # Implementation plan: the first Ask → Edit → Review journey
 
-This is the only checklist for this slice. The rest of J7 (the rejected
-date, the reason and the correction run) is task 5, and is not authorised
-yet.
+This is the only checklist for this slice. Task 5a, the correction loop of
+J7 (the rejected date, the reason and the correction run), was authorised
+in run 6 stage 3. The other items of task 5 are still not authorised.
 
 - [x] 1. Journal support for new issues, new links and dependencies
   - `record.create` and `record.addLink`, `{{issue:<ref>}}` references,
@@ -57,9 +57,20 @@ yet.
   - **Also:** a failed Edit turn offers **Retry Edit**, which asks first
     when the turn already proposed changes.
   - _Requirements: 2.2, 2.4, 2.5, 3.4 to 3.7_
-- [ ] 5. Not in this slice: the correction loop and other operations
-  - Feedback that starts a correction run whose change `supersedes` the
-    rejected one (PRD-064).
+- [x] 5a. The correction loop (Requirement 5, run 6 stage 3)
+  - Engine: `correction` on the change, `beginCorrection`, `endCorrection`,
+    `dropCorrection`, `propose` with `supersedes`, and recovery.
+  - Routes and the correction run: feedback, retry and drop; the scope check;
+    the correction prompt; the double's date rules.
+  - Review bar: preparing, failed and empty corrections with Retry and Keep it
+    rejected; opening the corrected change on its target.
+  - Evidence: `correction.test.ts`, `correction-http.test.ts` and
+    `j7-correction.spec.ts`.
+  - **Verified by Kiro, 2026-11-25,** with the test double only:
+    `correction.test.ts` (5 tests), `correction-http.test.ts` (7, real service)
+    and `j7-correction.spec.ts` (2, Edge). Live Edit corrections are unverified.
+  - _Requirements: 5.1 to 5.9, 4.1_
+- [ ] 5. Not in this slice: other operations
   - New notes and block insertions.
   - "Restore original" for ambiguous conflicts.
   - A live check of Edit with a real free provider (Requirement 4.2).
